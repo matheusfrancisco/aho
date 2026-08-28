@@ -1,0 +1,84 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/aho-*",
+    "crates/seams/*",
+    "crates/providers/*",
+    "crates/tools/*",
+    "crates/surfaces/*",
+    "crates/bundles/*",
+    "apps/*",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+# Real third-party dependencies, pinned by major. Each crate opts in via `x.workspace = true`.
+[workspace.dependencies]
+aho-types    = { path = "crates/aho-types" }
+aho-log      = { path = "crates/aho-log" }
+aho-cap      = { path = "crates/aho-cap" }
+aho-config   = { path = "crates/aho-config" }
+aho-policy   = { path = "crates/aho-policy" }
+aho-compose  = { path = "crates/aho-compose" }
+aho-session  = { path = "crates/aho-session" }
+aho-inspect  = { path = "crates/aho-inspect" }
+
+aho-llm        = { path = "crates/seams/aho-llm" }
+aho-fs         = { path = "crates/seams/aho-fs" }
+aho-proc       = { path = "crates/seams/aho-proc" }
+aho-sandbox    = { path = "crates/seams/aho-sandbox" }
+aho-approval   = { path = "crates/seams/aho-approval" }
+aho-skills     = { path = "crates/seams/aho-skills" }
+aho-mcp        = { path = "crates/seams/aho-mcp" }
+aho-goals      = { path = "crates/seams/aho-goals" }
+aho-subagent   = { path = "crates/seams/aho-subagent" }
+aho-control    = { path = "crates/seams/aho-control" }
+aho-embed      = { path = "crates/seams/aho-embed" }
+aho-memory     = { path = "crates/seams/aho-memory" }
+aho-formal     = { path = "crates/seams/aho-formal" }
+aho-tasks      = { path = "crates/seams/aho-tasks" }
+provider-auth = { path = "crates/providers/provider-auth" }
+llm-anthropic-messages = { path = "crates/providers/llm-anthropic-messages" }
+llm-openai-responses = { path = "crates/providers/llm-openai-responses" }
+
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml       = "0.8"
+toml_edit  = "0.22"
+blake3     = "1"
+clap       = { version = "4", features = ["derive"] }
+tokio      = { version = "1", features = ["full"] }
+tempfile   = "3"
+reqwest    = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+futures    = "0.3"
+globset    = "0.4"
+ignore     = "0.4"
+regex      = "1"
+libc       = "0.2"
+axum       = "0.8"
+ratatui    = "0.29"
+crossterm  = "0.28"
+# surface-web: HTTPS termination (already in the tree through reqwest's rustls-tls); surface-tui: wrap widths.
+rustls        = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+tokio-rustls  = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+unicode-width = "0.2"
+
+[workspace.lints.clippy]
+# Ambient authority is confined to audited provider/bootstrap items (clippy.toml).
+disallowed_methods = "deny"
+# Builder-style `let mut x = T::default(); x.field = ..` reads better for many-field inputs.
+field_reassign_with_default = "allow"
+unwrap_used = "warn"
+expect_used = "warn"
+
+# Keep a full workspace build small: line tables are enough for backtraces; hot deps optimized (12).
+[profile.dev]
+debug = "line-tables-only"
+incremental = false
+
+[profile.dev.package."*"]
+debug = false
