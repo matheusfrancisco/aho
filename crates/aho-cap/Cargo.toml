@@ -1,0 +1,16 @@
+[package]
+name = "aho-cap"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The one extension point: Capability, Deps, Manifest, Registrar, Composition, Resolver, Plan (02)."
+
+[dependencies]
+aho-types.workspace = true
+aho-log.workspace = true
+aho-config.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
