@@ -1,0 +1,32 @@
+[package]
+name = "aho-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The loop: pure next-step core + tokio driver; async tools, approvals, spill, compaction, checkpoints, rewind, resume; the Session API (01, 16)."
+
+[dependencies]
+aho-types.workspace = true
+aho-log.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-proc.workspace = true
+aho-fs.workspace = true
+aho-llm.workspace = true
+aho-control.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+world-host = { path = "../providers/world-host" }
+tool-fs = { path = "../tools/tool-fs" }
+tool-bash = { path = "../tools/tool-bash" }
+tool-jobs = { path = "../tools/tool-jobs" }
+tool-run-code = { path = "../tools/tool-run-code" }
+llm-scripted = { path = "../providers/llm-scripted" }
+
+[lints]
+workspace = true
