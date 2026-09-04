@@ -1,0 +1,19 @@
+[package]
+name = "aho-approval"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Approval channel seam: one-shot outcomes, turn-enclosed (04, 10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

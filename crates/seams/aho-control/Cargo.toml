@@ -1,0 +1,16 @@
+[package]
+name = "aho-control"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "What drivers (schedules, ralph loops) and session modes (plan mode) may ask of a live session: prompt sink, clock, ceiling (01, 04, 10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "aho-llm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Llm seam: protocol-keyed streaming, late-result rendering policy per adapter (01, 16)"
+
+[dependencies]
+aho-types.workspace = true
+aho-log.workspace = true
+aho-cap.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
