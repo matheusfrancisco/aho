@@ -1,0 +1,13 @@
+[package]
+name = "aho-display"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Guarded desktop capture and input in the bound execution world"
+
+[dependencies]
+aho-cap = { path = "../../aho-cap", version = "0.0.1" }
+serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

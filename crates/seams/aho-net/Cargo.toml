@@ -1,0 +1,14 @@
+[package]
+name = "aho-net"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sandbox Ethernet attachment, persisted network policy, and flow events"
+
+[dependencies]
+aho-cap = { path = "../../aho-cap" }
+serde = { version = "1", features = ["derive"] }
+ipnet = { version = "2", features = ["serde"] }
+
+[lints]
+workspace = true

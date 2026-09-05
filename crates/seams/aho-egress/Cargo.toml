@@ -1,0 +1,15 @@
+[package]
+name = "aho-egress"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Egress seam: the bound world's network as a bounded HTTP fetch, plus the operator's host allow/deny list (07)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
