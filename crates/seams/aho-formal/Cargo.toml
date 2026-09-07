@@ -1,0 +1,21 @@
+[package]
+name = "aho-formal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Formal seam: TLA+/Lean check, trace validation, prove, mutate; trace_of; the literate System Spec (13, 14)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+# trace_of maps Task/* entries through aho_tasks::tla_record (Tasks.tla)
+aho-tasks.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

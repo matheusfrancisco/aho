@@ -1,0 +1,15 @@
+[package]
+name = "aho-tasks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Task graph seam: swarm DAG, artifacts, gates, control (12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

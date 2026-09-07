@@ -1,0 +1,17 @@
+[package]
+name = "aho-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Memory seam: hybrid retrieval, rerank, suppression, extraction hooks (12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-embed.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

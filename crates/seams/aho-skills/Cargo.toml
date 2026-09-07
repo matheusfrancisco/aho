@@ -1,0 +1,15 @@
+[package]
+name = "aho-skills"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Skills seam: SKILL.md parsing (Untrusted), catalog snapshot, shared invocation render (10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-policy.workspace = true
+globset.workspace = true
+
+[lints]
+workspace = true
