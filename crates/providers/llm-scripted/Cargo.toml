@@ -1,0 +1,21 @@
+[package]
+name = "llm-scripted"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Deterministic scripted model route for system tests (01)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-llm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+aho-log.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

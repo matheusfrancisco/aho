@@ -1,0 +1,21 @@
+[package]
+name = "llm-pi-messages"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native pi-messages protocol adapter for the Radius gateway"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-llm.workspace = true
+provider-auth.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+aho-log.workspace = true
+
+[lints]
+workspace = true

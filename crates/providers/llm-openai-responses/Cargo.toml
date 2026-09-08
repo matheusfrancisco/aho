@@ -1,0 +1,21 @@
+[package]
+name = "llm-openai-responses"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OpenAI Responses protocol adapter for Codex, Meta, xAI and compatible endpoints"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-llm.workspace = true
+provider-auth.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

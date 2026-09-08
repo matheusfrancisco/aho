@@ -1,0 +1,24 @@
+[package]
+name = "llm-anthropic-messages"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Anthropic Messages protocol adapter; late results render as user blocks (16)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-llm.workspace = true
+provider-auth.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+aho-log.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

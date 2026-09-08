@@ -1,0 +1,15 @@
+{
+  "steps": [
+    {
+      "expect_last_user_contains": "run the tests",
+      "text": "Starting the suite.",
+      "tool_calls": [{ "id": "c1", "name": "bash", "args": { "command": "cargo test" } }]
+    },
+    {
+      "expect_tool_result_contains": "passed",
+      "thinking": "All tests passed.",
+      "text": "All green.",
+      "stop": "end_turn"
+    }
+  ]
+}

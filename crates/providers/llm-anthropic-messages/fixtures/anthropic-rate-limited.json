@@ -1,0 +1,1 @@
+{"type":"error","error":{"type":"rate_limit_error","message":"This request would exceed the rate limit for your organization (8d1c1a2e-0000-4000-8000-00000000a40b) of 30,000 input tokens per minute. For details, refer to: https://docs.claude.com/en/api/rate-limits. You can see the response headers for current usage."},"request_id":"req_011CSHq7rXk2Tb9Zc5Jm1Pw3"}

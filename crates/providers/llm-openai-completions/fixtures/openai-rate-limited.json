@@ -1,0 +1,8 @@
+{
+  "error": {
+    "message": "Rate limit reached for gpt-4.1-mini in organization org-aho on tokens per min (TPM): Limit 200000, Used 199500, Requested 1206. Please try again in 7s. Visit https://platform.openai.com/account/rate-limits to learn more.",
+    "type": "tokens",
+    "param": null,
+    "code": "rate_limit_exceeded"
+  }
+}
