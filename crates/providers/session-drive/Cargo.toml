@@ -1,0 +1,28 @@
+[package]
+name = "session-drive"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Hosts the schedule and ralph-loop drivers next to a live Session: SessionSink, DriverSeed, host() (00, 01, 10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-session.workspace = true
+aho-control = { path = "../../seams/aho-control" }
+tool-schedule = { path = "../../tools/tool-schedule" }
+tool-workflow = { path = "../../tools/tool-workflow" }
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true
+aho-config.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-llm.workspace = true
+llm-scripted = { path = "../llm-scripted" }
+
+[lints]
+workspace = true

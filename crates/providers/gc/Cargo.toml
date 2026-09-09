@@ -1,0 +1,37 @@
+[package]
+name = "gc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "`aho gc [--dry-run]`: orphans by owner session and age — unreachable snapshot trees, worktrees of gone/closed sessions, unreferenced spill files, children of dead identities (04, 11, 12)"
+
+[dependencies]
+world-ns = { path = "../world-ns" }
+world-vm = { path = "../world-vm" }
+net-userspace = { path = "../net-userspace" }
+aho-types.workspace = true
+aho-log.workspace = true
+aho-proc.workspace = true
+aho-inspect.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+aho-vm = { path = "../../seams/aho-vm" }
+serde = { version = "1" }
+tempfile.workspace = true
+tokio.workspace = true
+aho-config.workspace = true
+aho-fs.workspace = true
+world-host = { path = "../world-host" }
+# tests/session_children.rs: a real session's bash job is the child gc reaps once its owner dies
+aho-cap.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+aho-llm.workspace = true
+aho-session.workspace = true
+llm-scripted = { path = "../llm-scripted" }
+tool-bash = { path = "../../tools/tool-bash" }
+
+[lints]
+workspace = true

@@ -1,0 +1,34 @@
+[package]
+name = "pty-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Terminals on the host: portable-pty sessions rendered by vt100, process-tree close; world = host only (07)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-proc.workspace = true
+aho-sandbox.workspace = true
+aho-term = { path = "../../seams/aho-term" }
+tokio.workspace = true
+# PTY allocation + controlling-tty spawn (the only way to get a pty without `unsafe` here) and the
+# VT emulator for screen snapshots. vt100 0.15 (not 0.16): 0.16 needs unicode-width ^0.2.1, which
+# conflicts with ratatui's `=0.2.0` pin; 0.15 uses the unicode-width 0.1 already in the lock.
+# `vte` 0.11 is vt100's own parser, reused for the transcript.
+portable-pty = "0.9"
+vt100 = "0.15"
+vte = "0.11"
+
+[target.'cfg(unix)'.dependencies]
+# Safe wrappers for kill(2)/killpg(2)/getsid(2); already in the graph through portable-pty.
+nix = { version = "0.28", default-features = false, features = ["signal", "process"] }
+
+[dev-dependencies]
+world-host = { path = "../world-host" }
+aho-config.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
