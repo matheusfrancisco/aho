@@ -1,0 +1,32 @@
+[package]
+name = "world-vm"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+aho-cap = { path = "../../aho-cap" }
+aho-config = { path = "../../aho-config" }
+aho-types = { path = "../../aho-types" }
+aho-log = { path = "../../aho-log" }
+aho-fs = { path = "../../seams/aho-fs" }
+aho-proc = { path = "../../seams/aho-proc" }
+aho-sandbox = { path = "../../seams/aho-sandbox" }
+aho-term = { path = "../../seams/aho-term" }
+aho-net = { path = "../../seams/aho-net" }
+aho-vm = { path = "../../seams/aho-vm" }
+aho-display = { path = "../../seams/aho-display" }
+vm-guest = { path = "../vm-guest" }
+vm-rfb = { path = "../vm-rfb" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+blake3 = "1"
+fs2 = "0.4"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+net-userspace = { path = "../net-userspace" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

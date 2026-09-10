@@ -1,0 +1,31 @@
+[package]
+name = "world-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Host world: fs + processes + shadow-git snapshots on the host; optional git worktree; enforced by: policy only (07, 11)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+aho-sandbox.workspace = true
+aho-egress = { path = "../../seams/aho-egress" }
+reqwest.workspace = true
+tokio.workspace = true
+ignore.workspace = true
+globset.workspace = true
+regex.workspace = true
+libc.workspace = true
+serde_json.workspace = true
+
+tempfile.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,29 @@
+[package]
+name = "world-ssh"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SSH world: fs + processes + shadow-git snapshots on a remote host over the system ssh client (ControlMaster); enforced by: remote host (07, 11, 15)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+aho-sandbox.workspace = true
+aho-egress = { path = "../../seams/aho-egress" }
+tokio.workspace = true
+ignore.workspace = true
+globset.workspace = true
+regex.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+# Plan tests: `seams.world = "ssh"` must pick this bundle over the host world.
+world-host = { path = "../world-host" }
+
+[lints]
+workspace = true

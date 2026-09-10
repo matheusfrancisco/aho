@@ -1,0 +1,34 @@
+[package]
+name = "world-ns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Rootless Linux namespace execution world with persistent private overlays"
+
+[[bin]]
+name = "aho-ns-helper"
+path = "src/main.rs"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+aho-sandbox.workspace = true
+aho-term = { path = "../../seams/aho-term" }
+aho-net = { path = "../../seams/aho-net" }
+world-host = { path = "../world-host" }
+pty-host = { path = "../pty-host" }
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+tokio.workspace = true
+libc.workspace = true
+
+[dev-dependencies]
+net-userspace = { path = "../net-userspace" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true
