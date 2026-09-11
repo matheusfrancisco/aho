@@ -1,0 +1,29 @@
+[package]
+name = "net-userspace"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Userspace Ethernet switch, DHCP/DNS/NTP and policy-gated host-socket NAT"
+
+[dependencies]
+aho-net = { path = "../../seams/aho-net" }
+aho-cap = { path = "../../aho-cap" }
+aho-config = { path = "../../aho-config" }
+aho-log = { path = "../../aho-log" }
+aho-types = { path = "../../aho-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ipnet = { version = "2", features = ["serde"] }
+# Three gateway addresses (IPv4, IPv6, IPv6 link-local router) on one interface.
+smoltcp = { version = "0.12", default-features = false, features = ["std", "medium-ethernet", "proto-ipv4", "proto-ipv6", "socket-tcp", "iface-max-addr-count-3"] }
+socket2 = { version = "0.6", features = ["all"] }
+hickory-proto = "0.26"
+fs2 = "0.4"
+if-addrs = "0.13"
+
+[dev-dependencies]
+# A real userspace guest stack on the other end of the NIC socket (07: tests need no hypervisor or root).
+smoltcp = { version = "0.12", default-features = false, features = ["std", "medium-ethernet", "proto-ipv4", "proto-dhcpv4", "socket-dhcpv4", "socket-udp", "socket-tcp"] }
+
+[lints]
+workspace = true
