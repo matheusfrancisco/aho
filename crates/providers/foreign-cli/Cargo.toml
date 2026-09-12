@@ -1,0 +1,22 @@
+[package]
+name = "foreign-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Observe, don't wrap: host another agent CLI in tmux, tail its transcript by byte offset, mirror it into the parent log as Subagent/* entries, crash-honest receipts (08, 10, 12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+aho-subagent.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

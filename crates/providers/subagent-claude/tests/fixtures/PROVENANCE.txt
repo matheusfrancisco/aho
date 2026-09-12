@@ -1,0 +1,50 @@
+Recorded on this machine from real Claude Code transcripts (~/.claude/projects/<escaped cwd>/<session>.jsonl),
+every user-authored string replaced with synthetic text; field names, JSON types and nesting preserved.
+Installed binary when recorded: `claude --version` = 2.1.269 (Claude Code). Newest transcript on disk: 2.1.234.
+turn1.jsonl/turn2.jsonl: one interactive `cli` session, version 2.1.226; `__SESSION__`/`__CWD__` are filled in by tests/fake-claude.sh.
+records.jsonl: one record per kind (kind<TAB>version of the session it came from):
+ai-title	claude 2.1.226
+assistant/fallback	claude 2.1.197
+assistant/text	claude 2.1.226
+assistant/text/api-error	claude 2.1.234
+assistant/thinking	claude 2.1.226
+assistant/thinking,text	claude 2.1.138
+assistant/thinking,text,tool_use	claude 2.1.138
+assistant/tool_use	claude 2.1.226
+attachment/agent_listing_delta	claude 2.1.234
+attachment/command_permissions	claude 2.1.215
+attachment/date_change	claude 2.1.138
+attachment/deferred_tools_delta	claude 2.1.234
+attachment/directory	claude 2.1.138
+attachment/edited_text_file	claude 2.1.138
+attachment/file	claude 2.1.226
+attachment/hook_additional_context	claude 2.1.121
+attachment/mcp_instructions_delta	claude 2.1.220
+attachment/plan_mode	claude 2.1.121
+attachment/plan_mode_exit	claude 2.1.138
+attachment/queued_command	claude 2.1.121
+attachment/skill_listing	claude 2.1.234
+attachment/task_reminder	claude 2.1.226
+attachment/todo_reminder	claude 2.1.121
+file-history-delta	claude 2.1.226
+file-history-snapshot	claude 2.1.226
+last-prompt	claude 2.1.234
+mode	claude 2.1.226
+permission-mode	claude 2.1.226
+queue-operation/dequeue	claude 2.1.234
+queue-operation/enqueue	claude 2.1.234
+queue-operation/remove	claude 2.1.197
+system/api_error	claude 2.1.138
+system/local_command	claude 2.1.226
+system/model_consent_fallback	claude 2.1.226
+system/model_refusal_fallback	claude 2.1.197
+system/stop_hook_summary	claude 2.1.121
+system/turn_duration	claude 2.1.226
+user/interrupt	claude 2.1.220
+user/meta	claude 2.1.226
+user/prompt	claude 2.1.234
+user/text	claude 2.1.215
+user/tool_result	claude 2.1.226
+user/tool_result/error	claude 2.1.215
+user/tool_result/error/denied	claude 2.1.215
+user/tool_result/list	claude 2.1.220

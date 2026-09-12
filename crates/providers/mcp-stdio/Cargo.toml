@@ -1,0 +1,31 @@
+[package]
+name = "mcp-stdio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "MCP client over stdio JSON-RPC 2.0; registers each classified server's tools as `mcp__<server>__<tool>` (10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-mcp.workspace = true
+aho-proc = { path = "../../seams/aho-proc" }
+serde_json.workspace = true
+tokio.workspace = true
+
+# Test fixture only: a tiny MCP server the integration tests spawn via `CARGO_BIN_EXE_mcp-fixture`.
+[[bin]]
+name = "mcp-fixture"
+path = "tests/fixture/mcp_fixture.rs"
+test = false
+doc = false
+
+[dev-dependencies]
+tool-mcp-resources = { path = "../../tools/tool-mcp-resources" }
+world-host = { path = "../world-host" }
+parking_lot = "0.12"
+tokio.workspace = true
+
+[lints]
+workspace = true

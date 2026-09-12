@@ -1,0 +1,20 @@
+[package]
+name = "hooks-claude-code"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Claude Code hooks.json compatibility: command hooks on pre/post execute and session events, fail-closed (10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+futures.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

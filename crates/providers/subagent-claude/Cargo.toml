@@ -1,0 +1,23 @@
+[package]
+name = "subagent-claude"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Claude Code as a subagent: the real `claude` in tmux with the user's own credentials, observed through its JSONL transcript (08, 10, 12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-subagent.workspace = true
+serde_json.workspace = true
+foreign-cli = { path = "../foreign-cli" }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true
+aho-policy.workspace = true
+
+[lints]
+workspace = true

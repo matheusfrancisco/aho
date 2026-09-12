@@ -1,0 +1,44 @@
+Recorded on this machine from real Codex rollouts (~/.codex/sessions/YYYY/MM/DD/rollout-<local time>-<thread id>.jsonl),
+every user-authored string replaced with synthetic text; field names, JSON types and nesting preserved.
+Installed binary when recorded: `codex --version` = codex-cli 0.154.0.
+meta.jsonl/turn1.jsonl/turn2.jsonl/aborted.jsonl: one interactive codex-tui 0.153.2 session; `__SESSION__`/`__CWD__` are filled in by tests/fake-codex.sh.
+records.jsonl: one record per kind (kind<TAB>originator and cli_version of the session it came from):
+compacted	Codex Desktop 0.153.4
+event_msg/agent_message	Codex Desktop 0.153.4
+event_msg/agent_reasoning	Codex Desktop 0.153.4
+event_msg/context_compacted	Codex Desktop 0.153.4
+event_msg/item_completed/AgentMessage	codex-tui 0.153.2
+event_msg/item_completed/CommandExecution	codex-tui 0.153.2
+event_msg/item_completed/ContextCompaction	Codex Desktop 0.153.4
+event_msg/item_completed/Extension	codex-tui 0.153.2
+event_msg/item_completed/FileChange	Codex Desktop 0.153.4
+event_msg/item_completed/ImageView	codex-tui 0.153.2
+event_msg/item_completed/McpToolCall	Codex Desktop 0.153.4
+event_msg/item_completed/Reasoning	codex-tui 0.153.2
+event_msg/item_completed/UserMessage	codex-tui 0.154.0
+event_msg/item_completed/WebSearch	Codex Desktop 0.148.0-alpha.9
+event_msg/task_complete	codex-tui 0.153.2
+event_msg/task_started	codex-tui 0.154.0
+event_msg/thread_goal_updated	Codex Desktop 0.153.4
+event_msg/thread_settings_applied	codex-tui 0.153.2
+event_msg/token_count	codex-tui 0.154.0
+event_msg/turn_aborted	codex-tui 0.154.0
+event_msg/user_message	Codex Desktop 0.153.4
+response_item/compaction	Codex Desktop 0.153.4
+response_item/custom_tool_call	codex-tui 0.153.2
+response_item/custom_tool_call_output	codex-tui 0.153.2
+response_item/function_call	codex-tui 0.153.2
+response_item/function_call_output	codex-tui 0.153.2
+response_item/message/assistant/None	codex_vscode 0.77.0
+response_item/message/assistant/commentary	codex-tui 0.153.2
+response_item/message/assistant/final_answer	codex-tui 0.153.2
+response_item/message/developer	codex-tui 0.154.0
+response_item/message/user	codex-tui 0.154.0
+response_item/reasoning	codex-tui 0.153.2
+response_item/web_search_call	Codex Desktop 0.125.0-alpha.3
+session_meta/cli	codex-tui 0.154.0
+session_meta/subagent	Codex Desktop 0.153.4
+session_meta/vscode	Codex Desktop 0.153.4
+token_usage_record	codex-tui 0.153.2
+turn_context	codex-tui 0.154.0
+world_state	codex-tui 0.154.0

@@ -1,0 +1,33 @@
+[package]
+name = "subagent-acp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "External ACP agents as subagents: aho as the ACP client; child updates mirrored into the parent log, permission requests to the parent's operator (08, 10, 12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-subagent.workspace = true
+aho-acp = { path = "../../seams/aho-acp" }
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+aho-llm.workspace = true
+aho-session.workspace = true
+surface-acp = { path = "../../surfaces/surface-acp" }
+llm-scripted = { path = "../llm-scripted" }
+tempfile.workspace = true
+
+# Spawns its own binary as the ACP agent (aho's surface on real stdin/stdout), so it owns `main`.
+[[test]]
+name = "stdio"
+harness = false
+
+[lints]
+workspace = true
