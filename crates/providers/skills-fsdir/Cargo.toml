@@ -1,0 +1,20 @@
+[package]
+name = "skills-fsdir"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Skills from directories: SKILL.md discovery (precedence by root rank), per-skill enable switches (10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-policy.workspace = true
+aho-skills.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

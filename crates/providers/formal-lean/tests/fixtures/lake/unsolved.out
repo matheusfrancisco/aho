@@ -1,0 +1,18 @@
+✖ [2/3] Building Proofs.Unsolved
+trace: .> LEAN_PATH=././.lake/build/lib LD_LIBRARY_PATH= lean ././Proofs/Unsolved.lean -R ./. -o ././.lake/build/lib/Proofs/Unsolved.olean -i ././.lake/build/lib/Proofs/Unsolved.ilean -c ././.lake/build/ir/Proofs/Unsolved.c --json
+error: ././Proofs/Unsolved.lean:8:16: unsolved goals
+case succ
+k : Nat
+ih : 2 * gauss k = k * (k + 1)
+⊢ 2 * (gauss k + (k + 1)) =
+    (k + 1) * (k + 1 + 1)
+error: ././Proofs/Unsolved.lean:11:54: type mismatch
+  h
+has type
+  x < y : Prop
+but is expected to have type
+  x ≤ y : Prop
+error: Lean exited with code 1
+Some required builds logged failures:
+- Proofs.Unsolved
+error: build failed

@@ -1,0 +1,28 @@
+#exit 150
+TLC2 Version 2026.09.25.163503 (rev: 8f4bc8b)
+Running breadth-first search Model-Checking with fp 47 and seed 6872874995601422870 with 1 worker on 14 cores with 8192MB heap and 64MB offheap memory [pid: 40550] (Mac OS X 26.5.2 aarch64, Eclipse Adoptium 21.0.7 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file <work>/Broken.tla
+***Parse Error***
+Was expecting "==== or more Module body"
+Encountered "1" at line 6, column 20 and token "+" 
+
+Residual stack trace follows:
+Module definition starting at line 1, column 1.
+
+
+Fatal errors while parsing TLA+ spec in file Broken
+
+In module Broken
+
+Could not parse module Broken from file Broken.tla
+*** Errors: 1
+
+In module Broken
+
+Could not parse module Broken from file Broken.tla
+
+
+
+Starting... (2026-09-26 16:50:36)
+Error: Parsing or semantic analysis failed.
+Finished in 00s at (2026-09-26 16:50:36)

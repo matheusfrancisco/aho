@@ -1,0 +1,25 @@
+#exit 11
+TLC2 Version 2026.09.25.163503 (rev: 8f4bc8b)
+Running breadth-first search Model-Checking with fp 29 and seed -8011465729962113282 with 1 worker on 14 cores with 8192MB heap and 64MB offheap memory [pid: 40536] (Mac OS X 26.5.2 aarch64, Eclipse Adoptium 21.0.7 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file <work>/Pass.tla
+Parsing file <tlc-tmp>/Naturals.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/Naturals.tla)
+Semantic processing of module Naturals
+Semantic processing of module Pass
+Linting of module Pass
+Starting... (2026-09-26 16:50:36)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-09-26 16:50:36.
+Error: Deadlock reached.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+x = 0
+
+State 2: <Next line 9, col 5 to line 10, col 17 of module Pass>
+x = 1
+
+State 3: <Next line 9, col 5 to line 10, col 17 of module Pass>
+x = 2
+
+3 states generated, 3 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 3.
+Finished in 00s at (2026-09-26 16:50:36)

@@ -1,0 +1,25 @@
+[package]
+name = "memory-local"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Long-term memory capability: JSON store under ~/.aho/memory, hybrid retrieval, suppression, extraction, maintenance (12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-embed.workspace = true
+aho-memory.workspace = true
+aho-llm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+embed-local = { path = "../embed-local" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,26 @@
+[package]
+name = "formal-lean"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Lean 4 provider for the Formal seam: lake build goals, Charon + Aeneas translation, definition mutants (13)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-formal.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+serde_json.workspace = true
+
+tempfile.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+world-host = { path = "../world-host" }
+tokio.workspace = true
+aho-log.workspace = true
+
+[lints]
+workspace = true

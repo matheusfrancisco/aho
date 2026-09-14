@@ -1,0 +1,33 @@
+#exit 75
+TLC2 Version 2026.09.25.163503 (rev: 8f4bc8b)
+Running breadth-first search Model-Checking with fp 78 and seed 176629703823839576 with 1 worker on 14 cores with 8192MB heap and 64MB offheap memory [pid: 40752] (Mac OS X 26.5.2 aarch64, Eclipse Adoptium 21.0.7 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file <work>/Calls.tla
+Parsing file <tlc-tmp>/Naturals.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/Naturals.tla)
+Parsing file <tlc-tmp>/Sequences.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/Sequences.tla)
+Parsing file <tlc-tmp>/FiniteSets.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file <tlc-tmp>/TLC.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/TLC.tla)
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module Calls
+Linting of module Calls
+Starting... (2026-09-26 16:50:40)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-09-26 16:50:40.
+Error: Successor state is not completely specified by action Call of the next-state relation. The following variable is not defined: results.
+
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ results = <<>>
+/\ done = {}
+/\ open = {}
+
+State 2: <Call(c1) line 15, col 5 to line 18, col 25 of module Calls>
+/\ results = null
+/\ done = {}
+/\ open = {c1}
+
+2 states generated, 1 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 1.
+Finished in 00s at (2026-09-26 16:50:40)

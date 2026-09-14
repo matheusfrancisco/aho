@@ -1,0 +1,37 @@
+#exit 12
+TLC2 Version 2026.09.25.163503 (rev: 8f4bc8b)
+Running breadth-first search Model-Checking with fp 26 and seed 6490022364076781165 with 1 worker on 14 cores with 8192MB heap and 64MB offheap memory [pid: 40680] (Mac OS X 26.5.2 aarch64, Eclipse Adoptium 21.0.7 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file <work>/Calls.tla
+Parsing file <tlc-tmp>/Naturals.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/Naturals.tla)
+Parsing file <tlc-tmp>/Sequences.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/Sequences.tla)
+Parsing file <tlc-tmp>/FiniteSets.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file <tlc-tmp>/TLC.tla (jar:file:<tla2tools.jar>!/tla2sany/StandardModules/TLC.tla)
+Semantic processing of module Naturals
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module Calls
+Linting of module Calls
+Starting... (2026-09-26 16:50:39)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-09-26 16:50:39.
+Error: Invariant AtMostOneResult is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ results = <<>>
+/\ done = {}
+/\ open = {}
+
+State 2: <Result(c1) line 21, col 5 to line 25, col 36 of module Calls>
+/\ results = <<c1>>
+/\ done = {c1}
+/\ open = {}
+
+State 3: <Result(c1) line 21, col 5 to line 25, col 36 of module Calls>
+/\ results = <<c1, c1>>
+/\ done = {c1}
+/\ open = {}
+
+11 states generated, 9 distinct states found, 4 states left on queue.
+The depth of the complete state graph search is 3.
+Finished in 00s at (2026-09-26 16:50:39)

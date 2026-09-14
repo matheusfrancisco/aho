@@ -1,0 +1,23 @@
+[package]
+name = "selfdev"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Self-dev reload: immutable builds, smoke boot, channel symlinks, logged activation with fold-backed rollback (12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+world-host = { path = "../world-host" }
+
+[lints]
+workspace = true

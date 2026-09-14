@@ -1,0 +1,27 @@
+[package]
+name = "formal-tlc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "TLC provider for the TLA+ Formal seam: model checking, trace validation, mutation (13)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-formal.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+world-host = { path = "../world-host" }
+# tests/tasks_tla.rs: the aho-tasks simulator's trace is validated against formal/Tasks.tla
+aho-tasks.workspace = true
+tokio.workspace = true
+aho-types.workspace = true
+
+[lints]
+workspace = true
