@@ -1,0 +1,25 @@
+[package]
+name = "tool-terminal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "terminal_open/send/read/resize/close/list over the Terminals seam; screen + transcript cursor reads with wait-for-regex (00, 07)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+aho-term = { path = "../../seams/aho-term" }
+serde_json.workspace = true
+tokio.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+pty-host = { path = "../../providers/pty-host" }
+world-host = { path = "../../providers/world-host" }
+aho-config.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "tool-bash"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "bash / bash_persistent with the blast-radius classifier as tool check; output streamed into the op (04, 12, 16)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-proc.workspace = true
+aho-policy.workspace = true
+aho-config.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+world-host = { path = "../../providers/world-host" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,24 @@
+[package]
+name = "tool-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "lsp_definition/references/hover/diagnostics/symbols/rename_preview over language servers spawned in the bound world (00, 01)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+globset.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+world-host = { path = "../../providers/world-host" }
+tempfile.workspace = true
+
+[lints]
+workspace = true
