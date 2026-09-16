@@ -1,0 +1,24 @@
+[package]
+name = "tool-plan-mode"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "enter_plan_mode / exit_plan_mode: narrow the live session policy to read-only; only an operator-approved plan widens it back (04, 10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-goals.workspace = true
+aho-control = { path = "../../seams/aho-control" }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+aho-config.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,33 @@
+[package]
+name = "tool-tasks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Swarm task-graph tools: task_seed / expand / claim / complete / checkpoint / status / control (12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-tasks.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+# the invariant rows a verify gate is judged against (aho invariants, 13)
+aho-inspect.workspace = true
+globset.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+# tests/session.rs: the verify-gate rule in a live session
+aho-session.workspace = true
+aho-llm.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+tool-fs = { path = "../tool-fs" }
+
+[lints]
+workspace = true
