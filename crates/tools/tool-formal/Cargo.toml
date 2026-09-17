@@ -1,0 +1,34 @@
+[package]
+name = "tool-formal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "spec_check / spec_trace / lean_build / lean_translate / invariant_add / invariant_mutate; spec mode (13, 14)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-formal.workspace = true
+aho-fs.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+formal-tlc = { path = "../../providers/formal-tlc" }
+world-host = { path = "../../providers/world-host" }
+aho-proc.workspace = true
+# tests/session_stale.rs: a live session checkpoints, checks with real TLC, and a verify gate follows
+aho-session.workspace = true
+aho-llm.workspace = true
+aho-inspect.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+tool-fs = { path = "../tool-fs" }
+tool-tasks = { path = "../tool-tasks" }
+
+[lints]
+workspace = true

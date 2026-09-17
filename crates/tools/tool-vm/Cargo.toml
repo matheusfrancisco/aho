@@ -1,0 +1,18 @@
+[package]
+name = "tool-vm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The 13 vm_* tools over the session's VM lab (aho-vm): machines from operator recipes, console, screen, under a lease (00, 07)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-vm = { path = "../../seams/aho-vm" }
+aho-display = { path = "../../seams/aho-display" }
+tool-terminal = { path = "../tool-terminal" }
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

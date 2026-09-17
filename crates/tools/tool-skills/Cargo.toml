@@ -1,0 +1,23 @@
+[package]
+name = "tool-skills"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "`skill` tool, <available_skills> catalog context, `/name` invocation render (10)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-skills.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+aho-config.workspace = true
+aho-policy.workspace = true
+skills-fsdir = { path = "../../providers/skills-fsdir" }
+futures.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

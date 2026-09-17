@@ -1,0 +1,27 @@
+[package]
+name = "tool-subagent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "subagent, subagent_fork, send_message, interrupt_agent, list_agents over the subagent seam; lifecycle entries in the parent log (04, 10, 12, 16)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-policy.workspace = true
+aho-subagent.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+aho-config.workspace = true
+aho-approval.workspace = true
+aho-session.workspace = true
+aho-llm.workspace = true
+subagent-inproc = { path = "../../providers/subagent-inproc" }
+llm-scripted = { path = "../../providers/llm-scripted" }
+
+[lints]
+workspace = true
