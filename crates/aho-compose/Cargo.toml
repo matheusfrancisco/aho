@@ -1,0 +1,24 @@
+[package]
+name = "aho-compose"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "load(Composition, Inputs) -> Planned (loadout + plan + env); bootstrap log entries; aho.lock; loadouts; apply; plan diff (03)."
+
+[dependencies]
+aho-types.workspace = true
+aho-log.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-policy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+toml_edit.workspace = true
+
+[dev-dependencies]
+aho-inspect.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
