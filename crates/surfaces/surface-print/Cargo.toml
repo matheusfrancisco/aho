@@ -1,0 +1,18 @@
+[package]
+name = "surface-print"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "one-shot print / --json; wrapper contract: quiet, JSON on stdout, stderr empty unless real (08, 12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-llm.workspace = true
+aho-policy.workspace = true
+aho-session.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

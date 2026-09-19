@@ -1,0 +1,603 @@
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
+use aho_approval::{Decided, NeverApproval};
+use aho_cap::{BoundWorld, Composition, Registry};
+use aho_config::{FileSnapshot, Layer};
+use aho_inspect::{Missing, TreeNode};
+use aho_llm::LlmRoute;
+use aho_log::{CapState, CheckpointCause, EntryKind, GrantScope, LogStore, MemoryLog, RewindMode, ToolOutcome, Transition};
+use aho_policy::{ApprovalCard, DecisionReason};
+use aho_session::{Boot, Session};
+use aho_types::*;
+use llm_scripted::{ScriptedLlm, ScriptedStop, Step};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use serde_json::json;
+
+use crate::*;
+
+fn key(code: KeyCode) -> KeyEvent {
+    KeyEvent::new(code, KeyModifiers::NONE)
+}
+
+/// Draws through ratatui's `TestBackend` (the same `draw` the terminal loop uses).
+fn screen(ui: &UiState, w: u16, h: u16) -> String {
+    let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
+    term.draw(|f| {
+        let mut probe = Probe::default();
+        let area = f.area();
+        draw(ui, area, f.buffer_mut(), &mut probe);
+    })
+    .unwrap();
+    let buf = term.backend().buffer().clone();
+    buffer_lines(&buf, buf.area).join("\n")
+}
+
+fn region(text: &str, from: &str, rows: usize) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let start = lines.iter().position(|l| l.contains(from)).unwrap_or(0);
+    lines[start..(start + rows).min(lines.len())].join("\n")
+}
+
+fn vm_card(cut: Option<&str>) -> ApprovalCard {
+    ApprovalCard {
+        tool: "vm_start".into(),
+        class: Consequence::ControlsVM,
+        args: json!({"name": "ubuntu-24"}),
+        reason: DecisionReason::Preset("dev".into()),
+        world: BoundWorld { name: "namespace".into(), confines: true, enforced_by: "linux namespaces".into() },
+        suggested_cut: cut.map(str::to_string),
+        rendered: "preset `dev` does not allow ControlsVM".into(),
+    }
+}
+
+fn log_with(kinds: Vec<(Principal, EntryKind)>) -> Vec<aho_log::Entry> {
+    let log = MemoryLog::new();
+    kinds.into_iter().map(|(by, k)| log.append(None, by, k).unwrap()).collect()
+}
+
+fn model() -> Principal {
+    Principal::system("model")
+}
+
+#[test]
+fn approval_modal_renders_the_card_fields_and_answers_with_the_doc_keys() {
+    let mut ui = UiState::default();
+    ui.state.policy.epoch = Epoch(3);
+    ui.approval = Some(ApprovalView::new(&vm_card(Some("preset lab")), Some("tool-vm".into()), &ui.state));
+    let text = screen(&ui, 90, 26);
+    let card = region(&text, "┌ approval", 10);
+    println!("--- approval modal (TestBackend 90x26) ---\n{card}");
+    for needle in [
+        "tool-vm.vm_start",
+        "class: ControlsVM",
+        "args: { name: \"ubuntu-24\" }",
+        "why:  preset `dev` does not allow ControlsVM      (reason: Preset)",
+        "world: namespace (linux namespaces)  ·  lease: none yet",
+        "[a] allow once   [s] allow for session → opens epoch 4",
+        "[p] aho preset lab",
+        "[r] reject",
+        "[Esc] cancel",
+    ] {
+        assert!(card.contains(needle), "missing `{needle}` in\n{card}");
+    }
+
+    // The modal owns the keyboard: typing does not reach the draft.
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('x'))), None);
+    assert!(ui.local.draft.is_empty());
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('a'))), Some(Action::Answer(Decided::allowed(GrantScope::Once))));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('s'))), Some(Action::Answer(Decided::allowed(GrantScope::Session))));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('r'))), Some(Action::Answer(Decided::rejected())));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Esc)), Some(Action::Answer(Decided::cancelled())));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('p'))), Some(Action::PresetCut("lab".into())));
+}
+
+#[test]
+fn approval_without_a_preset_cut_offers_no_preset_key() {
+    let mut ui = UiState::default();
+    ui.approval = Some(ApprovalView::new(&vm_card(None), None, &ui.state));
+    let text = screen(&ui, 90, 26);
+    assert!(!text.contains("[p]"), "{text}");
+    assert!(text.contains("vm_start") && text.contains("opens epoch 2"), "{text}");
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('p'))), None);
+    assert!(ui.notice.as_deref().is_some_and(|n| n.contains("no single policy change")));
+
+    let long = "remove rule `ask write(*)` (File /Users/someone/projects/a-rather-long-workspace-name/aho.toml:10)";
+    let mut rule = vm_card(Some(long));
+    rule.reason = DecisionReason::Rule { origin: "./aho.toml:10".into(), rule: "ask write(*)".into() };
+    ui.approval = Some(ApprovalView::new(&rule, None, &ui.state));
+    let (buf, frame) = capture(&ui, 100, 30);
+    let text = buffer_lines(&buf, buf.area).join("\n");
+    assert!(
+        text.contains("[p] aho remove rule") && text.contains("[r] reject") && text.contains("[Esc] cancel"),
+        "a long cut never pushes the refusal keys off the card:\n{text}"
+    );
+    assert!(frame.anomalies.is_empty(), "{:?}", frame.anomalies);
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('p'))), None, "a rule cut is not applied from the card");
+    assert!(ui.notice.as_deref().is_some_and(|n| n.contains("is not a preset change")));
+}
+
+fn node(id: &str, kind: &str, state: CapState, missing: Vec<Missing>, action: Option<&str>) -> TreeNode {
+    TreeNode {
+        id: id.into(),
+        kind: kind.into(),
+        origin: "bundled".into(),
+        source: None,
+        state,
+        because: String::new(),
+        bound: vec![],
+        classes: ConsequenceSet::EMPTY,
+        ceiling: ConsequenceSet::EMPTY,
+        enforced_by: String::new(),
+        settings: vec![],
+        missing,
+        action: action.map(str::to_string),
+        over_preset: None,
+        doc: String::new(),
+        children: vec![],
+    }
+}
+
+#[test]
+fn tree_tab_uses_the_state_glyphs_and_names_each_fix() {
+    let mut ui = UiState::default();
+    let mut mcp = node(
+        "mcp.github",
+        "mcp",
+        CapState::Locked { missing: vec!["Credential(github)".into()] },
+        vec![Missing { requirement: "Credential(github)".into(), fix: Some("aho credential set github".into()) }],
+        Some("aho credential set github"),
+    );
+    mcp.children.push(node("mcp__github__*", "tool", CapState::Locked { missing: vec![] }, vec![], None));
+    ui.tree = vec![
+        node("tool-fs", "tool", CapState::Active, vec![], None),
+        node("tool-terminal", "tool", CapState::Unlocked, vec![], Some("aho enable tool-terminal")),
+        mcp,
+        node("skill.pdf-extract", "skill", CapState::Broken { err: "frontmatter invalid at line 3".into() }, vec![], None),
+        node("web-search", "tool", CapState::Disabled { why: "--disable web-search".into() }, vec![], Some("aho enable web-search")),
+    ];
+    ui.local.tab = Tab::Tree;
+    let text = screen(&ui, 120, 24);
+    let side: String = text.lines().map(|l| l.chars().skip(80).collect::<String>()).collect::<Vec<_>>().join("\n");
+    println!("--- tree tab (TestBackend 120x24, sidebar columns) ---\n{side}");
+    for needle in [
+        "● tool-fs",
+        "○ tool-terminal",
+        "aho enable tool-terminal",
+        "◌ mcp.github",
+        "Credential(github)",
+        "fix: aho credential set github",
+        "  ◌ mcp__github__*",
+        "✕ skill.pdf-extract",
+        "frontmatter invalid at line 3",
+        "⊘ web-search",
+    ] {
+        assert!(side.contains(needle), "missing `{needle}` in\n{side}");
+    }
+    // alt-2 switches the tab without touching the draft.
+    on_key(&mut ui, KeyEvent::new(KeyCode::Char('2'), KeyModifiers::ALT));
+    assert_eq!(ui.local.tab, Tab::Inventory);
+    assert!(ui.local.draft.is_empty());
+}
+
+#[test]
+fn placeholder_card_flips_to_the_result_in_place() {
+    let call = CallId("c1".into());
+    let entries = log_with(vec![
+        (Principal::system("loop"), EntryKind::TurnStart { turn: TurnId(1) }),
+        (Principal::Operator, EntryKind::UserMessage { form: Form::Prompt, text: "list files".into(), client_key: None }),
+        (
+            model(),
+            EntryKind::AssistantMessage {
+                content: vec![
+                    ContentBlock::text("checking"),
+                    ContentBlock::ToolUse { id: call.clone(), name: "bash".into(), args: json!({"command": "ls"}) },
+                ],
+                usage: Usage::default(),
+                stop: StopReason::ToolUse,
+            },
+        ),
+        (
+            model(),
+            EntryKind::ToolCall {
+                call: call.clone(),
+                tool: "bash".into(),
+                args: json!({"command": "ls"}),
+                class: Consequence::SpawnsProcess,
+            },
+        ),
+        (
+            Principal::system("ops"),
+            EntryKind::OpStarted {
+                op: OpId(4),
+                call: call.clone(),
+                kind: aho_log::OpKind::Process,
+                rerunnable: false,
+                external_effect: false,
+            },
+        ),
+        (
+            Principal::system("tools"),
+            EntryKind::ToolResult {
+                call: call.clone(),
+                outcome: ToolOutcome::Ok,
+                value: json!({}),
+                content: vec![ContentBlock::text("a.txt\nb.txt")],
+                spill_ref: None,
+                meta: Some(Card::Terminal { command: "ls".into(), output: "a.txt\nb.txt".into(), exit: Some(0) }),
+                late: true,
+            },
+        ),
+    ]);
+    let caps = BTreeMap::from([("bash".to_string(), "tool-bash".to_string())]);
+    let mut ui = UiState { tool_caps: caps, ..UiState::default() };
+    ui.refold(&entries[..5], &Default::default()).unwrap();
+    let before = screen(&ui, 100, 20);
+    assert!(before.contains("╭ tool-bash.bash · SpawnsProcess ─ ⋯ running (op 4)"), "{before}");
+    let blocks = ui.transcript.blocks.len();
+    let card_at = ui.transcript.blocks.iter().position(|b| matches!(b.body, Body::Tool(_))).unwrap();
+
+    assert!(ui.transcript.continues(&entries[5]));
+    ui.apply(&entries[5], &Default::default()).unwrap();
+    let after = screen(&ui, 100, 20);
+    assert!(after.contains("╭ tool-bash.bash · SpawnsProcess ─ ✓ $ ls  → exit 0 (late)"), "{after}");
+    assert!(after.contains("b.txt") && !after.contains("⋯ running"), "{after}");
+    assert_eq!(ui.transcript.blocks.len(), blocks, "the result flips the card; it does not add a block");
+    assert!(matches!(&ui.transcript.blocks[card_at].body, Body::Tool(c) if c.result.is_some()));
+}
+
+#[test]
+fn checkpoint_marker_offers_the_three_rewind_modes_plan_first() {
+    let entries = log_with(vec![
+        (Principal::system("loop"), EntryKind::TurnStart { turn: TurnId(1) }),
+        (Principal::Operator, EntryKind::UserMessage { form: Form::Prompt, text: "implement A".into(), client_key: None }),
+        (
+            model(),
+            EntryKind::AssistantMessage { content: vec![ContentBlock::text("done")], usage: Usage::default(), stop: StopReason::EndTurn },
+        ),
+        (
+            Principal::system("checkpoint"),
+            EntryKind::WorkspaceCheckpoint { id: CheckpointId(2), tree: Hash::of(b"t2"), parent: None, cause: CheckpointCause::TurnEnd },
+        ),
+        (Principal::system("loop"), EntryKind::TurnEnd { turn: TurnId(1) }),
+    ]);
+    let mut ui = UiState::default();
+    ui.refold(&entries, &Default::default()).unwrap();
+    on_key(&mut ui, key(KeyCode::Tab));
+    assert_eq!(ui.local.focus, Focus::Transcript);
+    let marker = ui.transcript.blocks.iter().position(|b| matches!(b.body, Body::Checkpoint { .. })).unwrap();
+    ui.local.selected = Some(marker);
+    let text = screen(&ui, 100, 20);
+    assert!(text.contains("◆ checkpoint c2 · turn 1 · turn end"), "{text}");
+    assert!(text.contains("[enter] rewind: both · chat · code"), "{text}");
+
+    let cp = CheckpointId(2);
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::PlanRewind { checkpoint: cp, mode: RewindMode::Both }));
+    let picker = screen(&ui, 100, 20);
+    println!("--- rewind picker (TestBackend 100x20) ---\n{}", region(&picker, "rewind to c2", 12));
+    for needle in ["rewind to c2", "▸ [1] both ", "[2] chat ", "[3] code ", "computing the plan"] {
+        assert!(picker.contains(needle), "missing `{needle}` in\n{picker}");
+    }
+    // Enter before the plan is shown applies nothing.
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None);
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('3'))), Some(Action::PlanRewind { checkpoint: cp, mode: RewindMode::CodeOnly }));
+    ui.rewind.as_mut().unwrap().plan = Some(Ok(RewindPlan {
+        checkpoint: cp,
+        mode: RewindMode::CodeOnly,
+        fork_at: None,
+        restore: Some((vec!["src/a.rs".into()], vec!["b.rs".into()])),
+        kill: vec!["op3 bash".into()],
+    }));
+    let planned = screen(&ui, 100, 20);
+    assert!(planned.contains("restore files: 1 changed, 1 deleted  src/a.rs, b.rs"), "{planned}");
+    assert!(planned.contains("kill 1 running job(s): op3 bash"), "{planned}");
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Rewind { checkpoint: cp, mode: RewindMode::CodeOnly }));
+    assert!(ui.rewind.is_none());
+}
+
+#[test]
+fn enter_prompts_when_idle_and_steers_when_busy() {
+    let mut ui = UiState::default();
+    for c in "hello".chars() {
+        on_key(&mut ui, key(KeyCode::Char(c)));
+    }
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Prompt("hello".into())));
+    ui.busy = true;
+    on_key(&mut ui, key(KeyCode::Char('x')));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Steer { text: "x".into(), urgent: false }));
+    on_key(&mut ui, key(KeyCode::Char('y')));
+    assert_eq!(on_key(&mut ui, KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT)), Some(Action::Steer { text: "y".into(), urgent: true }));
+    assert_eq!(on_key(&mut ui, KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)), Some(Action::Abort));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None, "an empty draft sends nothing");
+}
+
+#[test]
+fn hud_annotates_blocks_with_their_origin() {
+    let call = CallId("c9".into());
+    let entries = log_with(vec![(
+        model(),
+        EntryKind::ToolCall { call, tool: "read".into(), args: json!({"path": "a"}), class: Consequence::ReadOnly },
+    )]);
+    let mut ui = UiState { tool_caps: BTreeMap::from([("read".to_string(), "tool-fs".to_string())]), ..UiState::default() };
+    ui.refold(&entries, &Default::default()).unwrap();
+    assert!(!screen(&ui, 100, 16).contains("↳ e"));
+    on_key(&mut ui, KeyEvent::new(KeyCode::Char('h'), KeyModifiers::ALT));
+    let text = screen(&ui, 100, 16);
+    assert!(text.contains(&format!("↳ e{} · by model · cap tool-fs · class ReadOnly", entries[0].id.0)), "{text}");
+}
+
+#[test]
+fn frame_capture_drops_identical_frames_unless_anomalous_and_flags_oscillation() {
+    let ui = UiState::default();
+    let mut ring = FrameCapture::new(8);
+    assert!(ring.record(capture(&ui, 100, 20).1).is_some());
+    assert!(ring.record(capture(&ui, 100, 20).1).is_none(), "an identical frame is dropped");
+    assert_eq!(ring.dropped(), 1);
+
+    let (_, tiny) = capture(&ui, 30, 6);
+    assert!(tiny.anomalies.iter().any(|a| a.contains("smaller than 40x10")), "{:?}", tiny.anomalies);
+    assert!(ring.record(tiny.clone()).is_some());
+    assert!(ring.record(tiny).is_some(), "an anomalous frame is kept even when identical");
+
+    let mut ring = FrameCapture::new(8);
+    let wide = capture(&ui, 100, 20).1;
+    let narrow = capture(&ui, 60, 20).1;
+    ring.record(wide.clone());
+    ring.record(narrow.clone());
+    ring.record(wide);
+    let flagged = ring.record(narrow).cloned().unwrap();
+    assert!(flagged.anomalies.iter().any(|a| a.starts_with(LAYOUT_OSCILLATION)), "{:?}", flagged.anomalies);
+    let names: Vec<&str> = flagged.rects.iter().map(|r| r.0.as_str()).collect();
+
+    // A layout that changes with the content (picker opens, its plan arrives, the mode changes)
+    // never repeats a screen, so it is not flicker.
+    let mut ring = FrameCapture::new(8);
+    let mut picker = UiState::default();
+    picker.rewind = Some(RewindPicker { checkpoint: CheckpointId(1), entry: EntryId(5), selected: RewindMode::Both, plan: None });
+    let plan = |mode| Some(Ok(RewindPlan { checkpoint: CheckpointId(1), mode, fork_at: Some(EntryId(5)), restore: None, kill: vec![] }));
+    let mut planned_both = picker.clone();
+    planned_both.rewind.as_mut().unwrap().plan = plan(RewindMode::Both);
+    let mut code = picker.clone();
+    code.rewind.as_mut().unwrap().selected = RewindMode::CodeOnly;
+    let mut planned_code = code.clone();
+    planned_code.rewind.as_mut().unwrap().plan = plan(RewindMode::CodeOnly);
+    for s in [&ui, &picker, &planned_both, &code, &planned_code] {
+        let kept = ring.record(capture(s, 100, 24).1).cloned().unwrap();
+        assert!(kept.anomalies.is_empty(), "{:?}", kept.anomalies);
+    }
+    assert_eq!(names, ["header", "transcript", "input", "footer"], "no sidebar below 72 columns");
+}
+
+#[test]
+fn headless_json_is_the_trimmed_screen_with_named_areas() {
+    let mut ui = UiState::default();
+    ui.local.draft = "draft text".into();
+    ui.local.cursor = 10;
+    let v = render_frame_json(&ui, 100, 20);
+    let lines = v["lines"].as_array().unwrap();
+    assert_eq!(lines.len(), 20);
+    assert!(lines.iter().all(|l| !l.as_str().unwrap().ends_with(' ')));
+    let input = v["areas"].as_array().unwrap().iter().find(|a| a["area"] == "input").unwrap();
+    assert!(input["text"].as_str().unwrap().contains("draft text"));
+    assert_eq!(v["modal"], "none");
+    assert_eq!(v["focus"], "input");
+}
+
+// ───────────────────────────── against a real session ─────────────────────────────
+
+struct Rig {
+    planned: aho_compose::Planned,
+    comp: Composition,
+    root: std::path::PathBuf,
+    home: std::path::PathBuf,
+    _dir: tempfile::TempDir,
+}
+
+fn rig() -> Rig {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().join("ws");
+    let home = dir.path().join("home");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(&home).unwrap();
+    std::process::Command::new("git").arg("init").arg("-q").current_dir(&root).status().unwrap();
+    std::fs::write(root.join("a.txt"), "alpha\n").unwrap();
+    let comp = Composition::new("tui-test").provide::<world_host::HostWorld>().consume::<tool_fs::ToolFs>().surface::<SurfaceTui>();
+    let text = format!(
+        "[model]\nprovider = \"scripted\"\n[tools]\ngrace_ms = 150\n[workspace]\nroot = \"{}\"\nshadow_dir = \"{}\"\n[policy]\npreset = \"workspace\"\n",
+        root.display(),
+        home.join("shadow").display()
+    );
+    let mut inputs = aho_compose::Inputs::new(&root, &home);
+    inputs.files.push(FileSnapshot { path: root.join("aho.toml").display().to_string(), layer: Layer::FileProject, text });
+    if let Ok(p) = std::env::var("PATH") {
+        inputs.env.insert("PATH".into(), p);
+    }
+    let planned = aho_compose::load(&comp, &inputs).unwrap();
+    Rig { planned, comp, root, home, _dir: dir }
+}
+
+async fn boot(r: &Rig, steps: Vec<Step>) -> Arc<Session> {
+    let mut seed = Registry::default();
+    seed.services.insert("llm:scripted".into(), Arc::new(LlmRoute(Arc::new(ScriptedLlm::from_steps(steps)))));
+    Session::boot(Boot {
+        id: SessionId(0x5eed),
+        composition: &r.comp,
+        plan: &r.planned.plan,
+        loadout: &r.planned.loadout,
+        bootstrap: aho_compose::bootstrap_entries(&r.planned),
+        log: Arc::new(MemoryLog::new()),
+        approval: Arc::new(NeverApproval),
+        operator: aho_policy::Operator::authenticate(aho_policy::OperatorProof::local_tty()),
+        workspace: r.root.display().to_string(),
+        home: r.home.display().to_string(),
+        spill_dir: r.home.join("spill"),
+        seed,
+    })
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn live_events_fold_to_the_same_screen_as_a_fresh_fold() {
+    let r = rig();
+    let s = boot(
+        &r,
+        vec![
+            Step::tool_call("read", json!({"path": "a.txt"})).with_stop(ScriptedStop::ToolUse),
+            Step::text("the file says alpha").expect_tool_result("alpha"),
+        ],
+    )
+    .await;
+    let mut live = ui_from_session(&s, &r.planned).unwrap();
+    let folds = s.registry().entry_kinds.clone();
+    let mut events = s.subscribe();
+    assert_eq!(s.prompt("read a.txt", None).await.unwrap(), Transition::Completed);
+    while let Ok(ev) = events.try_recv() {
+        match ev {
+            aho_session::SessionEvent::Entry(e) if !live.transcript.already_seen(&e) => {
+                assert!(live.transcript.continues(&e));
+                live.apply(&e, &folds).unwrap();
+            }
+            aho_session::SessionEvent::Stream(ev) => live.transcript.stream(&ev),
+            _ => {}
+        }
+    }
+    let fresh = ui_from_session(&s, &r.planned).unwrap();
+    assert_eq!(live.transcript.blocks, fresh.transcript.blocks);
+    let text = screen(&fresh, 120, 30);
+    assert!(text.contains("you ▸ read a.txt"), "{text}");
+    assert!(text.contains("╭ tool-fs.read · ReadOnly ─ ✓"), "{text}");
+    assert!(text.contains("the file says alpha"), "{text}");
+    assert!(text.contains("◆ checkpoint c"), "turn end leaves a marker:\n{text}");
+    assert!(text.contains("● world-host") && text.contains("● tool-fs"), "{text}");
+
+    // A chat rewind moves the head: the next entry does not continue the folded branch.
+    let cp = s.fold().unwrap().checkpoints[0].0;
+    let plan = rewind_plan(&s, cp, RewindMode::ChatOnly).await.unwrap();
+    assert!(plan.fork_at.is_some() && plan.restore.is_none());
+    let before = fresh.transcript.clone();
+    let op = aho_policy::Operator::authenticate(aho_policy::OperatorProof::local_tty());
+    let restored = s.rewind(&op, cp, RewindMode::ChatOnly).await.unwrap();
+    let e = s.log().get(restored).unwrap();
+    assert!(!before.continues(&e), "a fork is detected so the surface refolds");
+    let after = ui_from_session(&s, &r.planned).unwrap();
+    assert!(after.transcript.blocks.iter().any(|b| matches!(b.body, Body::Restored { mode: RewindMode::ChatOnly, .. })));
+
+    let json = headless(&s, &r.planned, 100, 24).unwrap();
+    assert!(json["lines"].as_array().unwrap().iter().any(|l| l.as_str().unwrap().contains("↺ rewound to c")));
+}
+
+// ───────────────────────────── slash commands ─────────────────────────────
+
+fn typed(ui: &mut UiState, text: &str) -> Option<Action> {
+    for c in text.chars() {
+        on_key(ui, key(KeyCode::Char(c)));
+    }
+    on_key(ui, key(KeyCode::Enter))
+}
+
+#[test]
+fn slash_lines_become_commands_even_mid_turn_and_double_slash_is_a_prompt() {
+    let mut ui = UiState::default();
+    assert_eq!(typed(&mut ui, "/plan  checking first "), Some(Action::Command { name: "plan".into(), args: "checking first".into() }));
+    ui.busy = true;
+    assert_eq!(typed(&mut ui, "/help"), Some(Action::Command { name: "help".into(), args: String::new() }), "a command is never a steer");
+    assert_eq!(typed(&mut ui, "//etc/hosts is odd"), Some(Action::Steer { text: "/etc/hosts is odd".into(), urgent: false }));
+    ui.busy = false;
+    assert_eq!(typed(&mut ui, "//x"), Some(Action::Prompt("/x".into())));
+    assert_eq!(parse_line("/"), Parsed::Command { name: "", args: "" });
+    assert_eq!(parse_line("  hello /plan"), Parsed::Prompt("hello /plan"));
+}
+
+fn echo_commands() -> (Commands, std::sync::mpsc::Receiver<String>) {
+    let (s, seen) = std::sync::mpsc::channel();
+    let mut c = Commands::new();
+    c.register(
+        "echo",
+        "<text>",
+        "repeat the text",
+        Arc::new(move |_session: &Arc<Session>, args: &str, _run| {
+            s.send(args.to_string()).unwrap();
+            Ok(format!("echoed {args}"))
+        }),
+    )
+    .unwrap();
+    c.register("fail", "", "always refuses", Arc::new(|_: &Arc<Session>, _: &str, _| Err("nothing to do here".to_string()))).unwrap();
+    (c, seen)
+}
+
+fn kinds_after(s: &Session, before: usize) -> Vec<(Principal, EntryKind)> {
+    let all = s.log().read_branch(s.log().head().unwrap()).unwrap();
+    all.into_iter().skip(before).map(|e| (e.by, e.kind)).collect()
+}
+
+fn branch_len(s: &Session) -> usize {
+    s.log().read_branch(s.log().head().unwrap()).unwrap().len()
+}
+
+#[tokio::test]
+async fn registered_command_runs_with_its_args_is_logged_and_shows_in_the_status_line() {
+    let r = rig();
+    // No scripted steps: a turn reaching the model would fail the test.
+    let s = boot(&r, vec![]).await;
+    let (commands, seen) = echo_commands();
+    let mut ui = ui_from_session(&s, &r.planned).unwrap();
+    let before = branch_len(&s);
+    let Some(Action::Command { name, args }) = typed(&mut ui, "/echo hi there") else { panic!("not a command") };
+    crate::runtime::run_command(&mut ui, &commands, &s, &name, &args);
+    assert_eq!(seen.try_iter().collect::<Vec<_>>(), ["hi there"]);
+    assert_eq!(ui.notice.as_deref(), Some("echoed hi there"));
+    assert!(screen(&ui, 100, 16).lines().last().unwrap().contains("echoed hi there"));
+    let logged = kinds_after(&s, before);
+    assert!(
+        matches!(&logged[..], [
+            (Principal::Operator, EntryKind::CommandRun { name, args, .. }),
+            (Principal::Operator, EntryKind::CommandDone { kind, .. }),
+        ] if name == "echo" && args == &["hi there"] && kind == "ok"),
+        "{logged:?}"
+    );
+
+    crate::runtime::run_command(&mut ui, &commands, &s, "fail", "");
+    let notice = ui.notice.clone().unwrap();
+    assert!(notice.contains("`/fail`: nothing to do here"), "{notice}");
+    assert!(matches!(kinds_after(&s, before + 2).last(), Some((_, EntryKind::CommandDone { kind, .. })) if kind == "error"));
+    assert_eq!(s.fold().unwrap().turns, 0, "no command started a turn");
+}
+
+#[tokio::test]
+async fn unknown_command_is_refused_with_the_list_and_help_lists_every_command() {
+    let r = rig();
+    let s = boot(&r, vec![]).await;
+    let (commands, seen) = echo_commands();
+    let mut ui = ui_from_session(&s, &r.planned).unwrap();
+    let before = branch_len(&s);
+
+    crate::runtime::run_command(&mut ui, &commands, &s, "nope", "x");
+    let notice = ui.notice.clone().unwrap();
+    assert!(notice.contains("`/nope` is not a command here, so nothing was sent to the model"), "{notice}");
+    assert!(notice.contains("Commands: /help, /echo, /fail"), "{notice}");
+    let text = screen(&ui, 100, 16);
+    assert!(text.contains("Commands: /help, /echo, /fail") && text.contains("`//`"), "the refusal wraps into the footer:\n{text}");
+    assert_eq!(branch_len(&s), before, "a refusal writes nothing");
+    assert!(seen.try_recv().is_err(), "the handler was not called");
+
+    crate::runtime::run_command(&mut ui, &commands, &s, "help", "");
+    assert_eq!(ui.notice.as_deref(), Some("/help — list these commands\n/echo <text> — repeat the text\n/fail — always refuses"));
+    let text = screen(&ui, 100, 16);
+    let tail: Vec<&str> = text.lines().rev().take(3).collect();
+    assert!(tail[2].contains("/help — list") && tail[1].contains("/echo <text>") && tail[0].contains("/fail"), "{text}");
+    assert_eq!(branch_len(&s), before, "/help writes nothing");
+    assert_eq!(s.fold().unwrap().turns, 0);
+}
+
+#[test]
+fn registration_refuses_reserved_duplicate_and_malformed_names() {
+    let (mut c, _) = echo_commands();
+    let noop: Handler = Arc::new(|_: &Arc<Session>, _: &str, _| Ok(String::new()));
+    assert!(c.register("help", "", "", noop.clone()).unwrap_err().contains("already a command"));
+    assert!(c.register("echo", "", "", noop.clone()).unwrap_err().contains("already a command"));
+    assert!(c.register("Bad Name", "", "", noop).unwrap_err().contains("not a command name"));
+    assert_eq!(c.names().collect::<Vec<_>>(), ["echo", "fail"]);
+}
