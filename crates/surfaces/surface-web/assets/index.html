@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>aho</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header id="top">
+  <span id="title">aho</span>
+  <span id="status" class="idle">○ idle</span>
+  <span id="policy"></span>
+  <span class="spacer"></span>
+  <button id="hud-toggle" title="Alt+H: annotate every event with its origin">HUD</button>
+  <button id="abort" title="Cancel the running turn's operations">Abort</button>
+</header>
+<main>
+  <section id="chat" hidden>
+    <div id="timeline" aria-label="checkpoints"></div>
+    <div id="transcript" aria-live="polite"></div>
+    <form id="composer">
+      <textarea id="draft" rows="2" placeholder="Enter sends a prompt. While a turn runs, Enter steers it and Alt+Enter steers urgently. Shift+Enter for a new line."></textarea>
+      <button type="submit" id="send">Send</button>
+    </form>
+  </section>
+  <aside id="sidebar" hidden>
+    <nav id="tabs"></nav>
+    <div id="panel"></div>
+  </aside>
+</main>
+<footer id="notice"></footer>
+<div id="modal" class="modal" hidden></div>
+<div id="login" class="modal" hidden>
+  <div class="card">
+    <h2>Sign in</h2>
+    <p>Paste the token the server printed on your terminal. It is exchanged once for a cookie in this browser.</p>
+    <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="token">
+    <button id="login-go">Sign in</button>
+    <p id="login-err" class="err"></p>
+  </div>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

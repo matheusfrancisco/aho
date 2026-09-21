@@ -1,0 +1,351 @@
+{
+  "client": {
+    "approval.answer": {
+      "id": 8,
+      "method": "approval.answer",
+      "params": {
+        "id": 1,
+        "outcome": "allow",
+        "scope": "session"
+      },
+      "v": 1
+    },
+    "caps.allow": {
+      "id": 17,
+      "method": "caps.allow",
+      "params": {
+        "id": "tool-bash"
+      },
+      "v": 1
+    },
+    "caps.disable": {
+      "id": 16,
+      "method": "caps.disable",
+      "params": {
+        "id": "tool-bash"
+      },
+      "v": 1
+    },
+    "caps.enable": {
+      "id": 15,
+      "method": "caps.enable",
+      "params": {
+        "apply": true,
+        "id": "skill.deploy"
+      },
+      "v": 1
+    },
+    "caps.explain": {
+      "id": 11,
+      "method": "caps.explain",
+      "params": {
+        "at": 12,
+        "key": "policy.preset"
+      },
+      "v": 1
+    },
+    "caps.list": {
+      "id": 9,
+      "method": "caps.list",
+      "params": {
+        "kind": "tool"
+      },
+      "v": 1
+    },
+    "caps.plan": {
+      "id": 13,
+      "method": "caps.plan",
+      "params": {
+        "patch": "[policy]\npreset = \"dev\"\n",
+        "patch_path": "x.toml"
+      },
+      "v": 1
+    },
+    "caps.preset": {
+      "id": 18,
+      "method": "caps.preset",
+      "params": {
+        "name": "dev"
+      },
+      "v": 1
+    },
+    "caps.set": {
+      "id": 14,
+      "method": "caps.set",
+      "params": {
+        "apply": false,
+        "key": "tools.grace_ms",
+        "value": 500
+      },
+      "v": 1
+    },
+    "caps.tree": {
+      "id": 10,
+      "method": "caps.tree",
+      "params": {
+        "id": "tool-fs"
+      },
+      "v": 1
+    },
+    "caps.why": {
+      "id": 12,
+      "method": "caps.why",
+      "params": {
+        "id": "tool-bash"
+      },
+      "v": 1
+    },
+    "hello": {
+      "id": 1,
+      "method": "hello",
+      "params": {
+        "allow_takeover": false,
+        "client_instance": "tui-7f",
+        "has_local_history": true,
+        "max": 1,
+        "min": 1
+      },
+      "v": 1
+    },
+    "session.abort": {
+      "id": 4,
+      "method": "session.abort",
+      "params": null,
+      "v": 1
+    },
+    "session.fold": {
+      "id": 6,
+      "method": "session.fold",
+      "params": null,
+      "v": 1
+    },
+    "session.prompt": {
+      "id": 2,
+      "method": "session.prompt",
+      "params": {
+        "client_key": "k1",
+        "text": "run the tests"
+      },
+      "v": 1
+    },
+    "session.rewind": {
+      "id": 7,
+      "method": "session.rewind",
+      "params": {
+        "checkpoint": 2,
+        "mode": "code"
+      },
+      "v": 1
+    },
+    "session.steer": {
+      "id": 3,
+      "method": "session.steer",
+      "params": {
+        "text": "also lint",
+        "urgent": true
+      },
+      "v": 1
+    },
+    "session.subscribe": {
+      "id": 5,
+      "method": "session.subscribe",
+      "params": {
+        "from": 41
+      },
+      "v": 1
+    }
+  },
+  "server": {
+    "approval": {
+      "event": "approval",
+      "payload": {
+        "args": {
+          "path": "y.txt"
+        },
+        "cap": "tool-fs",
+        "class": "workspace_write",
+        "enforced_by": "policy only",
+        "epoch_next": 3,
+        "id": 1,
+        "preset_cut": "workspace",
+        "reason": "Preset",
+        "suggested_cut": "preset workspace",
+        "tool": "write",
+        "why": "`write` is outside preset `read-only`; the user is asked before it runs.",
+        "world": "host"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "entry": {
+      "event": "entry",
+      "payload": {
+        "at": 1700000000000,
+        "by": {
+          "kind": "operator"
+        },
+        "hash": "57f919d76d53affd58ccc723917201e5a2fb42e4818f9ac9472f9337a8c608bb",
+        "id": 42,
+        "kind": {
+          "args": {
+            "path": "a.txt"
+          },
+          "call": "c1",
+          "class": "read_only",
+          "tool": "read",
+          "type": "tool_call"
+        },
+        "parent": 41,
+        "prev_hash": "a11cb032790dba2f14af21a5eeeabe59468e99c3b2e78e632919462fe3d76bbb"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "error": {
+      "event": "error",
+      "payload": {
+        "message": "a turn is already running in this session"
+      },
+      "reply_to": 3,
+      "v": 1
+    },
+    "fold": {
+      "event": "result",
+      "payload": {
+        "caps": {},
+        "checkpoints": [],
+        "config": {
+          "policy.preset": "workspace"
+        },
+        "custom": {},
+        "head": 42,
+        "invariants": {},
+        "last_transition": null,
+        "open_calls": [],
+        "pending_approvals": [],
+        "plan_hash": null,
+        "policy": {
+          "allowed": [],
+          "epoch": 0,
+          "preset": ""
+        },
+        "turn": null,
+        "turns": 2,
+        "usage": {
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      },
+      "reply_to": 6,
+      "v": 1
+    },
+    "hello_ok": {
+      "event": "hello_ok",
+      "payload": {
+        "capabilities": [
+          "session.prompt",
+          "session.steer",
+          "session.abort",
+          "session.subscribe",
+          "session.fold",
+          "session.rewind",
+          "approval.answer",
+          "caps.list",
+          "caps.tree",
+          "caps.explain",
+          "caps.why",
+          "caps.plan",
+          "caps.set",
+          "caps.enable",
+          "caps.disable",
+          "caps.allow",
+          "caps.preset"
+        ],
+        "head": 42,
+        "session": "18f3a",
+        "version": 1
+      },
+      "reply_to": 1,
+      "v": 1
+    },
+    "idle": {
+      "event": "idle",
+      "payload": {
+        "transition": {
+          "reason": "stopped by the operator",
+          "transition": "aborted"
+        },
+        "turn": 2
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "result": {
+      "event": "result",
+      "payload": {
+        "transition": {
+          "transition": "completed"
+        }
+      },
+      "reply_to": 2,
+      "v": 1
+    },
+    "stream.text": {
+      "event": "stream",
+      "payload": {
+        "kind": "text",
+        "text": "hel"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "stream.thinking": {
+      "event": "stream",
+      "payload": {
+        "kind": "thinking",
+        "text": "hmm"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "stream.tool_use_end": {
+      "event": "stream",
+      "payload": {
+        "args": {
+          "path": "a.txt"
+        },
+        "id": "c1",
+        "kind": "tool_use_end",
+        "name": "read"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "stream.tool_use_start": {
+      "event": "stream",
+      "payload": {
+        "id": "c1",
+        "kind": "tool_use_start",
+        "name": "read"
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "stream.usage": {
+      "event": "stream",
+      "payload": {
+        "kind": "usage",
+        "usage": {
+          "cache_read_tokens": 0,
+          "cache_write_tokens": 0,
+          "input_tokens": 10,
+          "output_tokens": 3
+        }
+      },
+      "reply_to": null,
+      "v": 1
+    }
+  }
+}

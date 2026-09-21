@@ -1,0 +1,32 @@
+[package]
+name = "surface-rpc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "NDJSON over stdio or unix socket; versioned envelope; the SDK protocol; default daemon topology (08, 12)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-llm.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-session.workspace = true
+aho-compose.workspace = true
+aho-inspect.workspace = true
+surface-print = { path = "../surface-print" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+aho-egress = { path = "../../seams/aho-egress" }
+tool-fs = { path = "../../tools/tool-fs" }
+tempfile.workspace = true
+
+[lints]
+workspace = true

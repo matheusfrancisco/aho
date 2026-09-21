@@ -1,0 +1,41 @@
+[package]
+name = "surface-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "axum + embedded SPA, HTTPS only, RPC gateway + WS mux, panels by slot (08)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-config.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-session.workspace = true
+aho-compose.workspace = true
+aho-inspect.workspace = true
+aho-llm.workspace = true
+aho-proc.workspace = true
+aho-fs.workspace = true
+# The slash-command registry (`Commands`) is defined once, in the terminal surface, and shared.
+surface-tui = { path = "../surface-tui" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+futures.workspace = true
+axum = { workspace = true, features = ["ws"] }
+rustls.workspace = true
+tokio-rustls.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+reqwest.workspace = true
+world-host = { path = "../../providers/world-host" }
+# WebSocket client for the /api/mux tests; the same tungstenite axum's `ws` feature already builds.
+tokio-tungstenite = "0.29"
+tool-fs = { path = "../../tools/tool-fs" }
+llm-scripted = { path = "../../providers/llm-scripted" }
+
+[lints]
+workspace = true

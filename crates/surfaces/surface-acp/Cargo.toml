@@ -1,0 +1,26 @@
+[package]
+name = "surface-acp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ACP v1 over stdio: aho as an Agent Client Protocol agent, one ACP session per aho Session (08, 01)"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-log.workspace = true
+aho-llm.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-session.workspace = true
+aho-acp = { path = "../../seams/aho-acp" }
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+aho-config.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+tempfile.workspace = true
+
+[lints]
+workspace = true
