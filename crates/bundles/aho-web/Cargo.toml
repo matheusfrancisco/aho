@@ -1,0 +1,15 @@
+[package]
+name = "aho-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "headless + web + tui surfaces"
+
+[dependencies]
+aho-cap.workspace = true
+aho-headless = { path = "../aho-headless" }
+surface-web = { path = "../../surfaces/surface-web" }
+surface-tui = { path = "../../surfaces/surface-tui" }
+
+[lints]
+workspace = true

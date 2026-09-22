@@ -1,0 +1,23 @@
+[package]
+name = "aho-headless"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "spine + print + rpc surfaces"
+
+[dependencies]
+aho-cap.workspace = true
+aho-base = { path = "../aho-base" }
+surface-print = { path = "../../surfaces/surface-print" }
+surface-rpc = { path = "../../surfaces/surface-rpc" }
+surface-webhook = { path = "../../surfaces/surface-webhook" }
+surface-acp = { path = "../../surfaces/surface-acp" }
+
+[dev-dependencies]
+aho-compose.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

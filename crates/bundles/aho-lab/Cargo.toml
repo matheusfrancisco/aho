@@ -1,0 +1,35 @@
+[package]
+name = "aho-lab"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "web + formal verification (TLA+/TLC, Lean) + long-term memory (local embeddings)"
+
+[features]
+# Semantic local embeddings (12): ONNX MiniLM behind embed-local; the default build stays lexical.
+minilm = ["embed-local/minilm"]
+
+[dependencies]
+aho-cap.workspace = true
+aho-web = { path = "../aho-web" }
+formal-tlc = { path = "../../providers/formal-tlc" }
+formal-lean = { path = "../../providers/formal-lean" }
+tool-formal = { path = "../../tools/tool-formal" }
+embed-local = { path = "../../providers/embed-local" }
+memory-local = { path = "../../providers/memory-local" }
+tool-memory = { path = "../../tools/tool-memory" }
+tool-session = { path = "../../tools/tool-session" }
+subagent-claude = { path = "../../providers/subagent-claude" }
+subagent-codex = { path = "../../providers/subagent-codex" }
+selfdev = { path = "../../providers/selfdev" }
+world-vm = { path = "../../providers/world-vm" }
+tool-vm = { path = "../../tools/tool-vm" }
+tool-display = { path = "../../tools/tool-display" }
+
+[dev-dependencies]
+aho-compose.workspace = true
+aho-log.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

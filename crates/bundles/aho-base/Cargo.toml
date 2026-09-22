@@ -1,0 +1,59 @@
+[package]
+name = "aho-base"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "the spine every product includes (01, 03)"
+
+[dependencies]
+aho-cap.workspace = true
+serde_json.workspace = true
+tool-fs = { path = "../../tools/tool-fs" }
+tool-inspect = { path = "../../tools/tool-inspect" }
+tool-web = { path = "../../tools/tool-web" }
+mcp-http = { path = "../../providers/mcp-http" }
+tool-lsp = { path = "../../tools/tool-lsp" }
+tool-bash = { path = "../../tools/tool-bash" }
+tool-jobs = { path = "../../tools/tool-jobs" }
+llm-openai-completions = { path = "../../providers/llm-openai-completions" }
+llm-anthropic-messages = { path = "../../providers/llm-anthropic-messages" }
+llm-openai-responses = { path = "../../providers/llm-openai-responses" }
+llm-pi-messages = { path = "../../providers/llm-pi-messages" }
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+skills-fsdir = { path = "../../providers/skills-fsdir" }
+tool-skills = { path = "../../tools/tool-skills" }
+mcp-stdio = { path = "../../providers/mcp-stdio" }
+tool-mcp-resources = { path = "../../tools/tool-mcp-resources" }
+tool-tasks = { path = "../../tools/tool-tasks" }
+tool-goals = { path = "../../tools/tool-goals" }
+tool-todo = { path = "../../tools/tool-todo" }
+world-ssh = { path = "../../providers/world-ssh" }
+net-userspace = { path = "../../providers/net-userspace" }
+world-ns = { path = "../../providers/world-ns" }
+pty-host = { path = "../../providers/pty-host" }
+tool-terminal = { path = "../../tools/tool-terminal" }
+tool-run-code = { path = "../../tools/tool-run-code" }
+subagent-inproc = { path = "../../providers/subagent-inproc" }
+tool-subagent = { path = "../../tools/tool-subagent" }
+tool-schedule = { path = "../../tools/tool-schedule" }
+tool-workflow = { path = "../../tools/tool-workflow" }
+tool-plan-mode = { path = "../../tools/tool-plan-mode" }
+hooks-claude-code = { path = "../../providers/hooks-claude-code" }
+subagent-acp = { path = "../../providers/subagent-acp" }
+
+[dev-dependencies]
+aho-compose.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+aho-session.workspace = true
+aho-types.workspace = true
+aho-control.workspace = true
+session-drive = { path = "../../providers/session-drive" }
+tokio.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
