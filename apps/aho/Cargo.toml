@@ -1,0 +1,73 @@
+[package]
+name = "aho"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "the operator CLI (05): plan tree inventory explain why catalog enable disable allow set preset loadout lock apply run attach serve session fork checkpoints checkpoint rewind shell status rpc tui web cert webhook acp selfdev invariants doctor caps schedule ralph plan-mode spec credential login logout add"
+
+[[bin]]
+name = "aho"
+path = "src/main.rs"
+
+[features]
+# `aho doctor embed --install` and `embed.local.model = all-MiniLM-L6-v2` (12).
+minilm = ["aho-lab/minilm", "embed-local/minilm"]
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-llm.workspace = true
+aho-policy.workspace = true
+aho-approval.workspace = true
+aho-compose.workspace = true
+aho-session.workspace = true
+aho-inspect.workspace = true
+aho-formal.workspace = true
+aho-proc.workspace = true
+aho-fs.workspace = true
+provider-auth.workspace = true
+formal-tlc = { path = "../../crates/providers/formal-tlc" }
+tool-formal = { path = "../../crates/tools/tool-formal" }
+aho-tasks.workspace = true
+surface-print = { path = "../../crates/surfaces/surface-print" }
+surface-rpc = { path = "../../crates/surfaces/surface-rpc" }
+aho-control.workspace = true
+aho-sandbox.workspace = true
+aho-goals.workspace = true
+toml.workspace = true
+aho-lab = { path = "../../crates/bundles/aho-lab" }
+llm-openai-completions = { path = "../../crates/providers/llm-openai-completions" }
+llm-anthropic-messages = { path = "../../crates/providers/llm-anthropic-messages" }
+daemon = { path = "../../crates/providers/daemon" }
+subagent-inproc = { path = "../../crates/providers/subagent-inproc" }
+session-drive = { path = "../../crates/providers/session-drive" }
+selfdev = { path = "../../crates/providers/selfdev" }
+world-host = { path = "../../crates/providers/world-host" }
+world-ssh = { path = "../../crates/providers/world-ssh" }
+net-userspace = { path = "../../crates/providers/net-userspace" }
+aho-net = { path = "../../crates/seams/aho-net" }
+world-ns = { path = "../../crates/providers/world-ns" }
+world-vm = { path = "../../crates/providers/world-vm" }
+tool-vm = { path = "../../crates/tools/tool-vm" }
+aho-vm = { path = "../../crates/seams/aho-vm" }
+surface-tui = { path = "../../crates/surfaces/surface-tui" }
+surface-web = { path = "../../crates/surfaces/surface-web" }
+surface-webhook = { path = "../../crates/surfaces/surface-webhook" }
+surface-acp = { path = "../../crates/surfaces/surface-acp" }
+tool-schedule = { path = "../../crates/tools/tool-schedule" }
+tool-workflow = { path = "../../crates/tools/tool-workflow" }
+tool-plan-mode = { path = "../../crates/tools/tool-plan-mode" }
+tool-session = { path = "../../crates/tools/tool-session" }
+embed-local = { path = "../../crates/providers/embed-local" }
+gc = { path = "../../crates/providers/gc" }
+clap.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+crossterm.workspace = true
+
+[lints]
+workspace = true
