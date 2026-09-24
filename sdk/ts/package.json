@@ -1,0 +1,17 @@
+{
+  "name": "@aho/sdk",
+  "version": "0.0.1",
+  "description": "Thin TypeScript client for `aho rpc` (stdio NDJSON), generated from the aho rpc protocol table",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "e2e": "node --experimental-strip-types test/e2e.ts"
+  }
+}
