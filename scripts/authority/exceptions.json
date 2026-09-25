@@ -1,0 +1,1124 @@
+{
+  "compose-capture-env": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn from_process",
+    "authority": "env: whole process environment (HOME, PATH, AHO_*, credential variables)",
+    "reason": "Inputs::from_process is documented as the only place that reads the process environment, snapshotting vars_os into Inputs.env once so composition downstream works from captured, testable inputs and fails with NoHome when HOME is empty."
+  },
+  "compose-read-config": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn read_optional",
+    "authority": "fs: read one aho config layer file",
+    "reason": "read_optional reads exactly the layer path the composer hands it and turns NotFound into None, so an absent aho.toml or ~/.aho/config.toml is an empty layer rather than an error."
+  },
+  "compose-write-config": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn write_atomic",
+    "authority": "fs: atomic write of an aho config layer file",
+    "reason": "write_atomic creates the parent directory, writes `<path>.tmp` and renames it over the target so `aho apply`/`aho set` never leave a half-written layer file for readers."
+  },
+  "compose-probe-unix": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn is_executable",
+    "authority": "fs: stat candidate binaries on PATH directories (unix exec bit)",
+    "reason": "The unix is_executable only calls metadata on `<PATH dir>/<name>` for the binary names manifests mention and checks is_file plus an 0o111 mode bit, never opening or running the file."
+  },
+  "compose-probe-other": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn is_executable",
+    "authority": "fs: stat candidate binaries on PATH directories (non-unix)",
+    "reason": "On non-unix targets is_executable falls back to metadata().is_file() for the same manifest-named PATH candidates, keeping the binary probe read-only."
+  },
+  "compose-apply-target": {
+    "path": "crates/aho-compose/src/inputs.rs",
+    "item": "fn apply_target",
+    "authority": "fs: probe for ./aho.toml in the project directory",
+    "reason": "apply_target only checks whether `<project>/aho.toml` is a file to choose the most specific layer, falling back to `~/.aho/config.toml` without touching either."
+  },
+  "compose-list-loadouts": {
+    "path": "crates/aho-compose/src/loadouts.rs",
+    "item": "fn list",
+    "authority": "fs: list the ~/.aho loadouts directory",
+    "reason": "list reads the loadouts directory under home and returns sorted `*.toml` stems, treating a missing directory as no loadouts."
+  },
+  "session-index-rebuild": {
+    "path": "crates/aho-log/src/index/ingest.rs",
+    "item": "fn rebuild",
+    "authority": "fs: list the canonical sessions directory",
+    "reason": "rebuild enumerates `<sessions root>/*.jsonl`, accepting only stems that are the canonical hex spelling of a session id so duplicate aliases and path traversal cannot enter the index."
+  },
+  "session-index-source": {
+    "path": "crates/aho-log/src/index/ingest.rs",
+    "item": "fn load_session",
+    "authority": "fs: read one session JSONL source file",
+    "reason": "load_session symlink_metadata-checks the path and refuses non-regular files (symlinks are not indexed) before streaming the session's JSONL lines into SQLite."
+  },
+  "session-index-open": {
+    "path": "crates/aho-log/src/index.rs",
+    "item": "fn open",
+    "authority": "fs: create/canonicalize the sessions directory and open the SQLite index",
+    "reason": "SessionIndex::open creates and canonicalizes the sessions directory and opens the database in WAL mode, then binds the database to that one root and errors if it belongs to another."
+  },
+  "session-index-writer": {
+    "path": "crates/aho-log/src/index.rs",
+    "item": "fn open_log",
+    "authority": "fs: create-or-append open of `<root>/<id>.jsonl`",
+    "reason": "open_log materializes an empty `<hex id>.jsonl` inside the index's bound root within an immediate transaction so a new session log gets the same refresh semantics as every other before a JsonlLog writer is returned."
+  },
+  "session-index-sync": {
+    "path": "crates/aho-log/src/index.rs",
+    "item": "fn sync_source",
+    "authority": "fs: open and fsync one session JSONL file",
+    "reason": "sync_source reopens only `<root>/<hex id>.jsonl` of this IndexedLog and calls sync_all so the log is durable before the index row is updated."
+  },
+  "jsonl-open": {
+    "path": "crates/aho-log/src/store.rs",
+    "item": "fn open",
+    "authority": "fs: read an existing JSONL log or create its parent directory",
+    "reason": "JsonlLog::open replays every line of the given log file into the in-memory log, or creates the parent directory when the file does not exist yet."
+  },
+  "jsonl-append": {
+    "path": "crates/aho-log/src/store.rs",
+    "item": "fn write_line",
+    "authority": "fs: append a line to the JSONL log file",
+    "reason": "write_line opens only this log's own path in create+append mode and writes one serialized entry plus newline, so existing history is never rewritten."
+  },
+  "session-spill": {
+    "path": "crates/aho-session/src/tools.rs",
+    "item": "fn spill",
+    "authority": "fs: write oversized tool output into the session spill directory",
+    "reason": "spill writes text exceeding the inline budget to `<spill_dir>/<content hash>.txt` and, if that write fails, emits an error event and keeps the output inline instead of truncating."
+  },
+  "embed-minilm-read": {
+    "path": "crates/providers/embed-local/src/artifacts.rs",
+    "item": "fn load",
+    "authority": "fs: read the pinned MiniLM model and tokenizer files",
+    "reason": "load reads model.onnx and tokenizer.json from the configured artifact directory with a size cap of limit+1 bytes and re-verifies the exact buffers handed to the runtime against the pinned digests."
+  },
+  "embed-minilm-verify": {
+    "path": "crates/providers/embed-local/src/artifacts.rs",
+    "item": "fn verify_file",
+    "authority": "fs: open and hash an on-disk MiniLM artifact",
+    "reason": "verify_file checks an artifact's size against the pinned revision and streams it through SHA-256 (and git-blob SHA-1 for the tokenizer) with a bounded reader, only reading the file."
+  },
+  "embed-minilm-provision": {
+    "path": "crates/providers/embed-local/src/artifacts.rs",
+    "item": "fn provision_minilm",
+    "authority": "net: HTTPS download of pinned MiniLM artifacts into an operator-chosen directory",
+    "reason": "provision_minilm is an explicit operator step that uses an https_only client with timeouts, verifies rather than overwrites existing files, publishes atomically, touches no network when both artifacts already verify, and is never called by Embed::embed."
+  },
+  "foreign-cli-workspace": {
+    "path": "crates/providers/foreign-cli/src/provider.rs",
+    "item": "fn spawn_inner",
+    "authority": "fs: canonicalize the sandbox policy workspace as the foreign CLI's cwd",
+    "reason": "spawn_inner canonicalizes policy.workspace() so the tmux-launched foreign CLI starts in the resolved sandbox workspace and that absolute cwd is what gets recorded in the subagent's state."
+  },
+  "foreign-cli-binary-discovery": {
+    "path": "crates/providers/foreign-cli/src/settings.rs",
+    "item": "fn which",
+    "authority": "env: PATH lookup of a foreign CLI binary",
+    "reason": "which resolves a configured binary name the way a shell does, taking a value containing `/` as a path and otherwise checking is_file on each PATH entry, without executing anything."
+  },
+  "foreign-cli-transcript-identity": {
+    "path": "crates/providers/foreign-cli/src/tail.rs",
+    "item": "fn file_ident",
+    "authority": "fs: stat a foreign CLI transcript file",
+    "reason": "file_ident only calls metadata on the transcript path to derive its file identity (None when missing or not on unix), which lets the tailer detect replacement."
+  },
+  "foreign-cli-transcript-read": {
+    "path": "crates/providers/foreign-cli/src/tail.rs",
+    "item": "fn poll",
+    "authority": "fs: incremental read of a foreign CLI transcript file",
+    "reason": "poll opens the transcript, treats a missing file as `exists: false` because the CLI writes lazily, and reads only complete lines appended since the last offset with a bounded take."
+  },
+  "foreign-cli-tmux": {
+    "path": "crates/providers/foreign-cli/src/tmux.rs",
+    "item": "fn run",
+    "authority": "process: tmux client commands on aho's dedicated tmux socket",
+    "reason": "run spawns the configured tmux binary always with aho's own socket flag, strips AHO_READY_FD, sets kill_on_drop and bounds each call with COMMAND_TIMEOUT."
+  },
+  "gc-process-probe": {
+    "path": "crates/providers/gc/src/children.rs",
+    "item": "fn probe",
+    "authority": "process: `ps -o stat=,etime= -p <pid>` liveness probe",
+    "reason": "probe runs ps for a single recorded pid only to read its state and elapsed time, so gc can decide whether an artifact's owner process is still alive before reclaiming it."
+  },
+  "gc-process-signal": {
+    "path": "crates/providers/gc/src/children.rs",
+    "item": "fn signal",
+    "authority": "process: `kill -s <sig>` to a recorded child's process group",
+    "reason": "signal sends a signal to the process group of a pid gc already identified as its orphaned child, falling back to the lone pid when it leads no group, and reports kill's stderr on failure."
+  },
+  "gc-git-command": {
+    "path": "crates/providers/gc/src/git.rs",
+    "item": "fn command",
+    "authority": "process: git command builder with repository env vars removed",
+    "reason": "command builds a `git` invocation after stripping GIT_DIR, GIT_WORK_TREE, GIT_INDEX_FILE and the other REPO_ENV variables, so gc's git calls target only the explicit --git-dir it passes."
+  },
+  "gc-git-run": {
+    "path": "crates/providers/gc/src/git.rs",
+    "item": "fn run",
+    "authority": "process: run a git command to completion for gc",
+    "reason": "run executes a command from git::command and maps a non-zero exit to an error carrying git's own stderr, so gc never acts on a failed git read."
+  },
+  "gc-artifact-age": {
+    "path": "crates/providers/gc/src/lib.rs",
+    "item": "fn age_of",
+    "authority": "fs: symlink_metadata mtime of a gc candidate",
+    "reason": "age_of reads only the modification time of a candidate path via symlink_metadata (symlinks are not followed), returning None when unreadable, to enforce gc's grace period."
+  },
+  "gc-reclaim-spill": {
+    "path": "crates/providers/gc/src/lib.rs",
+    "item": "fn reclaim",
+    "authority": "fs: remove reclaimed spill files and worktrees listed in a gc report",
+    "reason": "reclaim deletes only items that the report lists and that a fresh scan still lists as reclaimable, and a failed removal is reported as still present."
+  },
+  "gc-session-directory": {
+    "path": "crates/providers/gc/src/logs.rs",
+    "item": "fn read_all",
+    "authority": "fs: list the session log directory",
+    "reason": "read_all collects every `*.jsonl` below the session directory, treating a missing directory as holding no sessions and an unlistable one as an error."
+  },
+  "gc-session-walk": {
+    "path": "crates/providers/gc/src/logs.rs",
+    "item": "fn walk",
+    "authority": "fs: recursive directory walk for session logs",
+    "reason": "walk recurses through subdirectories of the session dir and collects only regular files with a `.jsonl` extension."
+  },
+  "gc-snapshot-index": {
+    "path": "crates/providers/gc/src/snapshots.rs",
+    "item": "fn load",
+    "authority": "process: git cat-file/ls-files over a shadow snapshot repository",
+    "reason": "Repo::load runs `git --git-dir <shadow> cat-file --batch-all-objects --batch-check` and, when an index exists, `ls-files --stage` to build gc's view of a shadow repository's objects without modifying it."
+  },
+  "gc-snapshot-object-size": {
+    "path": "crates/providers/gc/src/snapshots.rs",
+    "item": "fn loose_files",
+    "authority": "fs: stat loose objects of a shadow repository",
+    "reason": "loose_files calls metadata on the loose-object files of the given ids to learn their on-disk sizes, leaving packed objects alone as not gc's to cut."
+  },
+  "gc-snapshot-read-trees": {
+    "path": "crates/providers/gc/src/snapshots.rs",
+    "item": "fn read_trees",
+    "authority": "process: `git cat-file --batch` fed tree ids over stdin",
+    "reason": "read_trees spawns one git::command cat-file --batch on a shadow repository, writes tree ids to its stdin from a thread and parses the output strictly as tree listings."
+  },
+  "gc-snapshot-repositories": {
+    "path": "crates/providers/gc/src/snapshots.rs",
+    "item": "fn repos",
+    "authority": "fs: canonicalize the project and list worktrees to locate shadow repositories",
+    "reason": "repos canonicalizes the project and its `.aho/worktrees` entries and checks `<shadow dir>/<id prefix>.git` directories, finding only this project's shadow repositories."
+  },
+  "gc-snapshot-delete": {
+    "path": "crates/providers/gc/src/snapshots.rs",
+    "item": "fn delete",
+    "authority": "fs: delete unreferenced loose objects from a shadow repository",
+    "reason": "delete removes loose objects reachable only from roots it rechecks as unreferenced and older than the grace period, and on error reports bytes already freed while leaving remaining objects intact."
+  },
+  "gc-spill-scan": {
+    "path": "crates/providers/gc/src/spill.rs",
+    "item": "fn judge",
+    "authority": "fs: list `*.spill` directories and their `.txt` files under the session dir",
+    "reason": "judge reads the session directory for `*.spill` dirs and stats their regular `.txt` files to report size and ownership, performing no deletion itself."
+  },
+  "gc-state-load": {
+    "path": "crates/providers/gc/src/state.rs",
+    "item": "fn load",
+    "authority": "fs: read the gc state file",
+    "reason": "load reads the previous scan's list of missing owners from the gc state file, and no file means no previous scan."
+  },
+  "gc-state-save": {
+    "path": "crates/providers/gc/src/state.rs",
+    "item": "fn save",
+    "authority": "fs: atomic write of the gc state file",
+    "reason": "save creates the state file's directory and replaces the file via write-to-temp plus rename so a crashed gc never leaves a partial state file."
+  },
+  "gc-worktree-root": {
+    "path": "crates/providers/gc/src/worktrees.rs",
+    "item": "fn names_root",
+    "authority": "fs: canonicalize a session log's workspace root",
+    "reason": "names_root canonicalizes the root a session log names and compares it with the project base to decide whether that log belongs to this project's worktree."
+  },
+  "gc-worktree-size": {
+    "path": "crates/providers/gc/src/worktrees.rs",
+    "item": "fn size_of",
+    "authority": "fs: recursive size walk of a worktree directory",
+    "reason": "size_of sums file sizes below a worktree using symlink_metadata so symlinks are not followed and unreadable entries are skipped."
+  },
+  "gc-worktree-scan": {
+    "path": "crates/providers/gc/src/worktrees.rs",
+    "item": "fn judge",
+    "authority": "fs: canonicalize the project and list `.aho/worktrees` git checkouts",
+    "reason": "judge enumerates entries of the project's worktree directory that contain `.git` and reports them as candidates with ownership and liveness, deleting nothing."
+  },
+  "hooks-claude-code-config": {
+    "path": "crates/providers/hooks-claude-code/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: current working directory as default hooks project dir",
+    "reason": "from_loadout falls back to std::env::current_dir only when hooks.claude_code.project_dir is unset, and resolves the Claude Code settings files relative to that project."
+  },
+  "hooks-claude-code-settings": {
+    "path": "crates/providers/hooks-claude-code/src/lib.rs",
+    "item": "fn build",
+    "authority": "fs: read Claude Code settings files for hook definitions",
+    "reason": "build reads each configured settings file to parse hook groups, and a missing or unparsable file is recorded in status instead of failing the build."
+  },
+  "hooks-claude-code-command": {
+    "path": "crates/providers/hooks-claude-code/src/run.rs",
+    "item": "fn run_command",
+    "authority": "process: `sh -c` hook commands in the project directory",
+    "reason": "run_command runs a configured Claude Code hook through sh with current_dir set to the project, pipes the JSON payload on stdin, strips AHO_READY_FD, and kills the child on timeout."
+  },
+  "llm-anthropic-egress": {
+    "path": "crates/providers/llm-anthropic-messages/src/lib.rs",
+    "item": "fn http_client",
+    "authority": "net: HTTPS client for the Anthropic Messages API",
+    "reason": "http_client builds the reqwest client this provider uses, with CONNECT_TIMEOUT set, and is the provider's only place for constructing network egress."
+  },
+  "llm-anthropic-send": {
+    "path": "crates/providers/llm-anthropic-messages/src/lib.rs",
+    "item": "fn run",
+    "authority": "net: POST to the configured Anthropic-compatible messages endpoint",
+    "reason": "run posts one model request to the configured base_url (or the Copilot endpoint for github-copilot) with the resolved credential and maps transport failures and retry-after into LlmError."
+  },
+  "llm-completions-egress": {
+    "path": "crates/providers/llm-openai-completions/src/lib.rs",
+    "item": "fn http_client",
+    "authority": "net: HTTPS client for OpenAI chat completions",
+    "reason": "http_client builds the connect-timeout-bounded reqwest client the chat-completions provider uses for every request."
+  },
+  "llm-completions-send": {
+    "path": "crates/providers/llm-openai-completions/src/lib.rs",
+    "item": "fn run",
+    "authority": "net: POST to `<base_url>/chat/completions`",
+    "reason": "run sends one chat-completions request to the configured base URL (or the Copilot endpoint when authenticated for it) and streams the response into the sink."
+  },
+  "llm-responses-egress": {
+    "path": "crates/providers/llm-openai-responses/src/transport.rs",
+    "item": "fn http_client",
+    "authority": "net: HTTPS client for the OpenAI Responses API",
+    "reason": "http_client builds the reqwest client with a 30 s connect timeout that the Responses transport reuses for every request."
+  },
+  "llm-responses-send": {
+    "path": "crates/providers/llm-openai-responses/src/transport.rs",
+    "item": "fn run",
+    "authority": "net: POST streaming request to the configured Responses endpoint",
+    "reason": "run posts one request to endpoint(base, flavor) with `accept: text/event-stream` and maps transport errors and headers into the provider's LlmError."
+  },
+  "llm-pi-messages-egress": {
+    "path": "crates/providers/llm-pi-messages/src/lib.rs",
+    "item": "fn http_client",
+    "authority": "net: HTTPS client for the pi messages API",
+    "reason": "http_client builds the reqwest client with a 30 s connect timeout used by this provider's messages transport."
+  },
+  "llm-pi-messages-send": {
+    "path": "crates/providers/llm-pi-messages/src/lib.rs",
+    "item": "fn run",
+    "authority": "net: POST to `<base_url>/messages`",
+    "reason": "run sends one messages request to the configured base URL and converts retry-after and transport failures into LlmError."
+  },
+  "memory-local-config": {
+    "path": "crates/providers/memory-local/src/lib.rs",
+    "item": "fn build",
+    "authority": "env: HOME and current directory as memory store defaults",
+    "reason": "build uses $HOME and the current directory only when memory.home / memory.project are not configured, and fails with a message naming `aho set memory.home` when HOME is unset."
+  },
+  "memory-local-store-open": {
+    "path": "crates/providers/memory-local/src/store.rs",
+    "item": "fn open",
+    "authority": "fs: read a local memory store file",
+    "reason": "Store::open reads the scope's store file and reports a permissions error that names `memory.home`, so the memory provider reads only its own store path."
+  },
+  "memory-local-store-flush": {
+    "path": "crates/providers/memory-local/src/store.rs",
+    "item": "fn flush",
+    "authority": "fs: atomic write of a local memory store file",
+    "reason": "flush writes the store only when something changed since the last save, creating its directory and replacing the file via temp write plus rename."
+  },
+  "net-userspace-dns": {
+    "path": "crates/providers/net-userspace/src/lib.rs",
+    "item": "mod dns",
+    "authority": "net: host-side DNS resolution for guest queries",
+    "reason": "The dns module backs runtime.rs's dns::resolve(query, nic, nics, config, policy) and dns::refused, which answer a guest's DNS query on a dedicated aho-net-dns thread under the network policy, with at most 32 lookups pending."
+  },
+  "net-userspace-store": {
+    "path": "crates/providers/net-userspace/src/lib.rs",
+    "item": "mod store",
+    "authority": "fs: private network state directory, lock file and network.json",
+    "reason": "Store creates the network directory with mode 0700, refuses symlinked lock or state files, takes a 0600 lock file, reads network.json capped at 4 MiB, and saves it by create_new temp file, rename and directory fsync."
+  },
+  "net-userspace-runtime": {
+    "path": "crates/providers/net-userspace/src/lib.rs",
+    "item": "mod runtime",
+    "authority": "net: host TCP/UDP sockets for guest NAT flows and port maps",
+    "reason": "The runtime terminates guest TCP in smoltcp and opens host TcpStream/UdpSocket connections only for flows the policy allows, binding host listeners only for configured PortMap entries, so no host interface is exposed to a guest."
+  },
+  "auth-callback-listener": {
+    "path": "crates/providers/provider-auth/src/browser.rs",
+    "item": "fn bind",
+    "authority": "net: loopback TCP listener for the OAuth redirect callback",
+    "reason": "bind listens only on 127.0.0.1 at the requested port for the browser's OAuth redirect and derives redirect_uri from the bound address, failing with CallbackUnavailable otherwise."
+  },
+  "auth-http-client": {
+    "path": "crates/providers/provider-auth/src/engine.rs",
+    "item": "fn new",
+    "authority": "net: shared HTTPS client for provider login flows",
+    "reason": "Engine::new builds one process-wide reqwest client with a 10 s connect timeout and redirects disabled, so login token exchanges cannot be redirected elsewhere."
+  },
+  "auth-http-send": {
+    "path": "crates/providers/provider-auth/src/engine.rs",
+    "item": "fn send",
+    "authority": "net: send a login-flow HTTP request",
+    "reason": "send executes a RequestBuilder built on the engine's client and maps failures to AuthError, providing the single egress point for provider login flows."
+  },
+  "auth-kimi-host-env": {
+    "path": "crates/providers/provider-auth/src/providers/device.rs",
+    "item": "fn kimi_host",
+    "authority": "env: KIMI_CODE_OAUTH_HOST / KIMI_OAUTH_HOST override",
+    "reason": "kimi_host reads only the two Kimi OAuth host variables, ignoring empty values, and otherwise defaults to https://auth.kimi.com."
+  },
+  "auth-store-persist": {
+    "path": "crates/providers/provider-auth/src/store.rs",
+    "item": "fn persist",
+    "authority": "fs: atomic replace of the credential store file",
+    "reason": "persist writes the document to a create_new `.auth-<random>.pending` file in the store's directory, renames it over the store and fsyncs the directory so credentials are never partially written."
+  },
+  "auth-store-open": {
+    "path": "crates/providers/provider-auth/src/store.rs",
+    "item": "fn private_open",
+    "authority": "fs: open the credential store with private-permission checks",
+    "reason": "private_open opens the store file (creating it only when asked) and runs check_private on its metadata so a store readable by others is refused."
+  },
+  "auth-store-directory": {
+    "path": "crates/providers/provider-auth/src/store.rs",
+    "item": "fn secure_directory",
+    "authority": "fs: create and lock down the credential store directory to 0700",
+    "reason": "secure_directory creates the directory with mode 0700, refuses it unless it is a real directory owned by the effective uid, and tightens group/other bits through an O_NOFOLLOW|O_DIRECTORY handle."
+  },
+  "pty-host-working-directory": {
+    "path": "crates/providers/pty-host/src/pty.rs",
+    "item": "fn start",
+    "authority": "process: spawn a PTY program in a directory under the host root",
+    "reason": "start resolves the terminal's cwd against the host root (relative paths join the root), refuses a non-directory, spawns the program on a PTY slave and kills the tree if the reader threads fail."
+  },
+  "pty-host-procfs": {
+    "path": "crates/providers/pty-host/src/tree.rs",
+    "item": "fn list_proc",
+    "authority": "fs: read /proc/<pid>/stat for the process tree (Linux)",
+    "reason": "list_proc reads /proc and each process's stat file only to extract ppid, pgid and sid so the PTY host can find the processes of a terminal's session."
+  },
+  "pty-host-ps": {
+    "path": "crates/providers/pty-host/src/tree.rs",
+    "item": "fn list_ps",
+    "authority": "process: `ps` listing for the process tree (non-Linux)",
+    "reason": "list_ps runs /bin/ps (or ps from PATH) to list processes and parses the output with getsid, as the non-Linux replacement for reading /proc."
+  },
+  "selfdev-remove-channel": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn remove_if_present",
+    "authority": "fs: remove a channel symlink if present",
+    "reason": "remove_if_present deletes a channel link path and treats NotFound as success, so clearing a channel or its staging link is idempotent."
+  },
+  "selfdev-publish": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn publish",
+    "authority": "fs: copy a build into read-only `versions/<hash>/aho`",
+    "reason": "publish reads the binary, stages it in a temp dir under versions, sets it read-only and renames it into `versions/<hash>`, re-hashing when another publisher of the same bytes won the rename."
+  },
+  "selfdev-verify-build": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn verify",
+    "authority": "fs: re-read a published build for hash verification",
+    "reason": "verify re-reads `versions/<hash>/aho` and checks its bytes against the hash so a channel is never pointed at a tampered or truncated build."
+  },
+  "selfdev-read-channel": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn channel",
+    "authority": "fs: read_link of a selfdev channel symlink",
+    "reason": "channel reads the symlink of a named channel under the builds root and returns the build hash it points at, or None when the link is absent."
+  },
+  "selfdev-point-channel": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn point",
+    "authority": "fs: atomically repoint a channel symlink at `versions/<hash>`",
+    "reason": "point creates a `.<name>.tmp` symlink to `versions/<hash>` and renames it over the channel link, or removes the link when no hash is given."
+  },
+  "selfdev-activate": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn activate",
+    "authority": "fs: flip selfdev channels to a verified published build",
+    "reason": "activate refuses a non-hash or unpublished build, then points each requested channel at it with an atomic symlink rename and restores earlier channels if a later flip fails."
+  },
+  "selfdev-smoke": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn run_smoke",
+    "authority": "process: smoke-boot a candidate build in a throwaway HOME/project tempdir",
+    "reason": "run_smoke creates a tempdir with fresh project and home dirs, runs the candidate binary's `plan --json` there with HOME overridden and AHO_READY_FD removed, and kills its process group on timeout."
+  },
+  "selfdev-kill-smoke": {
+    "path": "crates/providers/selfdev/src/builds.rs",
+    "item": "fn kill_group",
+    "authority": "process: `kill` the smoke binary's process group",
+    "reason": "kill_group signals the process group of the smoke-boot child (its grandchildren share it via process_group(0)) with AHO_READY_FD removed, so a hung smoke boot leaves nothing running."
+  },
+  "selfdev-home": {
+    "path": "crates/providers/selfdev/src/lib.rs",
+    "item": "fn build",
+    "authority": "env: HOME expansion for selfdev.builds_dir",
+    "reason": "build reads HOME only to expand a `~`-prefixed selfdev.builds_dir into the builds root the selfdev capability manages."
+  },
+  "skills-fsdir-scan": {
+    "path": "crates/providers/skills-fsdir/src/lib.rs",
+    "item": "fn scan",
+    "authority": "fs: read skill directories and SKILL.md / *.md files",
+    "reason": "scan lists each configured skill root, skips missing roots, refuses skill files over MAX_SKILL_BYTES and parses file text as Untrusted, turning unreadable entries into Broken rows."
+  },
+  "skills-fsdir-resources": {
+    "path": "crates/providers/skills-fsdir/src/lib.rs",
+    "item": "fn resources",
+    "authority": "fs: bounded listing of a skill directory's resource files",
+    "reason": "resources walks a skill directory and returns relative, sorted, bounded paths of its files, excluding SKILL.md and hidden entries."
+  },
+  "skills-fsdir-config": {
+    "path": "crates/providers/skills-fsdir/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: current directory and HOME as default skill roots",
+    "reason": "from_loadout uses the current directory and $HOME only when skills.project_dir / skills.home_dir are unset, to locate the default project and user skill roots."
+  },
+  "subagent-acp-program": {
+    "path": "crates/providers/subagent-acp/src/lib.rs",
+    "item": "fn resolve_program",
+    "authority": "env: PATH lookup of an ACP agent program",
+    "reason": "resolve_program takes a program containing a separator as-is and otherwise returns the first PATH entry where the file exists, without running it."
+  },
+  "subagent-acp-launch": {
+    "path": "crates/providers/subagent-acp/src/lib.rs",
+    "item": "fn launch",
+    "authority": "process: spawn a configured ACP agent command in the subagent cwd",
+    "reason": "launch starts the agent command from caps.subagent-acp.agents.<name>.command in the given cwd with AHO_READY_FD removed and kill_on_drop set, or connects through a configured connector instead."
+  },
+  "subagent-claude-locate": {
+    "path": "crates/providers/subagent-claude/src/lib.rs",
+    "item": "fn locate",
+    "authority": "fs: find a Claude Code transcript under the config dir's projects",
+    "reason": "locate checks the direct transcript path for the session, then searches `<config_dir>/projects/*/<session>` for a regular file, only reading directory listings."
+  },
+  "subagent-claude-config": {
+    "path": "crates/providers/subagent-claude/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: CLAUDE_CONFIG_DIR and HOME for the Claude config directory",
+    "reason": "from_loadout inherits CLAUDE_CONFIG_DIR, or falls back to `$HOME/.claude`, only when the loadout does not configure the directory, so transcripts are located where Claude Code writes them."
+  },
+  "subagent-codex-transcript-directories": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn numeric_dirs",
+    "authority": "fs: list numeric year/month/day directories of Codex sessions",
+    "reason": "numeric_dirs lists a Codex sessions directory, keeps only all-digit subdirectory names and returns the newest `keep` of them to bound the transcript search."
+  },
+  "subagent-codex-session-meta": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn session_meta",
+    "authority": "fs: read the first line of a Codex rollout file",
+    "reason": "session_meta reads only the first line of a rollout and returns its payload when it is a session_meta record."
+  },
+  "subagent-codex-transcript-modified": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn modified_ms",
+    "authority": "fs: mtime of a Codex rollout file",
+    "reason": "modified_ms reads only a rollout's modification time, used to rank candidate transcripts."
+  },
+  "subagent-codex-workspace": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn same_dir",
+    "authority": "fs: canonicalize a rollout's recorded cwd",
+    "reason": "same_dir canonicalizes the cwd recorded in a Codex session_meta to compare it with the subagent's workspace when the strings differ."
+  },
+  "subagent-codex-locate": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn locate",
+    "authority": "fs: scan recent Codex day directories for this subagent's rollout",
+    "reason": "locate reads recent day directories and accepts only a rollout whose session_meta cwd matches the subagent cwd and that is its own thread rather than a fork or child."
+  },
+  "subagent-codex-config": {
+    "path": "crates/providers/subagent-codex/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: CODEX_HOME and HOME for the Codex home directory",
+    "reason": "from_loadout inherits CODEX_HOME, or falls back to `$HOME/.codex`, only when subagent.codex.home is not configured."
+  },
+  "vm-guest-connect": {
+    "path": "crates/providers/vm-guest/src/connection.rs",
+    "item": "fn connect",
+    "authority": "net: unix-socket connection to the in-guest agent",
+    "reason": "connect opens the configured guest-agent socket path and runs a reader thread that routes responses to pending request ids, erroring with setup guidance when the socket is absent."
+  },
+  "vm-guest-agent-endpoint": {
+    "path": "crates/providers/vm-guest-agent/src/main.rs",
+    "item": "fn run",
+    "authority": "fs: open the virtio agent port or bind a fixture unix socket (guest side)",
+    "reason": "run parses `--workspace` plus exactly one of `--device` (opened read/write) or `--socket` (bound as a UnixListener fixture) and serves the host's agent protocol on it."
+  },
+  "vm-rfb-connect": {
+    "path": "crates/providers/vm-rfb/src/lib.rs",
+    "item": "fn connect",
+    "authority": "net: unix-socket connection to a VM's RFB display",
+    "reason": "connect opens the manager-selected display socket with read and write timeouts and wraps it with the caller's guard, normally a VM lease check."
+  },
+  "world-host-egress-client": {
+    "path": "crates/providers/world-host/src/egress.rs",
+    "item": "fn new",
+    "authority": "net: HTTP client for host-world egress",
+    "reason": "HostEgress::new builds a reqwest client with automatic redirects disabled and a connect timeout, so every redirect hop is returned to the egress layer to re-check."
+  },
+  "world-host-egress-exchange": {
+    "path": "crates/providers/world-host/src/egress.rs",
+    "item": "fn exchange",
+    "authority": "net: perform one policy-approved egress HTTP exchange from the host",
+    "reason": "exchange sends the approved request, surfaces Location for manual redirect handling and reads the body chunk by chunk so it can stop at the size limit."
+  },
+  "world-host-fs": {
+    "path": "crates/providers/world-host/src/lib.rs",
+    "item": "mod fs",
+    "authority": "fs: host-disk Fs seam fenced to the workspace root",
+    "reason": "The fs module canonicalizes the workspace root once, refuses `..` escapes and symlinks leaving or dangling from the root, and makes every write atomic via temp file plus rename in the same directory."
+  },
+  "world-host-config": {
+    "path": "crates/providers/world-host/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: current directory, HOME and SHELL as host-world defaults",
+    "reason": "from_loadout uses the current directory for workspace.root, `$HOME/.aho/shadow` for the shadow dir and $SHELL (else /bin/sh) only when the loadout leaves those keys unset."
+  },
+  "world-host-worktree-git": {
+    "path": "crates/providers/world-host/src/lib.rs",
+    "item": "fn git_in",
+    "authority": "process: git subcommands under the project worktree",
+    "reason": "git_in runs git in the given directory with GIT_DIR and GIT_WORK_TREE removed, so worktree setup acts on that repository only."
+  },
+  "world-host-worktree-root": {
+    "path": "crates/providers/world-host/src/lib.rs",
+    "item": "fn ensure_worktree",
+    "authority": "fs: create/canonicalize `.aho/worktrees/<name>` via git worktree add",
+    "reason": "ensure_worktree reuses an existing `.aho/worktrees/<name>` checkout or runs `git worktree add` on branch aho/<name> after verifying a repository exists, then returns the canonical path."
+  },
+  "world-host-build-root": {
+    "path": "crates/providers/world-host/src/lib.rs",
+    "item": "fn build",
+    "authority": "fs: canonicalize the configured workspace root",
+    "reason": "build canonicalizes cfg.root so the host world's fs and shell seams are fenced to one resolved workspace directory."
+  },
+  "world-host-snapshot-git": {
+    "path": "crates/providers/world-host/src/snapshot.rs",
+    "item": "fn git",
+    "authority": "process: git against the shadow checkpoint store",
+    "reason": "git runs git with `--git-dir=<shadow store>` and current_dir at the workspace root, feeding optional stdin and turning a failed command into an FsError naming the shadow store."
+  },
+  "world-host-snapshot-store": {
+    "path": "crates/providers/world-host/src/snapshot.rs",
+    "item": "fn ensure",
+    "authority": "fs: create and init the shadow checkpoint git store",
+    "reason": "ensure is a no-op once HEAD exists, and otherwise creates the parent directory, runs SHA-256 `git init` under clean_env, and writes an info/exclude that ignores `.aho/`."
+  },
+  "world-host-snapshot-restore": {
+    "path": "crates/providers/world-host/src/snapshot.rs",
+    "item": "fn restore",
+    "authority": "fs: restore workspace files from a checkpoint tree",
+    "reason": "restore verifies the target is a tree, then uses read-tree and checkout-index in the shadow store and deletes only non-directory paths the checkpoint does not contain."
+  },
+  "world-host-snapshot-prune": {
+    "path": "crates/providers/world-host/src/snapshot.rs",
+    "item": "fn prune_empty_parents",
+    "authority": "fs: remove empty parent directories inside the workspace root",
+    "reason": "prune_empty_parents walks up from a deleted file, calling remove_dir only on directories strictly inside the root, and stops at the first non-empty one."
+  },
+  "world-ssh-egress-hop": {
+    "path": "crates/providers/world-ssh/src/egress.rs",
+    "item": "fn hop",
+    "authority": "process: ssh-run curl on the remote host for egress",
+    "reason": "hop runs one curl over the world's ssh command with kill_on_drop, stops reading at headers plus max_body+1 bytes and kills the transfer there, and maps exit codes to specific egress errors."
+  },
+  "world-ssh-config-home": {
+    "path": "crates/providers/world-ssh/src/lib.rs",
+    "item": "fn expand_home",
+    "authority": "env: HOME expansion of `~/` in ssh world paths",
+    "reason": "expand_home replaces a leading `~/` with $HOME for configured ssh paths (identity, config, known_hosts, control dir) and leaves other paths unchanged."
+  },
+  "world-ssh-config-cwd": {
+    "path": "crates/providers/world-ssh/src/lib.rs",
+    "item": "fn from_loadout",
+    "authority": "env: current directory to anchor a relative ssh control_dir",
+    "reason": "from_loadout joins a relative world.ssh.control_dir or session-dir default onto std::env::current_dir, so the control socket location does not change with later cwd changes."
+  },
+  "world-ssh-command": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn command",
+    "authority": "process: tokio ssh client command to the configured target",
+    "reason": "command builds `ssh <options> -- <host> <remote>` from the world's Target options with stdio unset, so every async remote call goes through one option set."
+  },
+  "world-ssh-std-command": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn std_command",
+    "authority": "process: blocking ssh client command to the configured target",
+    "reason": "std_command is the std::process twin of command, with the same options and `--` host separator, for synchronous callers."
+  },
+  "world-ssh-run": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn run",
+    "authority": "process: run a script on the remote host over ssh",
+    "reason": "run spawns the ssh command with kill_on_drop, feeds input (or /dev/null) to stdin, and reports only ssh-level failures as Err while a script's non-zero exit is returned in Out."
+  },
+  "world-ssh-run-blocking": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn run_blocking",
+    "authority": "process: blocking remote script over ssh for Capability::build",
+    "reason": "run_blocking runs the script through std_command with stdin null, used only where Capability::build is synchronous."
+  },
+  "world-ssh-close-master": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn drop",
+    "authority": "process: `ssh -O exit` to stop the control master on drop",
+    "reason": "Drop runs ssh to stop the control master so no connection outlives the world, treating no running master as the normal case."
+  },
+  "world-ssh-effective-config": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn effective",
+    "authority": "process: `ssh -G` to resolve effective host settings",
+    "reason": "effective runs `ssh -G` for the target only to read the effective hostname, port, user and known_hosts, and connects to nothing."
+  },
+  "world-ssh-control-directory": {
+    "path": "crates/providers/world-ssh/src/ssh.rs",
+    "item": "fn create_private_dir",
+    "authority": "fs: create the private (0700) ssh control directory",
+    "reason": "create_private_dir creates the control-socket directory recursively with mode 0700 and reports a failure naming world.ssh.control_dir."
+  },
+  "vm-image-create": {
+    "path": "crates/providers/world-vm/src/manager.rs",
+    "item": "fn create_disk",
+    "authority": "process: qemu-img create for a VM-owned disk",
+    "reason": "create_disk runs the configured qemu_img to create one owned disk at the machine's disk path and size, optionally backed by a base, and keeps the disk for inspection on failure."
+  },
+  "vm-supervisor-spawn": {
+    "path": "crates/providers/world-vm/src/manager.rs",
+    "item": "fn start_any",
+    "authority": "process: spawn the aho-vm-supervisor for a machine",
+    "reason": "start_any launches the configured supervisor in its own process group and kills it unless QEMU exposes an owned QMP socket in the machine directory within 15 seconds."
+  },
+  "vm-destroy": {
+    "path": "crates/providers/world-vm/src/manager.rs",
+    "item": "fn destroy",
+    "authority": "fs: remove a VM's machine directory",
+    "reason": "destroy is operator cleanup that drops the machine's network proxy and removes its machine directory, which is permitted after lease revocation when lab effects are not."
+  },
+  "vm-console-write": {
+    "path": "crates/providers/world-vm/src/manager.rs",
+    "item": "fn console_write",
+    "authority": "net: unix-socket write to a VM's console socket",
+    "reason": "console_write connects to `<machine dir>/console.sock` of the named VM and writes the given bytes to the guest console, and is unix-only."
+  },
+  "vm-media-import": {
+    "path": "crates/providers/world-vm/src/media.rs",
+    "item": "fn import_media",
+    "authority": "fs: copy an operator-supplied file into immutable 0400 VM media storage",
+    "reason": "import_media refuses existing names and empty or non-regular sources, has qemu-img reject qcow2 files with backing or data files, then copies with create_new and marks the copy 0400."
+  },
+  "vm-network-listen": {
+    "path": "crates/providers/world-vm/src/network.rs",
+    "item": "fn listen",
+    "authority": "net: unix-socket listener that attaches a VM NIC to the userspace network",
+    "reason": "listen replaces a stale socket file, binds the per-VM network socket and relays each accepted stream to an attachment of the configured Network."
+  },
+  "vm-qmp-connect": {
+    "path": "crates/providers/world-vm/src/qmp.rs",
+    "item": "fn command",
+    "authority": "net: unix-socket QMP command to QEMU",
+    "reason": "command connects to a machine's QMP socket, requires QEMU's greeting, negotiates qmp_capabilities and executes exactly one command."
+  },
+  "vm-state-directory": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn directory",
+    "authority": "fs: create a 0700 VM state directory",
+    "reason": "directory creates the VM state path, sets mode 0700 on unix and returns its canonical form for all later VM storage."
+  },
+  "vm-state-read": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn load",
+    "authority": "fs: read a VM state JSON file",
+    "reason": "load opens a VM state file and refuses anything over 8 MiB before deserializing."
+  },
+  "vm-state-save": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn save",
+    "authority": "fs: atomic write of a VM state JSON file",
+    "reason": "save writes to a create_new `.write-<uuid>` sibling, renames it over the target and fsyncs the parent directory."
+  },
+  "vm-state-lock": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn lock",
+    "authority": "fs: open a VM lock file",
+    "reason": "lock opens the machine lock file read/write, creating it without truncation, to hold an exclusive lock on the VM state."
+  },
+  "vm-state-list": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn entries",
+    "authority": "fs: list a VM storage directory",
+    "reason": "entries lists the paths in a VM storage directory, sorted, so records are enumerated deterministically."
+  },
+  "vm-media-hash": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn hash",
+    "authority": "fs: read a media file to hash it",
+    "reason": "hash streams a media file to compute the content hash recorded for immutable VM media."
+  },
+  "vm-supervisor-output": {
+    "path": "crates/providers/world-vm/src/supervisor.rs",
+    "item": "fn capture",
+    "authority": "fs: persist QEMU stdout/stderr scrollback in the machine directory",
+    "reason": "capture runs a thread that reads a QEMU output pipe into a capacity-bounded ring persisted to console.json or stderr.json in the machine directory, resuming an existing file."
+  },
+  "vm-supervisor-console": {
+    "path": "crates/providers/world-vm/src/supervisor.rs",
+    "item": "fn console",
+    "authority": "net: unix-socket console listener feeding QEMU stdin",
+    "reason": "console replaces a stale socket, binds the machine's console socket and forwards accepted connections to the QEMU child's stdin until stopped."
+  },
+  "vm-supervisor-launch": {
+    "path": "crates/providers/world-vm/src/supervisor.rs",
+    "item": "fn supervise",
+    "authority": "process: run QEMU under the aho-vm-supervisor binary",
+    "reason": "supervise is the installed supervisor's entry point, launching the recorded QEMU binary and args from the launch file only under the lease budget and killing QEMU when the lease ends; it never executes guest commands."
+  },
+  "rpc-unix-listener": {
+    "path": "crates/surfaces/surface-rpc/src/lib.rs",
+    "item": "fn serve_unix",
+    "authority": "net: 0600 unix-socket listener for the rpc surface",
+    "reason": "serve_unix refuses to replace a socket another server still answers on, removes a stale file, binds, chmods the socket 0600 and serves each connection against the session."
+  },
+  "web-listener": {
+    "path": "crates/surfaces/surface-web/src/lib.rs",
+    "item": "let tcp",
+    "authority": "net: TCP listener for the web UI",
+    "reason": "The web surface binds its configured address only after refusing plain HTTP on a non-loopback address, so non-loopback serving always has TLS."
+  },
+  "webhook-tls-input": {
+    "path": "crates/surfaces/surface-webhook/src/lib.rs",
+    "item": "fn read_pem",
+    "authority": "fs: read the webhook TLS certificate/key PEM files",
+    "reason": "read_pem reads the configured surface.webhook cert or key file and names which one could not be read."
+  },
+  "webhook-listener": {
+    "path": "crates/surfaces/surface-webhook/src/lib.rs",
+    "item": "let tcp",
+    "authority": "net: TCP listener for the GitHub webhook surface",
+    "reason": "The webhook surface binds only once a transport is configured and refuses plain HTTP off loopback, so any exposed webhook listener uses TLS."
+  },
+  "auth-browser-opener": {
+    "path": "apps/aho/src/auth/terminal.rs",
+    "item": "fn open",
+    "authority": "process: platform URL opener (open / rundll32 / xdg-open) for login",
+    "reason": "open launches the platform's URL opener with only the login URL, null stdio and AHO_READY_FD removed, and reaps it on a thread."
+  },
+  "cli-config": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod config",
+    "authority": "fs: read patch files and write lock files for config verbs",
+    "reason": "The config module reads operator-named patch files and writes the lock file into the most specific layer after the plan → diff → `apply? [y/N]` flow."
+  },
+  "cli-ctx": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod ctx",
+    "authority": "env: current directory, NO_COLOR and project paths for every CLI verb",
+    "reason": "ctx is the shared CLI plumbing that resolves the project by canonicalizing the launch directory, lists session files, checks NO_COLOR for terminal output and uses ps to test recorded pids."
+  },
+  "cli-history": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod history",
+    "authority": "process: git and tar for fork/diff/merge/destroy of worktree sessions",
+    "reason": "history runs git (under clean_git) and tar against a session's canonical workspace and shadow store, extracting trees into a tempfile scratch dir to fork, diff, merge or remove worktrees."
+  },
+  "cli-invariants": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod invariants",
+    "authority": "process: java/TLC for formal invariant checks, with tempdir scratch under .aho",
+    "reason": "invariants probes the configured java, writes counterexamples and spill reads under the session dir, and generates TLA specs in a tempdir inside the project's `.aho` directory for `aho invariants` and `session verify --formal`."
+  },
+  "cli-ops": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod ops",
+    "authority": "process: operator-confirmed curl/sh installers plus doctor/apply file IO",
+    "reason": "ops reads apply inputs, keeps doctor logs under `~/.aho/doctor`, looks up tools on PATH, and runs curl or the Lean installer only after the operator confirms the printed plan."
+  },
+  "cli-rpc-bridge": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod rpc_bridge",
+    "authority": "net: 0600 unix-socket bridge to the serving daemon",
+    "reason": "rpc_bridge speaks the rpc protocol on stdio or on a `--socket` it binds 0600 after refusing to replace a live server, and forwards frames to the daemon's socket."
+  },
+  "cli-selfdev": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod selfdev_cmd",
+    "authority": "fs: create the selfdev builds directory and connect to the daemon",
+    "reason": "selfdev_cmd creates the builds root and connects to the running daemon's socket to publish, smoke, flip channels and hand over during `aho selfdev reload`."
+  },
+  "cli-serve": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod serve",
+    "authority": "process: re-exec the aho binary as a detached daemon with a project log",
+    "reason": "serve spawns the running aho executable (current_exe) with the operator's --set/--disable flags, appending output to `<project>/.aho/daemon.log`, and connects thin clients to its unix socket."
+  },
+  "cli-session": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod session",
+    "authority": "process: operator shell or program in the session workspace",
+    "reason": "session runs the verbs that open a session log, including `aho shell`, which starts $SHELL (else /bin/sh) or a given program in the session workspace, and removes session files it owns."
+  },
+  "cli-spec": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod spec",
+    "authority": "fs: read and write spec/SPEC.md",
+    "reason": "spec reads spec/SPEC.md for `status`/`render` and writes the rendered file back when asked."
+  },
+  "cli-surfaces": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod surfaces",
+    "authority": "process: openssl for `aho cert` plus TLS file IO for long-lived surfaces",
+    "reason": "surfaces reads TLS files for the web and webhook surfaces and implements `aho cert`, running openssl into a directory and installing the key 0600 via rename."
+  },
+  "daemon-crash-probe": {
+    "path": "crates/providers/daemon/src/crash.rs",
+    "item": "fn identity_alive",
+    "authority": "process: `ps -o etime= -p <pid>` on the host",
+    "reason": "Crash detection compares a recorded (pid, start_time) with the live process table; the daemon itself always runs on the host (07), so this probe is host lifecycle, not a tool effect."
+  },
+  "daemon-ready-env": {
+    "path": "crates/providers/daemon/src/ready.rs",
+    "item": "fn take_ready_fd",
+    "authority": "env: AHO_READY_FD of this process",
+    "reason": "The exec-in-place reload handshake (12) passes the readiness descriptor through the environment; it is read once at startup before anything can spawn and inherit it."
+  },
+  "daemon-ready-spawn": {
+    "path": "crates/providers/daemon/src/ready.rs",
+    "item": "fn spawn_with_ready",
+    "authority": "process: spawn the detached daemon binary",
+    "reason": "`aho serve --detach` starts the daemon process and waits on its readiness pipe; daemon lifecycle is host-side by definition (07: the daemon always lives on the host)."
+  },
+  "daemon-ready-exec": {
+    "path": "crates/providers/daemon/src/ready.rs",
+    "item": "fn exec_with_ready",
+    "authority": "process: execve of the new daemon image in place",
+    "reason": "Self-dev reload (12) replaces the daemon image with the same pid; only the daemon may do this, and only after quiescing sessions and stopping drivers."
+  },
+  "daemon-serve-lifecycle": {
+    "path": "crates/providers/daemon/src/server.rs",
+    "item": "fn serve",
+    "authority": "fs: the sessions directory and the daemon's own socket file",
+    "reason": "Startup creates the project's session directory and shutdown removes the socket it bound; both are daemon-owned host paths, never workspace content."
+  },
+  "daemon-fresh-id": {
+    "path": "crates/providers/daemon/src/server.rs",
+    "item": "fn fresh_id",
+    "authority": "fs: existence of <sessions>/<id>.jsonl",
+    "reason": "A new session id must not collide with a log already on disk; this is an existence probe on daemon-owned storage."
+  },
+  "daemon-open-session": {
+    "path": "crates/providers/daemon/src/server.rs",
+    "item": "fn open",
+    "authority": "fs: existence of <sessions>/<id>.jsonl",
+    "reason": "Opening decides between creating and resuming a log (and whether a >64-bit id names an existing CLI log); the log itself is opened through SessionIndex."
+  },
+  "daemon-socket-bind": {
+    "path": "crates/providers/daemon/src/server/conn.rs",
+    "item": "fn bind",
+    "authority": "net+fs: bind the operator unix socket (0600) and clear a stale one",
+    "reason": "The socket carries operator authority, so binding fails closed unless it can be restricted to this user; a stale socket nobody answers on is removed."
+  },
+  "daemon-list-logs": {
+    "path": "crates/providers/daemon/src/server/conn.rs",
+    "item": "fn list_logs",
+    "authority": "fs: list <sessions>/*.jsonl",
+    "reason": "`session.list` and the crash scan enumerate daemon-owned logs; reads names only."
+  },
+  "daemon-reload-binary": {
+    "path": "crates/providers/daemon/src/server/conn.rs",
+    "item": "fn executable",
+    "authority": "fs: metadata of the reload binary",
+    "reason": "Reload refuses before quiescing anything unless the named binary is an executable file."
+  },
+  "daemon-client-connect": {
+    "path": "crates/providers/daemon/src/server/client.rs",
+    "item": "fn connect",
+    "authority": "net: connect to the daemon's operator unix socket",
+    "reason": "The CLI and bridges are clients of the local daemon (12); the socket is 0600, so connecting is operator authority, not agent egress."
+  },
+  "daemon-reload-exec": {
+    "path": "crates/providers/daemon/src/server/reload.rs",
+    "item": "fn reload",
+    "authority": "env+fs+process: current_exe, remove own socket, exec the new image",
+    "reason": "daemon.reload persists recovery intents, quiesces, removes its own socket and execs the new binary in place; on failure it rebinds and keeps serving."
+  },
+  "scripted-read-script": {
+    "path": "crates/providers/llm-scripted/src/lib.rs",
+    "item": "fn build",
+    "authority": "fs: read the operator-named JSON script",
+    "reason": "The deterministic model route loads `provider.scripted.script`, a file the operator names on the host; it is test/CI infrastructure and never reachable by the agent."
+  },
+  "mcp-http-post": {
+    "path": "crates/providers/mcp-http/src/client.rs",
+    "item": "fn post",
+    "authority": "net: HTTP POST to a configured MCP endpoint",
+    "reason": "Streamable-HTTP MCP sends JSON-RPC requests to the endpoint the operator configured; the client was built by http_client with the egress list checked on every hop."
+  },
+  "mcp-http-stream": {
+    "path": "crates/providers/mcp-http/src/client.rs",
+    "item": "fn open_stream",
+    "authority": "net: HTTP GET of the server's notification stream",
+    "reason": "The same configured MCP endpoint's SSE stream, under the handshake timeout; same egress-checked client."
+  },
+  "mcp-http-session-close": {
+    "path": "crates/providers/mcp-http/src/client.rs",
+    "item": "fn drop",
+    "authority": "net: HTTP DELETE ending the MCP session",
+    "reason": "Dropping the last handle tells the configured server the session ended, as the MCP HTTP transport requires."
+  },
+  "mcp-http-client": {
+    "path": "crates/providers/mcp-http/src/lib.rs",
+    "item": "fn http_client",
+    "authority": "net: construct the reqwest client for MCP endpoints",
+    "reason": "The single construction point for MCP HTTP traffic; its redirect policy checks each hop against egress.allow/egress.deny (07: under host, egress is enforced by tool.check on web tools and MCP)."
+  },
+  "world-host-transport": {
+    "path": "crates/providers/world-host/src/proc.rs",
+    "item": "fn start",
+    "authority": "process: spawn a host child with separate protocol pipes",
+    "reason": "The host world's Subprocess provider (07) is the process authority for world=host; this adds the lossless stdin/stdout/stderr transport MCP servers use, in the same process group model."
+  },
+  "world-ssh-transport": {
+    "path": "crates/providers/world-ssh/src/proc.rs",
+    "item": "fn start",
+    "authority": "process: ssh over the world's control master with separate protocol pipes",
+    "reason": "The ssh world's Subprocess provider; the child runs on the remote host, with the transport pipes carried by the local ssh client."
+  },
+  "world-ssh-kill-group": {
+    "path": "crates/providers/world-ssh/src/proc.rs",
+    "item": "fn kill_group",
+    "authority": "process: ssh control command signalling the remote process group",
+    "reason": "Killing a remote child (TERM, grace, KILL) must reach its whole remote process group, which only a control command over the master can do."
+  },
+  "world-ssh-drop-cleanup": {
+    "path": "crates/providers/world-ssh/src/proc.rs",
+    "item": "fn drop",
+    "authority": "process: best-effort remote group kill for an abandoned child",
+    "reason": "A child nobody holds any more cannot be waited on; its remote group is killed so it cannot outlive the session."
+  },
+  "formal-extract-write": {
+    "path": "crates/seams/aho-formal/src/spec_doc.rs",
+    "item": "fn extract",
+    "authority": "fs: write/remove SPEC.md extracts under the operator's spec/ directory",
+    "reason": "Only `aho spec render` (operator CLI) calls this; it writes marker-carrying extracts and never touches files without the marker. Agent tools materialize through FsWrite scratch instead."
+  },
+  "formal-extract-scan": {
+    "path": "crates/seams/aho-formal/src/spec_doc.rs",
+    "item": "fn marked_files",
+    "authority": "fs: list and read spec/tla and spec/lean",
+    "reason": "Finds extract-marked files so render can remove stale extracts and status can report orphans; operator CLI only."
+  },
+  "formal-extract-freshness": {
+    "path": "crates/seams/aho-formal/src/spec_doc.rs",
+    "item": "fn freshness",
+    "authority": "fs: read SPEC.md extracts under spec/",
+    "reason": "`aho spec status` compares on-disk extracts with what SPEC.md produces, byte for byte; operator CLI only."
+  },
+  "sdk-client-spawn": {
+    "path": "crates/bundles/aho-sdk/src/client.rs",
+    "item": "fn spawn",
+    "authority": "process: spawn `aho rpc` as the SDK's session server",
+    "reason": "An embedder's SDK client drives aho through the rpc surface on stdio (08); starting that process is the embedder's own operator authority."
+  },
+  "sdk-client-connect": {
+    "path": "crates/bundles/aho-sdk/src/client.rs",
+    "item": "fn connect_unix",
+    "authority": "net: connect to an `aho rpc --socket` unix socket",
+    "reason": "The same rpc surface over a 0600 unix socket the embedder chose; operator transport, not agent egress."
+  },
+  "sdk-codegen-dir": {
+    "path": "crates/bundles/aho-sdk/src/codegen/mod.rs",
+    "item": "fn default_dir",
+    "authority": "fs: canonicalize this checkout's sdk/ directory",
+    "reason": "Build-time generator location for the TypeScript/Python SDKs (`aho-sdk` codegen), never used by a session."
+  },
+  "sdk-codegen-write": {
+    "path": "crates/bundles/aho-sdk/src/codegen/mod.rs",
+    "item": "fn write",
+    "authority": "fs: write generated SDK files under sdk/",
+    "reason": "Regenerates the thin SDKs from the protocol table, writing only files whose content changed."
+  },
+  "sdk-codegen-drift": {
+    "path": "crates/bundles/aho-sdk/src/codegen/mod.rs",
+    "item": "fn drift",
+    "authority": "fs: read generated SDK files under sdk/",
+    "reason": "The drift gate compares checked-in generated files with a fresh render; read-only."
+  },
+  "sdk-builder-project": {
+    "path": "crates/bundles/aho-sdk/src/lib.rs",
+    "item": "fn build",
+    "authority": "env+fs: current_dir and canonical project/script paths",
+    "reason": "An embedder builds an SDK instance for a project directory (default: where it runs) the way `aho` resolves its own; the result is captured Inputs."
+  },
+  "sdk-workspace-root": {
+    "path": "crates/bundles/aho-sdk/src/lib.rs",
+    "item": "fn workspace",
+    "authority": "fs: canonicalize the configured workspace.root",
+    "reason": "The host world's workspace root handed to Session::boot, resolved once from the embedder's configuration."
+  },
+  "sdk-session-open": {
+    "path": "crates/bundles/aho-sdk/src/lib.rs",
+    "item": "fn boot",
+    "authority": "fs: session log existence and the session index",
+    "reason": "Resuming refuses an id with no log on disk; logs are opened through SessionIndex so SDK sessions are searchable like CLI ones."
+  },
+  "daemon-ready-probe": {
+    "path": "crates/providers/daemon/src/bin/ready_probe.rs",
+    "item": "fn main",
+    "authority": "process: exec in place for the readiness-handshake tests",
+    "reason": "Test helper binary for exec-in-place reload (12); it exists to exercise take_ready_fd/exec_with_ready exactly as a real reload does."
+  },
+  "net-userspace-control": {
+    "path": "crates/providers/net-userspace/src/lib.rs",
+    "item": "mod control",
+    "authority": "net+fs: the network's control unix socket inside its private (0700) state directory",
+    "reason": "A running network answers status and configure requests from the operator's `aho net` on `<state_dir>/ctl`; the directory is owner-only, so the socket carries exactly the authority of the user who already owns the network's state, and a stale socket is removed only while the state lock is held."
+  },
+  "cli-net": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod net",
+    "authority": "fs: read a session network's persisted network.json",
+    "reason": "`aho net status` reads a stopped network's persisted configuration without starting it; changes go through the network's own locked store or its control socket, never raw writes."
+  },
+  "world-ns-boundary": {
+    "path": "crates/providers/world-ns/src/lib.rs",
+    "item": "mod linux",
+    "authority": "fs+process+namespaces: the sandbox's private state directory, the aho-ns-helper keeper, mounts and setns inside the helper",
+    "reason": "The namespace world's audited Linux boundary: on the host it creates the session's 0700 sandbox directory (recipe and seed copies), starts and signals the keeper by pidfd, and bridges the NIC socket; inside the dedicated single-threaded helper it builds the user/mount/net namespaces, pivots root and drops every capability before any sandbox command runs. Agent-supplied paths are only ever resolved inside the sandbox."
+  },
+  "cli-sandbox": {
+    "path": "apps/aho/src/main.rs",
+    "item": "mod sandbox",
+    "authority": "fs+process: operator export target on the host, the operator shell into the sandbox",
+    "reason": "`aho export` writes a copy of sandbox files to an operator-named host path (create-new only, every target checked before the first write); `aho shell` runs the namespace helper on the operator's terminal; `aho sandbox destroy` removes the session's own sandbox directory after confirmation. Sandbox contents are read through the world's Fs, never as host paths."
+  },
+  "vm-state-exists": {
+    "path": "crates/providers/world-vm/src/storage.rs",
+    "item": "fn exists",
+    "authority": "fs: presence of VM state under the private VM directory",
+    "reason": "The VM manager and supervisor check whether machine records, leases, scrollback and QEMU sockets exist inside the 0700 VM state directory they own; agent input is never a path here (machine names are validated labels)."
+  },
+  "vm-host-destroy": {
+    "path": "crates/providers/world-vm/src/host.rs",
+    "item": "fn destroy_machine",
+    "authority": "fs+process: quit an owned QEMU over QMP and remove its machine directory",
+    "reason": "Operator `aho sandbox destroy` and `aho gc` remove a machine the owning session no longer needs: QEMU is stopped only after its QMP UUID matches the persisted record, and only the machine's own directory under the private VM state is removed."
+  },
+  "gc-sandbox-scan": {
+    "path": "crates/providers/gc/src/sandboxes.rs",
+    "item": "fn judge",
+    "authority": "fs: list sandbox and network directories in session.dir and VM owner state",
+    "reason": "`aho gc` finds `<id>.ns` / `<id>.net` directories and VM machines whose owning session log is gone (or whose lease ended) by listing aho's own state; reclaiming goes through each world's destroy path, never a raw delete of foreign paths."
+  }
+}
