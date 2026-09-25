@@ -1,0 +1,18 @@
+{
+  "aho-approval": [
+    "aho-policy"
+  ],
+  "aho-mcp": [
+    "sha2"
+  ],
+  "aho-net": [
+    "ipnet"
+  ],
+  "aho-skills": [
+    "aho-policy",
+    "globset"
+  ],
+  "aho-subagent": [
+    "aho-policy"
+  ]
+}
