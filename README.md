@@ -1,8 +1,11 @@
-# aho — a modular Rust agent harness
+<p align="center">
+  <img src="imgs/logo.png" alt="aho" width="640">
+</p>
 
-Implements the design in `../docs/` (00–16). Each crate names the doc it implements (`../docs/NN-*.md`).
-Engineers extend aho by implementing `aho_cap::Capability` in a new crate and adding it to a
-`Composition`; nothing is forked.
+# aho: a modular Rust agent harness
+
+You extend aho by implementing `aho_cap::Capability` in a new crate and adding it to a `Composition`.
+You never fork aho itself.
 
 ```
 cargo build -p aho                  # the CLI, linked against the aho-lab bundle
@@ -16,26 +19,25 @@ cargo run -p aho-sdk -- gen --check # generated TS/Python SDKs match the rpc pro
 ```
 aho/
 ├── crates/
-│   ├── aho-types        00/06  leaf DTOs: ids (u128 as decimal strings on the wire), Message, ContentBlock, ToolSpec,
-│   │                           Consequence(Set), Principal, Card, Usage
-│   ├── aho-log          06     Entry/EntryKind (closed core + namespaced Custom), hash chain, fold/step, derive_messages,
-│   │                           MemoryLog + JsonlLog (append-only; a fork is a head move)
-│   ├── aho-cap          02/15  Capability, Deps, handles + ceiling(), Manifest, ToolDecl, Registrar, Discoverer,
-│   │                           Composition (builds providers in dependency order), plan() → Plan/PlanRow/Because
-│   ├── aho-config       03     layers/scopes/origins, Sourced<T>, Secret, schema, resolve → Loadout, lint
-│   ├── aho-policy       04     Operator/Engineer/Agent/System authority, presets (per-call ceilings), rules, decide() chain,
-│   │                           shell blast-radius classifier, paths, leases, approval cards
-│   ├── aho-compose      03     plan(Composition, inputs) → (Loadout, Plan), plan diff, saved loadouts, lock file
-│   ├── aho-session      01/16  pure core (Input/Effect/step), async driver, tool dispatch with grace window + late results,
-│   │                           abort, compaction, hooks, checkpoints & rewind, resume, PTC nested calls, session ceiling
-│   │                           (plan mode), prompt_as (driver attribution), verify_replay, canary
-│   ├── aho-inspect      05/12  tree, inventory, explain, why, status, orphans, catch-up, invariants — all folds
+│   ├── aho-types        leaf DTOs: ids (u128 as decimal strings on the wire), Message, ContentBlock, ToolSpec,
+│   │                    Consequence(Set), Principal, Card, Usage
+│   ├── aho-log          Entry/EntryKind (closed core + namespaced Custom), hash chain, fold/step, derive_messages,
+│   │                    MemoryLog + JsonlLog (append-only; a fork is a head move)
+│   ├── aho-cap          Capability, Deps, handles + ceiling(), Manifest, ToolDecl, Registrar, Discoverer,
+│   │                    Composition (builds providers in dependency order), plan() → Plan/PlanRow/Because
+│   ├── aho-config       layers/scopes/origins, Sourced<T>, Secret, schema, resolve → Loadout, lint
+│   ├── aho-policy       Operator/Engineer/Agent/System authority, presets (per-call ceilings), rules, decide() chain,
+│   │                    shell blast-radius classifier, paths, leases, approval cards
+│   ├── aho-compose      plan(Composition, inputs) → (Loadout, Plan), plan diff, saved loadouts, lock file
+│   ├── aho-session      pure core (Input/Effect/step), async driver, tool dispatch with grace window + late results,
+│   │                    abort, compaction, hooks, checkpoints & rewind, resume, PTC nested calls, session ceiling
+│   │                    (plan mode), prompt_as (driver attribution), verify_replay, canary
+│   ├── aho-inspect      folds over the log: tree, inventory, explain, why, status, orphans, catch-up, invariants
 │   │
 │   ├── seams/           traits + handle newtypes, no I/O
-│   │   aho-llm (01/16) · aho-fs (02/11) · aho-proc (07/16) · aho-sandbox (07/15) · aho-egress (07) · aho-term (07)
-│   │   aho-approval (04/10) · aho-skills (10) · aho-mcp (10) · aho-acp (08, ACP v1 schema 1.23.0) · aho-control (04/10)
-│   │   aho-goals (10/12) · aho-subagent (10/12) · aho-tasks (12) · aho-embed (12) · aho-memory (12) · aho-formal (13/14)
-│   │   aho-net (07) · aho-vm (07) · aho-display (07)
+│   │   aho-llm · aho-fs · aho-proc · aho-sandbox · aho-egress · aho-term · aho-approval · aho-skills · aho-mcp
+│   │   aho-acp (ACP v1 schema 1.23.0) · aho-control · aho-goals · aho-subagent · aho-tasks · aho-embed
+│   │   aho-memory · aho-formal · aho-net · aho-vm · aho-display
 │   │
 │   ├── providers/       one crate per backend; each `impl Capability` unless noted
 │   │   worlds:    world-host (worktree per session; enforced by: policy only) · world-ssh (remote dir over one
@@ -46,7 +48,7 @@ aho/
 │   │   models:    llm-openai-completions · llm-anthropic-messages · llm-openai-responses (Codex/Meta/xAI) ·
 │   │              llm-pi-messages (Radius gateway) · llm-scripted (deterministic; tests and smoke runs)
 │   │   auth:      provider-auth (account login: OAuth browser/device flows, private ~/.aho/auth.json store,
-│   │              request-time refresh; consumed by every model adapter as `oauth:<store path>` key references)
+│   │              request-time refresh; each model adapter reads it through `oauth:<store path>` key references)
 │   │   knowledge: skills-fsdir · mcp-stdio · mcp-http (Streamable HTTP, 2025-06-18) · embed-local (hash-ngram-384,
 │   │              offline) · memory-local · hooks-claude-code (opt-in)
 │   │   agents:    subagent-inproc · subagent-acp · subagent-claude · subagent-codex (foreign CLIs observed in tmux via
@@ -73,34 +75,35 @@ aho/
 │       │                world-vm, tool-vm, tool-display)
 │       └── aho-sdk      aho-sdk-min: spine + rpc as an embeddable Rust API, plus the TS/Python SDK generator
 │
-├── apps/aho             the CLI (05). `aho --help` lists every verb: plan tree inventory explain why catalog caps
+├── apps/aho             the CLI. `aho --help` lists the verbs: plan tree inventory explain why catalog caps
 │                        enable disable allow set preset apply loadout lock run attach serve tui web cert webhook acp
 │                        session (list show verify diff merge destroy branches) fork checkpoints checkpoint rewind shell
 │                        status rpc spec invariants doctor selfdev schedule ralph plan-mode gc credential login logout add
 │                        net sandbox export lease media
 ├── formal/              Log · Policy · Turn · Tasks (.tla/.cfg; TasksVerify.cfg), checked by formal-tlc
-├── sdk/                 schema/aho-rpc.schema.json · ts/ · python/ (generated by aho-sdk; drift-checked)
+├── imgs/                logo
+├── sdk/                 schema/aho-rpc.schema.json · ts/ · python/ (aho-sdk generates them and checks for drift)
 └── scripts/             gate.sh; ratchets/*.json baselines (panic, swallowed, long, wildcard, layers)
 ```
 
 ## Provider accounts (`aho login`)
 
-`aho login [provider]` signs into a model provider account natively (no vendor CLI is executed) and
+`aho login [provider]` signs you into a model provider account without running a vendor CLI, and
 `aho logout [provider]` removes the stored login. Providers: `anthropic` (Claude Pro/Max), `openai-codex`
 (ChatGPT Plus/Pro, browser or `--device-code`), `github-copilot` (`--enterprise-domain <host>`),
 `kimi-coding`, `meta`, `openrouter`, `radius` (`--gateway <url>`, browser or `--device-code`), `xai`.
 `aho login --list` prints this table; `--no-browser` prints the URL without launching a browser.
 
-- Tokens live in `~/.aho/auth.json` (created 0600 in a 0700-owned directory, written atomically, cross-process
-  locked). Config files never hold tokens: login writes `provider.<id>.key = "oauth:<store path>"` into
-  `~/.aho/config.toml`, and adapters resolve + refresh the credential on every model request, so long-lived
-  daemons see rotated tokens. An explicit API key in any higher layer still wins (`aho credential set <id>`).
-- Logout clears only the login reference and the stored account; it does not revoke the grant at the provider
-  and leaves configured API keys alone. A cleared credential relocks the routes it unlocked.
-- Subscription caveat: providers may bill third-party-harness usage as metered/extra usage rather than plan
-  quota (pi's Anthropic warning); aho prints a notice at `aho login anthropic` and cannot verify vendor billing.
-- Verified by local protocol servers end to end (login, refresh/re-mint, streamed tool turns through every
-  route, replayed session logs); live provider acceptance and billing are not covered by CI.
+- Tokens live in `~/.aho/auth.json`. aho creates it 0600 in a 0700-owned directory, writes it atomically and
+  locks it across processes. Config files hold no tokens: login writes `provider.<id>.key = "oauth:<store path>"`
+  into `~/.aho/config.toml`, and adapters resolve and refresh the credential on each model request, so long-lived
+  daemons pick up rotated tokens. An explicit API key in a higher layer still wins (`aho credential set <id>`).
+- Logout clears the login reference and the stored account. It leaves the grant at the provider and any
+  configured API keys in place. Clearing a credential relocks the routes it unlocked.
+- Subscription caveat: providers may bill third-party-harness usage as metered or extra usage instead of plan
+  quota (pi's Anthropic warning). aho prints a notice at `aho login anthropic` and cannot verify vendor billing.
+- Local protocol servers exercise login, refresh/re-mint, streamed tool turns through each route and replayed
+  session logs end to end. CI does not cover live provider acceptance or billing.
 
 ## Worlds
 
@@ -112,8 +115,8 @@ aho/
 | ssh | world-ssh | remote dir (needs POSIX sh, perl, git ≥ 2.29; curl for egress) | remote host |
 
 Sandbox worlds plug their only NIC into `net-userspace` (aho-net: DHCP/DHCPv6/RA, `<name>.aho` DNS, NTP,
-NAT44/NAT66, port maps, isolation, egress policy), one network per session under `<session.dir>/<id>.net`,
-started when a sandbox attaches. `aho net status|allow|map` changes it (live through its control socket).
+NAT44/NAT66, port maps, isolation, egress policy). Each session gets one network under `<session.dir>/<id>.net`,
+started when a sandbox attaches. `aho net status|allow|map` changes it live through its control socket.
 
 - `namespace` needs `world.ns.rootfs` (an unpacked recipe with `/bin/sh`), iproute2, unprivileged user
   namespaces, overlayfs and `/dev/net/tun`, and the helper:
@@ -122,28 +125,28 @@ started when a sandbox attaches. `aho net status|allow|map` changes it (live thr
   (`cargo install --locked --path crates/providers/world-vm --bin aho-vm-supervisor`), a guest image that runs
   `vm-guest-agent --workspace <dir>` on virtio port `org.aho.agent`, and a lease: `aho media import`,
   `aho add recipe`, `aho set vm.recipe <name>`, `aho lease grant`. Machines listen on unix sockets under
-  `vm.dir` (default `~/.aho/vm`); keep it short.
+  `vm.dir` (default `~/.aho/vm`); keep that path short.
 
 ## Not implemented
 
-- `aho session import` (doc 09 lists it as "explicitly later") and `aho craft` (design-record only).
+- `aho session import` and `aho craft`.
 
-## Deviations from the docs
+## Design notes
 
-- The egress allow/deny list lives at `egress.allow` / `egress.deny` (shared by web tools, MCP and the
-  sandbox network's seed), not per tool.
+- The egress allow/deny list lives at `egress.allow` / `egress.deny`, shared by web tools, MCP and the
+  sandbox network's seed. Tools have no per-tool list.
 - A blocked flow's unlock names what blocked it: `aho net allow <dest>` for the egress list, and
-  `aho net allow host-lan|other-sessions|internet` for an isolation rule (07 shows only the first form).
+  `aho net allow host-lan|other-sessions|internet` for an isolation rule.
 
 ## Known gaps
 
-- `subagent-claude` / `subagent-codex` are tested against recorded transcript fixtures and fake CLIs in real
-  tmux. The real `claude` and `codex` binaries were never launched with a prompt, because that spends the
+- Tests cover `subagent-claude` / `subagent-codex` with recorded transcript fixtures and fake CLIs in real
+  tmux. We never launched the real `claude` and `codex` binaries with a prompt, since that spends the
   operator's credits.
-- Under `world = vm`, `aho shell` without a command does not open a PTY into the guest (use
-  `aho shell -- <cmd>`), and there are no workspace checkpoints. The guest agent serves one host channel, so
-  `aho export` from the VM fails while the session holds it.
+- Under `world = vm`, `aho shell` without a command opens no PTY into the guest (use `aho shell -- <cmd>`),
+  and you get no workspace checkpoints. The guest agent serves one host channel, so `aho export` from the VM
+  fails while the session holds it.
 - The namespace sandbox's recipe root is an overlay whose writes last while its keeper runs; `/workspace` and
   `/session` persist across keeper restarts.
 - The VM tests and smokes run against a stub `qemu-system-*` (real QMP, the real supervisor and guest agent);
-  no real QEMU guest was booted here. The namespace world was exercised on Linux (privileged container).
+  we have not booted a real QEMU guest. The namespace world ran on Linux in a privileged container.
