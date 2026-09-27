@@ -78,6 +78,9 @@ impl Capability for ToolFs {
             });
             r.tool(decl, exec);
         }
+        // With `grep`/`glob` mounted, shell invocations that exist only to search the tree are
+        // redirected at the decision chain (deny-only, step 4) instead of asked for in prose.
+        r.guard(Arc::new(redirect_search));
     }
 }
 
@@ -90,6 +93,39 @@ declare_capability!(
     tools = TOOLS,
     doc = "File tools with a read-before-write ledger, version-checked edits, and applied-diff cards."
 );
+
+/// Deny-only guard on the shell tools: a command whose whole job the mounted fs tools do
+/// (`rg`/`fd` always; `grep -r` over the tree) is denied with the tool to use instead.
+/// Stream filtering (`… | grep`) and single-file `grep` stay allowed.
+pub fn redirect_search(view: &ExecView) -> Option<String> {
+    if view.tool != "bash" && view.tool != "bash_persistent" {
+        return None;
+    }
+    let command = view.args.get("command")?.as_str()?;
+    for (_, stripped) in aho_policy::shell::simple_commands(command) {
+        let mut words = stripped.split_whitespace();
+        let Some(argv0) = words.next() else { continue };
+        let bin = argv0.rsplit('/').next().unwrap_or(argv0);
+        match bin {
+            "rg" | "fd" | "fdfind" => {
+                return Some(format!(
+                    "`{bin}` duplicates a mounted tool: use `grep` for content search or `glob` for file names. The shell stays for what those tools cannot do."
+                ));
+            }
+            "grep" | "egrep" | "fgrep" => {
+                let recursive =
+                    words.any(|w| w == "--recursive" || (w.starts_with('-') && !w.starts_with("--") && w[1..].contains(['r', 'R'])));
+                if recursive {
+                    return Some(
+                        "recursive `grep` over the tree duplicates the mounted `grep` tool: use it (or `glob` for file names). Piping output into `grep` for stream filtering stays allowed.".into(),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
 
 // ───────────────────────────── declarations ─────────────────────────────
 

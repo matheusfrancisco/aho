@@ -43,6 +43,7 @@ fn transitions() -> Vec<Transition> {
         ToolUse,
         WaitingOnOps,
         ReactiveCompactRetry,
+        EmptyStopRetry,
         MaxOutputRecovery,
         StopHookBlocking,
         QueuedCommand,
@@ -55,8 +56,8 @@ fn transitions() -> Vec<Transition> {
     // A new variant fails to compile here: add it above and to the table.
     for t in &all {
         match t {
-            Completed | ToolUse | WaitingOnOps | ReactiveCompactRetry | MaxOutputRecovery | StopHookBlocking | QueuedCommand
-            | BudgetContinue | PromptTooLong | MaxTurns | Reload | Aborted(_) => {}
+            Completed | ToolUse | WaitingOnOps | ReactiveCompactRetry | EmptyStopRetry | MaxOutputRecovery | StopHookBlocking
+            | QueuedCommand | BudgetContinue | PromptTooLong | MaxTurns | Reload | Aborted(_) => {}
         }
     }
     all

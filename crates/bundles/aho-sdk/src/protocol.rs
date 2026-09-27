@@ -259,6 +259,7 @@ const TRANSITIONS: &[Variant] = &[
     var("tool_use", &[]),
     var("waiting_on_ops", &[]),
     var("reactive_compact_retry", &[]),
+    var("empty_stop_retry", &[]),
     var("max_output_recovery", &[]),
     var("stop_hook_blocking", &[]),
     var("queued_command", &[]),

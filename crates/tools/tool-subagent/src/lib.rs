@@ -25,6 +25,11 @@ use aho_subagent::{ChildInfo, Mode, Result_, SpawnRequest, SubagentError, Subage
 use aho_types::*;
 use serde_json::json;
 
+/// Bundled role instructions: output-shape specs the child receives as its persona.
+/// The role's authority (read-only) comes from the defaulted preset, never from this text.
+const SCOUT_ROLE: &str = include_str!("../prompts/scout.md");
+const REVIEWER_ROLE: &str = include_str!("../prompts/reviewer.md");
+
 pub struct SubagentDeps {
     pub provider: Arc<dyn SubagentProvider>,
 }
@@ -128,6 +133,7 @@ fn schema_subagent(_: &BoundWorld) -> RootSchema {
             "prompt": {"type": "string", "description": "The task, with every piece of context the subagent needs: it does not see this conversation."},
             "label": {"type": "string", "description": "Short name you will use to refer to it (send_message, interrupt_agent)."},
             "persona": {"type": "string", "description": "Standing instructions for the subagent (role, style, constraints)."},
+            "role": {"type": "string", "enum": ["scout", "reviewer"], "description": "Bundled role: reporting-shape instructions prepended to `persona`; when `preset` is omitted, a role defaults it to read-only."},
             "tools": {"type": "array", "items": {"type": "string"}, "description": "Tool names it may use; omitted = all of yours."},
             "preset": {"type": "string", "enum": ["read-only", "workspace", "dev", "lab", "full", "spec"], "description": "Narrows its policy; it can never exceed yours."},
             "async": {"type": "boolean", "default": false, "description": "Background agent: it cannot ask the operator for approval unless `bubble` is true."},
@@ -273,16 +279,33 @@ impl ToolSubagent {
             None if fork => "fork".to_string(),
             None => return Err(bad_args("`label` is required: a short name you will use to refer to the subagent; nothing was started.")),
         };
-        let (persona, tools, preset, is_async, bubble) = if fork {
-            (None, Vec::new(), None, false, false)
+        let (persona, role, tools, preset, is_async, bubble) = if fork {
+            (None, None, Vec::new(), None, false, false)
         } else {
             (
                 opt_str(args, "persona")?,
+                opt_str(args, "role")?,
                 opt_str_array(args, "tools")?,
                 opt_str(args, "preset")?,
                 opt_bool(args, "async")?,
                 opt_bool(args, "bubble")?,
             )
+        };
+        let role_text = match role.as_deref() {
+            None => None,
+            Some("scout") => Some(SCOUT_ROLE),
+            Some("reviewer") => Some(REVIEWER_ROLE),
+            Some(other) => {
+                return Err(bad_args(format!("`{other}` is not a role; use scout or reviewer. Nothing was started.")));
+            }
+        };
+        // A role is reporting shape plus a read-only default preset; an explicit preset still wins
+        // (the child policy chain caps it at the parent's either way).
+        let preset = preset.or_else(|| role_text.map(|_| "read-only".to_string()));
+        let persona = match (role_text, persona) {
+            (Some(r), Some(p)) => Some(format!("{r}\n\n{p}")),
+            (Some(r), None) => Some(r.to_string()),
+            (None, p) => p,
         };
 
         let features = self.provider.features();
@@ -293,7 +316,11 @@ impl ToolSubagent {
             return Err(unsupported("fork a conversation; use `subagent` and put the context in its prompt"));
         }
         if persona.is_some() && !features.persona {
-            return Err(unsupported("take a persona; drop `persona` and put the instructions in the prompt"));
+            return Err(unsupported(if role_text.is_some() {
+                "take a role (roles are persona-based); drop `role` and put the instructions in the prompt"
+            } else {
+                "take a persona; drop `persona` and put the instructions in the prompt"
+            }));
         }
         if !tools.is_empty() && !features.tool_filter {
             return Err(unsupported("restrict tools; drop `tools` or use `preset` to narrow the policy"));

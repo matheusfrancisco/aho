@@ -10,6 +10,7 @@ aho-types.workspace = true
 aho-cap.workspace = true
 aho-log.workspace = true
 aho-fs.workspace = true
+aho-policy.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

@@ -7,6 +7,7 @@
 #   swallowed  `let _ = `  `.ok();`
 #   long       files over 1200 lines (value = line count)
 #   wildcard   `pub use …::*;` (baseline pinned at 0)
+#   prose      model-facing prompt bytes: crates/**/prompts/**/*.md (value = bytes)
 #
 # Usage: scripts/ratchets/run.sh [--update]    (--update rewrites the JSON baselines)
 set -u
@@ -31,6 +32,11 @@ current() {
         long)
             # shellcheck disable=SC2046
             wc -l $(cat "$WORK/all.txt") | awk -v lim="$LIMIT" '$2 != "total" && $1 > lim { print $2 "\t" $1; n++ } END { print "__total__\t" n + 0 }'
+            ;;
+        prose)
+            find crates apps -path '*/prompts/*' -name '*.md' -not -path '*/target/*' | sort | while IFS= read -r f; do
+                printf '%s\t%d\n' "$f" "$(wc -c <"$f")"
+            done | awk -F"$tab" '{ print; s += $2 } END { print "__total__\t" s + 0 }'
             ;;
         *)
             awk -v kind="$1" -f "$DIR/count.awk" "$WORK/code.tsv" | awk -F"$tab" '{ print; s += $2 } END { print "__total__\t" s + 0 }'
@@ -64,7 +70,7 @@ from_json() { # file > tsv
 total_of() { awk -F"$tab" '$1 == "__total__" { print $2 }' "$1"; }
 
 failed=""
-for name in panic swallowed long wildcard; do
+for name in panic swallowed long wildcard prose; do
     current "$name" | sort >"$WORK/$name.tsv"
     total=$(total_of "$WORK/$name.tsv")
     baseline="$DIR/$name.json"

@@ -241,7 +241,7 @@ Continue == {"tool_use", "waiting_on_ops", "queued_command",
 
 TraceStepEnd(t) ==
     IF t \in Continue THEN Decide
-    ELSE IF t = "reactive_compact_retry" THEN Retry
+    ELSE IF t \in {"reactive_compact_retry", "empty_stop_retry"} THEN Retry
     ELSE IF t = "completed" THEN Completed
     ELSE Stop
 

@@ -170,8 +170,9 @@ pub fn justification_ok(j: &str) -> bool {
 }
 
 /// Every simple command in the line, recursing into `sh -c`, `eval` and substitutions:
-/// `(as typed, with wrappers and assignments stripped)`. Used by content rules.
-pub(crate) fn simple_commands(command: &str) -> Vec<(String, String)> {
+/// `(as typed, with wrappers and assignments stripped)`. Used by content rules and by
+/// tool guards that redirect shell invocations to a mounted specialized tool.
+pub fn simple_commands(command: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
     collect_commands(command, 0, &mut out);
     out

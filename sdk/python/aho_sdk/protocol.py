@@ -410,6 +410,10 @@ class TransitionReactiveCompactRetry(TypedDict):
     transition: Literal["reactive_compact_retry"]
 
 
+class TransitionEmptyStopRetry(TypedDict):
+    transition: Literal["empty_stop_retry"]
+
+
 class TransitionMaxOutputRecovery(TypedDict):
     transition: Literal["max_output_recovery"]
 
@@ -448,6 +452,7 @@ Transition = Union[
     "TransitionToolUse",
     "TransitionWaitingOnOps",
     "TransitionReactiveCompactRetry",
+    "TransitionEmptyStopRetry",
     "TransitionMaxOutputRecovery",
     "TransitionStopHookBlocking",
     "TransitionQueuedCommand",

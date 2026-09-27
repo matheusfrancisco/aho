@@ -386,6 +386,8 @@ pub enum Transition {
     ToolUse,
     WaitingOnOps,
     ReactiveCompactRetry,
+    /// The reply had no text and no tool call; the driver nudged once and re-requested.
+    EmptyStopRetry,
     MaxOutputRecovery,
     StopHookBlocking,
     QueuedCommand,

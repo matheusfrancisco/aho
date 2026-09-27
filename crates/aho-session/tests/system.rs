@@ -686,3 +686,53 @@ async fn operator_preset_changes_are_durable_and_spec_scope_survives_resume() {
     assert!(!r.root.join("outside-spec.txt").exists(), "resuming must retain the spec content restriction");
     assert_eq!(resumed.fold().unwrap().policy.preset, "spec");
 }
+
+#[tokio::test]
+async fn empty_reply_is_nudged_then_the_turn_completes() {
+    let r = rig("workspace", "");
+    let (s, llm) = boot(&r, vec![Step::text(""), Step::text("recovered")], Arc::new(MemoryLog::new()), Arc::new(NeverApproval)).await;
+    assert_eq!(s.prompt("go", None).await.unwrap(), Transition::Completed);
+    assert_eq!(llm.remaining(), 0, "the empty reply is retried, not accepted");
+    let entries = s.log().read_branch(s.log().head().unwrap()).unwrap();
+    assert!(entries.iter().any(|e| matches!(&e.kind, EntryKind::StepEnd { transition: Transition::EmptyStopRetry, .. })));
+    assert!(
+        entries.iter().any(|e| matches!(&e.kind, EntryKind::UserMessage { text, .. } if text.contains("no text and no tool call"))),
+        "the nudge notice is in the transcript"
+    );
+    assert!(replay_ok(&s) >= 2);
+}
+
+#[tokio::test]
+async fn identical_replies_trigger_the_loop_guard_notice() {
+    let r = rig("workspace", "");
+    write(&r.root, "a.txt", "x\n");
+    let same = || Step::tool_call("read", json!({"path": "a.txt"})).with_stop(ScriptedStop::ToolUse);
+    let (s, llm) = boot(&r, vec![same(), same(), same(), Step::text("done")], Arc::new(MemoryLog::new()), Arc::new(NeverApproval)).await;
+    assert_eq!(s.prompt("go", None).await.unwrap(), Transition::Completed);
+    assert_eq!(llm.remaining(), 0);
+    let entries = s.log().read_branch(s.log().head().unwrap()).unwrap();
+    let notices = entries.iter().filter(|e| matches!(&e.kind, EntryKind::UserMessage { text, .. } if text.contains("Loop guard"))).count();
+    assert_eq!(notices, 1, "one notice at the third identical reply, none earlier");
+    assert!(replay_ok(&s) >= 2);
+}
+
+#[tokio::test]
+async fn the_last_budgeted_step_gets_a_wrap_up_notice() {
+    let r = rig("workspace", "[session]\nmax_turns = 2\n");
+    write(&r.root, "a.txt", "x\n");
+    let (s, llm) = boot(
+        &r,
+        vec![Step::tool_call("read", json!({"path": "a.txt"})).with_stop(ScriptedStop::ToolUse), Step::text("all done")],
+        Arc::new(MemoryLog::new()),
+        Arc::new(NeverApproval),
+    )
+    .await;
+    assert_eq!(s.prompt("go", None).await.unwrap(), Transition::MaxTurns);
+    assert_eq!(llm.remaining(), 0);
+    let entries = s.log().read_branch(s.log().head().unwrap()).unwrap();
+    assert!(
+        entries.iter().any(|e| matches!(&e.kind, EntryKind::UserMessage { text, .. } if text.contains("Step budget: this is step 2 of 2"))),
+        "the wrap-up notice precedes the final request"
+    );
+    assert!(replay_ok(&s) >= 2);
+}

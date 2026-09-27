@@ -246,3 +246,38 @@ async fn runs_through_a_composition_with_the_host_world() {
     let out = exec(req).await;
     assert_eq!(text(&out), "     1\thi\n");
 }
+
+fn bash_view(tool: &str, command: &str) -> ExecView {
+    ExecView {
+        call: CallId("c1".into()),
+        tool: tool.into(),
+        class: Consequence::SpawnsProcess,
+        args: json!({"command": command}),
+        policy: PolicyView {
+            epoch: Epoch(0),
+            allowed: ConsequenceSet::ALL,
+            world: BoundWorld::host(),
+            workspace: "/ws".into(),
+            home: "/home/u".into(),
+        },
+        by: Principal::system("test"),
+    }
+}
+
+#[test]
+fn search_binaries_are_redirected_to_the_mounted_tools() {
+    assert!(redirect_search(&bash_view("bash", "rg foo src")).unwrap().contains("`grep`"));
+    assert!(redirect_search(&bash_view("bash_persistent", "fd -e rs")).is_some());
+    assert!(redirect_search(&bash_view("bash", "env rg foo")).is_some(), "wrappers are unwrapped");
+    assert!(redirect_search(&bash_view("bash", "echo \"$(rg foo)\"")).is_some(), "substitutions are scanned");
+    assert!(redirect_search(&bash_view("bash", "grep -rn foo src")).unwrap().contains("recursive"));
+    assert!(redirect_search(&bash_view("bash", "grep --recursive foo .")).is_some());
+}
+
+#[test]
+fn stream_filters_and_other_tools_stay_allowed() {
+    assert!(redirect_search(&bash_view("bash", "ps aux | grep tokio")).is_none(), "pipe filtering is legitimate shell");
+    assert!(redirect_search(&bash_view("bash", "grep foo Cargo.toml")).is_none(), "single-file grep is not a tree search");
+    assert!(redirect_search(&bash_view("bash", "git grep -r foo")).is_none(), "`git grep` is git, not the grep binary");
+    assert!(redirect_search(&bash_view("read", "rg foo")).is_none(), "only the shell tools are guarded");
+}

@@ -1,0 +1,1 @@
+You are compacting a coding session. Write a dense summary of the conversation so far that preserves: the user's goals and constraints, decisions made and why, files read or changed (paths), commands run and their outcomes, errors still open, and what was about to happen next. Use plain prose and short lists. Do not call tools.

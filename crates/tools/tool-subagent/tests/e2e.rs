@@ -396,3 +396,53 @@ fn lifecycle_events_are_accepted_by_the_session() {
     let got = aho_session::tool_events(&v);
     assert_eq!(got.len(), 2, "{v}");
 }
+
+#[tokio::test]
+async fn a_role_seeds_the_persona_and_defaults_the_child_to_read_only() {
+    let r = rig("");
+    let p = boot(
+        &r,
+        vec![
+            Step::tool_call("subagent", json!({"prompt": "map the session crate", "label": "recon", "role": "scout"})),
+            Step::text("relayed").expect_tool_result("found it"),
+        ],
+        vec![Step::text("found it")],
+        Arc::new(NeverApproval),
+    )
+    .await;
+    assert_eq!(p.s.prompt("scout it", None).await.unwrap(), Transition::Completed);
+    assert_eq!((p.parent_llm.remaining(), p.child_llm.remaining()), (0, 0));
+
+    let children = child_logs(&p.sessions.join("7"));
+    assert_eq!(children.len(), 1);
+    let ces = &children[0].1;
+    assert!(
+        matches!(&ces[0].kind, EntryKind::SubagentDescriptor { persona: Some(t), .. } if t.starts_with("Scout:")),
+        "the bundled role text is the child's persona"
+    );
+    assert!(user_texts(ces).iter().any(|t| t.contains("## Start here")), "the role reaches the child as instructions");
+    let state = aho_log::fold(ces, &CustomFolds::new()).unwrap();
+    assert!(
+        !state.policy.allowed.contains(Consequence::WorkspaceWrite),
+        "the role's authority comes from the defaulted read-only preset, not prose"
+    );
+    assert!(p.s.policy_view().allowed.contains(Consequence::WorkspaceWrite), "the parent keeps its own preset");
+}
+
+#[tokio::test]
+async fn an_unknown_role_is_refused_before_anything_starts() {
+    let r = rig("");
+    let p = boot(
+        &r,
+        vec![
+            Step::tool_call("subagent", json!({"prompt": "x", "label": "n", "role": "ninja"})),
+            Step::text("nothing ran").expect_tool_result("not a role"),
+        ],
+        vec![],
+        Arc::new(NeverApproval),
+    )
+    .await;
+    assert_eq!(p.s.prompt("go", None).await.unwrap(), Transition::Completed);
+    assert_eq!((p.parent_llm.remaining(), p.child_llm.remaining()), (0, 0));
+    assert!(child_logs(&p.sessions.join("7")).is_empty(), "no child was started");
+}

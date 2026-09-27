@@ -203,6 +203,9 @@ fn lk<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
+/// Empty replies (no text, no calls) nudged per turn before the turn is left to end.
+const EMPTY_STOP_RETRIES: u32 = 2;
+
 impl Session {
     /// Starts the composition's capabilities, opens (or resumes) the log, and returns a live session.
     pub async fn boot(b: Boot<'_>) -> Result<Arc<Session>, SessionError> {
@@ -511,6 +514,10 @@ impl Session {
         let mut pending = Pending::default();
         let mut queued: Vec<Input> = Vec::new();
         let mut overflow_retries = 0u32;
+        let mut empty_retries = 0u32;
+        // Consecutive identical replies (same visible text, same tool names + args).
+        let mut loop_sig: Option<Hash> = None;
+        let mut loop_run = 0u32;
 
         // results that landed between turns are recorded first (late results)
         while let Ok(f) = results.try_recv() {
@@ -555,6 +562,22 @@ impl Session {
             }
             self.maybe_compact(false).await;
             self.log_contexts()?;
+            // The next reply is the last one `session.max_turns` allows: ask for a wrap-up
+            // instead of truncating silently at the budget.
+            if pending.steps + 1 == self.cfg.max_steps {
+                self.append(
+                    Principal::system("loop"),
+                    EntryKind::UserMessage {
+                        form: Form::Notice,
+                        text: format!(
+                            "Step budget: this is step {} of {}, the last one this turn. Wrap up now: give your best final answer from what you have; new tool calls will not be awaited.",
+                            pending.steps + 1,
+                            self.cfg.max_steps
+                        ),
+                        client_key: None,
+                    },
+                )?;
+            }
 
             let request = tokio::select! {
                 r = self.request(turn) => r,
@@ -598,6 +621,59 @@ impl Session {
                 })
                 .collect();
             let issued: Vec<CallId> = uses.iter().map(|u| u.0.clone()).collect();
+
+            // Empty stop: no visible text, no tool call, model simply ended. Retrying the identical
+            // request tends to repeat, so nudge with a notice and spend a bounded number of steps.
+            let visible_text = resp.content.iter().any(|b| matches!(b, ContentBlock::Text { text } if !text.trim().is_empty()));
+            if issued.is_empty()
+                && !visible_text
+                && resp.stop == StopReason::EndTurn
+                && empty_retries < EMPTY_STOP_RETRIES
+                && pending.steps < self.cfg.max_steps
+            {
+                empty_retries += 1;
+                self.append(
+                    Principal::system("loop"),
+                    EntryKind::UserMessage {
+                        form: Form::Notice,
+                        text: format!(
+                            "The reply had no text and no tool call, so nothing advanced (retry {empty_retries}/{EMPTY_STOP_RETRIES}). Continue: give the final answer or make the next tool call."
+                        ),
+                        client_key: None,
+                    },
+                )?;
+                self.append(Principal::system("loop"), EntryKind::StepEnd { step, transition: Transition::EmptyStopRetry })?;
+                continue;
+            }
+
+            // Loop guard: a reply identical to the previous one (text and calls) makes no progress.
+            // Warn at every third repeat; the step budget bounds the worst case.
+            let sig = Hash::of_json(&(
+                resp.content
+                    .iter()
+                    .filter_map(|b| if let ContentBlock::Text { text } = b { Some(text.as_str()) } else { None })
+                    .collect::<Vec<_>>(),
+                uses.iter().map(|(_, name, args)| (name, args)).collect::<Vec<_>>(),
+            ));
+            if loop_sig == Some(sig) {
+                loop_run += 1;
+            } else {
+                loop_run = 0;
+                loop_sig = Some(sig);
+            }
+            if loop_run >= 2 && (loop_run - 2).is_multiple_of(3) {
+                self.append(
+                    Principal::system("loop"),
+                    EntryKind::UserMessage {
+                        form: Form::Notice,
+                        text: format!(
+                            "Loop guard: the last {} replies were identical (same text, same tool calls), so repeating them will not progress. Change approach: a different tool or different arguments, or give your final answer.",
+                            loop_run + 1
+                        ),
+                        client_key: None,
+                    },
+                )?;
+            }
             self.dispatch_calls(turn, uses, early).await?;
             let state = self.fold()?;
             pending.open_calls = state.open_calls.clone();
@@ -711,8 +787,11 @@ impl Session {
     // ───────────────────────────── requests ─────────────────────────────
 
     fn system_sections(&self, state: &State) -> Vec<(String, String, bool)> {
-        let mut secs: Vec<(i32, String, bool, String)> =
-            vec![(-1000, "identity".into(), false, IDENTITY.into()), (-900, "async-tools".into(), true, ASYNC_PREAMBLE.into())];
+        let mut secs: Vec<(i32, String, bool, String)> = vec![
+            (-1000, "identity".into(), false, IDENTITY.into()),
+            (-950, "contract".into(), false, CONTRACT.into()),
+            (-900, "async-tools".into(), true, ASYNC_PREAMBLE.into()),
+        ];
         for (_, order, name, cache_break, f) in &self.reg.sections {
             secs.push((*order, name.clone(), *cache_break, f(state)));
         }
@@ -881,7 +960,11 @@ pub fn verify_replay(entries: &[Entry], folds: &CustomFolds, late: LateResults) 
     Ok(checked)
 }
 
-pub const IDENTITY: &str = "You are a coding agent running in aho, a modular harness. You act only through the tools you are given; every call is checked against the session policy and logged.";
+pub const IDENTITY: &str = include_str!("../prompts/identity.md");
+
+/// The distilled delivery contract: the only judgment prose the harness ships. Everything
+/// checkable lives in policy, guards, and the driver; this is the residue that cannot be gated.
+pub const CONTRACT: &str = include_str!("../prompts/contract.md");
 
 /// The model-facing contract for async tool calls.
-pub const ASYNC_PREAMBLE: &str = "You work in turns. Each turn re-sends the whole conversation, so prefer going wide within a turn: when the next commands do not depend on each other's output, issue them as separate tool calls in the same turn.\n\nTool calls are asynchronous: each starts the moment you issue it and runs in the background, so many run at once. As each finishes, its result is appended and wakes a new turn; results that land together arrive together, and a call still running shows a placeholder until its own result arrives. If you need a result before continuing and have nothing independent to do, end your turn or call job_wait.\n\nEnding a turn with no tool calls while calls are running means you sleep until one finishes; ending a turn with nothing running ends the task, so do that only when the task is complete.";
+pub const ASYNC_PREAMBLE: &str = include_str!("../prompts/async-preamble.md");

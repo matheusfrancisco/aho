@@ -1,0 +1,12 @@
+{
+  "ratchet": "prose",
+  "total": 4661,
+  "files": {
+    "crates/aho-session/prompts/async-preamble.md": 801,
+    "crates/aho-session/prompts/compaction.md": 329,
+    "crates/aho-session/prompts/contract.md": 1339,
+    "crates/aho-session/prompts/identity.md": 164,
+    "crates/tools/tool-subagent/prompts/reviewer.md": 1106,
+    "crates/tools/tool-subagent/prompts/scout.md": 922
+  }
+}

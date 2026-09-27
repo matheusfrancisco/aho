@@ -4198,6 +4198,17 @@
         {
           "properties": {
             "transition": {
+              "const": "empty_stop_retry"
+            }
+          },
+          "required": [
+            "transition"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "transition": {
               "const": "max_output_recovery"
             }
           },

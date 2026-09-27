@@ -363,6 +363,10 @@ export interface TransitionReactiveCompactRetry {
   transition: "reactive_compact_retry";
 }
 
+export interface TransitionEmptyStopRetry {
+  transition: "empty_stop_retry";
+}
+
 export interface TransitionMaxOutputRecovery {
   transition: "max_output_recovery";
 }
@@ -402,6 +406,7 @@ export type Transition =
   | TransitionToolUse
   | TransitionWaitingOnOps
   | TransitionReactiveCompactRetry
+  | TransitionEmptyStopRetry
   | TransitionMaxOutputRecovery
   | TransitionStopHookBlocking
   | TransitionQueuedCommand
