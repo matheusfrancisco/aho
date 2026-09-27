@@ -68,7 +68,7 @@ fn approval_modal_renders_the_card_fields_and_answers_with_the_doc_keys() {
     ui.state.policy.epoch = Epoch(3);
     ui.approval = Some(ApprovalView::new(&vm_card(Some("preset lab")), Some("tool-vm".into()), &ui.state));
     let text = screen(&ui, 90, 26);
-    let card = region(&text, "┌ approval", 10);
+    let card = region(&text, "╭ approval", 10);
     println!("--- approval modal (TestBackend 90x26) ---\n{card}");
     for needle in [
         "tool-vm.vm_start",
@@ -102,7 +102,7 @@ fn approval_without_a_preset_cut_offers_no_preset_key() {
     assert!(!text.contains("[p]"), "{text}");
     assert!(text.contains("vm_start") && text.contains("opens epoch 2"), "{text}");
     assert_eq!(on_key(&mut ui, key(KeyCode::Char('p'))), None);
-    assert!(ui.notice.as_deref().is_some_and(|n| n.contains("no single policy change")));
+    assert!(notice(&ui).contains("no single policy change"));
 
     let long = "remove rule `ask write(*)` (File /Users/someone/projects/a-rather-long-workspace-name/aho.toml:10)";
     let mut rule = vm_card(Some(long));
@@ -116,7 +116,7 @@ fn approval_without_a_preset_cut_offers_no_preset_key() {
     );
     assert!(frame.anomalies.is_empty(), "{:?}", frame.anomalies);
     assert_eq!(on_key(&mut ui, key(KeyCode::Char('p'))), None, "a rule cut is not applied from the card");
-    assert!(ui.notice.as_deref().is_some_and(|n| n.contains("is not a preset change")));
+    assert!(notice(&ui).contains("is not a preset change"));
 }
 
 fn node(id: &str, kind: &str, state: CapState, missing: Vec<Missing>, action: Option<&str>) -> TreeNode {
@@ -141,7 +141,7 @@ fn node(id: &str, kind: &str, state: CapState, missing: Vec<Missing>, action: Op
 }
 
 #[test]
-fn tree_tab_uses_the_state_glyphs_and_names_each_fix() {
+fn tree_is_a_panel_in_front_of_the_transcript_with_the_state_glyphs_and_each_fix_and_esc_closes_it() {
     let mut ui = UiState::default();
     let mut mcp = node(
         "mcp.github",
@@ -158,11 +158,15 @@ fn tree_tab_uses_the_state_glyphs_and_names_each_fix() {
         node("skill.pdf-extract", "skill", CapState::Broken { err: "frontmatter invalid at line 3".into() }, vec![], None),
         node("web-search", "tool", CapState::Disabled { why: "--disable web-search".into() }, vec![], Some("aho enable web-search")),
     ];
-    ui.local.tab = Tab::Tree;
+    let closed = screen(&ui, 120, 24);
+    assert!(!closed.contains("tool-fs"), "no sidebar: the tree is not on screen until asked for\n{closed}");
+
+    assert_eq!(typed(&mut ui, "/tree"), None, "a view opens here; nothing reaches the session");
+    assert_eq!(front(&ui), "panel");
     let text = screen(&ui, 120, 24);
-    let side: String = text.lines().map(|l| l.chars().skip(80).collect::<String>()).collect::<Vec<_>>().join("\n");
-    println!("--- tree tab (TestBackend 120x24, sidebar columns) ---\n{side}");
+    println!("--- /tree panel (TestBackend 120x24) ---\n{text}");
     for needle in [
+        "╭ tree ",
         "● tool-fs",
         "○ tool-terminal",
         "aho enable tool-terminal",
@@ -173,13 +177,25 @@ fn tree_tab_uses_the_state_glyphs_and_names_each_fix() {
         "✕ skill.pdf-extract",
         "frontmatter invalid at line 3",
         "⊘ web-search",
+        "esc close",
     ] {
-        assert!(side.contains(needle), "missing `{needle}` in\n{side}");
+        assert!(text.contains(needle), "missing `{needle}` in\n{text}");
     }
-    // alt-2 switches the tab without touching the draft.
-    on_key(&mut ui, KeyEvent::new(KeyCode::Char('2'), KeyModifiers::ALT));
-    assert_eq!(ui.local.tab, Tab::Inventory);
+    // The panel owns the keyboard, then Esc hands it back to the prompt.
+    assert_eq!(on_key(&mut ui, key(KeyCode::Char('x'))), None);
     assert!(ui.local.draft.is_empty());
+    on_key(&mut ui, key(KeyCode::Esc));
+    assert_eq!(front(&ui), "none");
+    assert!(!screen(&ui, 120, 24).contains("mcp.github"));
+    // Panels stack: the top one closes first.
+    typed(&mut ui, "/jobs");
+    ui.overlays.push(Overlay::Panel(Panel::view(View::Invariants)));
+    on_key(&mut ui, key(KeyCode::Char('q')));
+    assert!(matches!(ui.overlays.last(), Some(Overlay::Panel(p)) if p.title == "jobs"));
+}
+
+fn notice(ui: &UiState) -> String {
+    ui.notice.as_ref().map(|n| n.text.clone()).unwrap_or_default()
 }
 
 #[test]
@@ -235,21 +251,21 @@ fn placeholder_card_flips_to_the_result_in_place() {
     let mut ui = UiState { tool_caps: caps, ..UiState::default() };
     ui.refold(&entries[..5], &Default::default()).unwrap();
     let before = screen(&ui, 100, 20);
-    assert!(before.contains("╭ tool-bash.bash · SpawnsProcess ─ ⋯ running (op 4)"), "{before}");
+    assert!(before.contains("▍ tool-bash.bash · SpawnsProcess ⋯ running (op 4)"), "{before}");
     let blocks = ui.transcript.blocks.len();
     let card_at = ui.transcript.blocks.iter().position(|b| matches!(b.body, Body::Tool(_))).unwrap();
 
     assert!(ui.transcript.continues(&entries[5]));
     ui.apply(&entries[5], &Default::default()).unwrap();
     let after = screen(&ui, 100, 20);
-    assert!(after.contains("╭ tool-bash.bash · SpawnsProcess ─ ✓ $ ls  → exit 0 (late)"), "{after}");
+    assert!(after.contains("▍ tool-bash.bash · SpawnsProcess ✓ $ ls  → exit 0 (late)"), "{after}");
     assert!(after.contains("b.txt") && !after.contains("⋯ running"), "{after}");
     assert_eq!(ui.transcript.blocks.len(), blocks, "the result flips the card; it does not add a block");
     assert!(matches!(&ui.transcript.blocks[card_at].body, Body::Tool(c) if c.result.is_some()));
 }
 
 #[test]
-fn checkpoint_marker_offers_the_three_rewind_modes_plan_first() {
+fn rewind_lists_the_checkpoints_then_offers_the_three_modes_plan_first() {
     let entries = log_with(vec![
         (Principal::system("loop"), EntryKind::TurnStart { turn: TurnId(1) }),
         (Principal::Operator, EntryKind::UserMessage { form: Form::Prompt, text: "implement A".into(), client_key: None }),
@@ -264,15 +280,15 @@ fn checkpoint_marker_offers_the_three_rewind_modes_plan_first() {
         (Principal::system("loop"), EntryKind::TurnEnd { turn: TurnId(1) }),
     ]);
     let mut ui = UiState::default();
+    assert_eq!(typed(&mut ui, "/rewind"), None);
+    assert!(notice(&ui).contains("no checkpoint"), "nothing to rewind to yet");
     ui.refold(&entries, &Default::default()).unwrap();
-    on_key(&mut ui, key(KeyCode::Tab));
-    assert_eq!(ui.local.focus, Focus::Transcript);
-    let marker = ui.transcript.blocks.iter().position(|b| matches!(b.body, Body::Checkpoint { .. })).unwrap();
-    ui.local.selected = Some(marker);
     let text = screen(&ui, 100, 20);
-    assert!(text.contains("◆ checkpoint c2 · turn 1 · turn end"), "{text}");
-    assert!(text.contains("[enter] rewind: both · chat · code"), "{text}");
+    assert!(text.contains("◆ checkpoint c2 · turn 1 · turn end") && text.contains("/rewind"), "{text}");
 
+    assert_eq!(typed(&mut ui, "/rewind"), None);
+    let list = screen(&ui, 100, 20);
+    assert!(list.contains("rewind to…") && list.contains("▸ ◆ c2 · turn 1 · turn end"), "{list}");
     let cp = CheckpointId(2);
     assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::PlanRewind { checkpoint: cp, mode: RewindMode::Both }));
     let picker = screen(&ui, 100, 20);
@@ -283,7 +299,8 @@ fn checkpoint_marker_offers_the_three_rewind_modes_plan_first() {
     // Enter before the plan is shown applies nothing.
     assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None);
     assert_eq!(on_key(&mut ui, key(KeyCode::Char('3'))), Some(Action::PlanRewind { checkpoint: cp, mode: RewindMode::CodeOnly }));
-    ui.rewind.as_mut().unwrap().plan = Some(Ok(RewindPlan {
+    let Some(Overlay::Rewind(p)) = ui.overlays.last_mut() else { panic!("{:?}", ui.overlays) };
+    p.plan = Some(Ok(RewindPlan {
         checkpoint: cp,
         mode: RewindMode::CodeOnly,
         fork_at: None,
@@ -294,7 +311,7 @@ fn checkpoint_marker_offers_the_three_rewind_modes_plan_first() {
     assert!(planned.contains("restore files: 1 changed, 1 deleted  src/a.rs, b.rs"), "{planned}");
     assert!(planned.contains("kill 1 running job(s): op3 bash"), "{planned}");
     assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Rewind { checkpoint: cp, mode: RewindMode::CodeOnly }));
-    assert!(ui.rewind.is_none());
+    assert!(ui.overlays.is_empty(), "applying closes the picker and the list under it");
 }
 
 #[test]
@@ -354,20 +371,22 @@ fn frame_capture_drops_identical_frames_unless_anomalous_and_flags_oscillation()
     // A layout that changes with the content (picker opens, its plan arrives, the mode changes)
     // never repeats a screen, so it is not flicker.
     let mut ring = FrameCapture::new(8);
-    let mut picker = UiState::default();
-    picker.rewind = Some(RewindPicker { checkpoint: CheckpointId(1), entry: EntryId(5), selected: RewindMode::Both, plan: None });
-    let plan = |mode| Some(Ok(RewindPlan { checkpoint: CheckpointId(1), mode, fork_at: Some(EntryId(5)), restore: None, kill: vec![] }));
-    let mut planned_both = picker.clone();
-    planned_both.rewind.as_mut().unwrap().plan = plan(RewindMode::Both);
-    let mut code = picker.clone();
-    code.rewind.as_mut().unwrap().selected = RewindMode::CodeOnly;
-    let mut planned_code = code.clone();
-    planned_code.rewind.as_mut().unwrap().plan = plan(RewindMode::CodeOnly);
+    let picker_at = |selected, plan: Option<RewindMode>| {
+        let mut ui = UiState::default();
+        let plan =
+            plan.map(|mode| Ok(RewindPlan { checkpoint: CheckpointId(1), mode, fork_at: Some(EntryId(5)), restore: None, kill: vec![] }));
+        ui.overlays.push(Overlay::Rewind(RewindPicker { checkpoint: CheckpointId(1), entry: EntryId(5), selected, plan }));
+        ui
+    };
+    let picker = picker_at(RewindMode::Both, None);
+    let planned_both = picker_at(RewindMode::Both, Some(RewindMode::Both));
+    let code = picker_at(RewindMode::CodeOnly, None);
+    let planned_code = picker_at(RewindMode::CodeOnly, Some(RewindMode::CodeOnly));
     for s in [&ui, &picker, &planned_both, &code, &planned_code] {
         let kept = ring.record(capture(s, 100, 24).1).cloned().unwrap();
         assert!(kept.anomalies.is_empty(), "{:?}", kept.anomalies);
     }
-    assert_eq!(names, ["header", "transcript", "input", "footer"], "no sidebar below 72 columns");
+    assert_eq!(names, ["transcript", "input", "footer"], "one column: no header bar, no sidebar at any width");
 }
 
 #[test]
@@ -381,8 +400,13 @@ fn headless_json_is_the_trimmed_screen_with_named_areas() {
     assert!(lines.iter().all(|l| !l.as_str().unwrap().ends_with(' ')));
     let input = v["areas"].as_array().unwrap().iter().find(|a| a["area"] == "input").unwrap();
     assert!(input["text"].as_str().unwrap().contains("draft text"));
-    assert_eq!(v["modal"], "none");
-    assert_eq!(v["focus"], "input");
+    assert_eq!((v["v"].as_u64(), v["overlay"].as_str()), (Some(2), Some("none")));
+    assert!(v["menu"].is_null());
+    ui.local.draft = "/tre".into();
+    ui.local.cursor = 4;
+    let v = render_frame_json(&ui, 100, 20);
+    assert_eq!(v["menu"]["items"], json!(["/tree"]), "the open menu is part of the screen record");
+    assert!(v["areas"].as_array().unwrap().iter().any(|a| a["area"] == "menu"));
 }
 
 // ───────────────────────────── against a real session ─────────────────────────────
@@ -467,11 +491,14 @@ async fn live_events_fold_to_the_same_screen_as_a_fresh_fold() {
     let fresh = ui_from_session(&s, &r.planned).unwrap();
     assert_eq!(live.transcript.blocks, fresh.transcript.blocks);
     let text = screen(&fresh, 120, 30);
-    assert!(text.contains("you ▸ read a.txt"), "{text}");
-    assert!(text.contains("╭ tool-fs.read · ReadOnly ─ ✓"), "{text}");
+    assert!(text.contains("❯ read a.txt"), "{text}");
+    assert!(text.contains("▍ tool-fs.read · ReadOnly ✓"), "{text}");
     assert!(text.contains("the file says alpha"), "{text}");
     assert!(text.contains("◆ checkpoint c"), "turn end leaves a marker:\n{text}");
-    assert!(text.contains("● world-host") && text.contains("● tool-fs"), "{text}");
+    let mut treed = fresh.clone();
+    typed(&mut treed, "/tree");
+    let tree = screen(&treed, 120, 30);
+    assert!(tree.contains("● world-host") && tree.contains("● tool-fs"), "{tree}");
 
     // A chat rewind moves the head: the next entry does not continue the folded branch.
     let cp = s.fold().unwrap().checkpoints[0].0;
@@ -503,7 +530,9 @@ fn slash_lines_become_commands_even_mid_turn_and_double_slash_is_a_prompt() {
     let mut ui = UiState::default();
     assert_eq!(typed(&mut ui, "/plan  checking first "), Some(Action::Command { name: "plan".into(), args: "checking first".into() }));
     ui.busy = true;
-    assert_eq!(typed(&mut ui, "/help"), Some(Action::Command { name: "help".into(), args: String::new() }), "a command is never a steer");
+    assert_eq!(typed(&mut ui, "/plan"), Some(Action::Command { name: "plan".into(), args: String::new() }), "a command is never a steer");
+    assert_eq!(typed(&mut ui, "/help"), None, "/help is a view here");
+    assert!(matches!(ui.overlays.pop(), Some(Overlay::Panel(p)) if p.body == PanelBody::View(View::Help)));
     assert_eq!(typed(&mut ui, "//etc/hosts is odd"), Some(Action::Steer { text: "/etc/hosts is odd".into(), urgent: false }));
     ui.busy = false;
     assert_eq!(typed(&mut ui, "//x"), Some(Action::Prompt("/x".into())));
@@ -548,7 +577,7 @@ async fn registered_command_runs_with_its_args_is_logged_and_shows_in_the_status
     let Some(Action::Command { name, args }) = typed(&mut ui, "/echo hi there") else { panic!("not a command") };
     crate::runtime::run_command(&mut ui, &commands, &s, &name, &args);
     assert_eq!(seen.try_iter().collect::<Vec<_>>(), ["hi there"]);
-    assert_eq!(ui.notice.as_deref(), Some("echoed hi there"));
+    assert_eq!(notice(&ui), "echoed hi there");
     assert!(screen(&ui, 100, 16).lines().last().unwrap().contains("echoed hi there"));
     let logged = kinds_after(&s, before);
     assert!(
@@ -560,8 +589,8 @@ async fn registered_command_runs_with_its_args_is_logged_and_shows_in_the_status
     );
 
     crate::runtime::run_command(&mut ui, &commands, &s, "fail", "");
-    let notice = ui.notice.clone().unwrap();
-    assert!(notice.contains("`/fail`: nothing to do here"), "{notice}");
+    assert!(notice(&ui).contains("`/fail`: nothing to do here"), "{}", notice(&ui));
+    assert_eq!(ui.notice.as_ref().map(|n| n.tone), Some(Tone::Error));
     assert!(matches!(kinds_after(&s, before + 2).last(), Some((_, EntryKind::CommandDone { kind, .. })) if kind == "error"));
     assert_eq!(s.fold().unwrap().turns, 0, "no command started a turn");
 }
@@ -575,19 +604,25 @@ async fn unknown_command_is_refused_with_the_list_and_help_lists_every_command()
     let before = branch_len(&s);
 
     crate::runtime::run_command(&mut ui, &commands, &s, "nope", "x");
-    let notice = ui.notice.clone().unwrap();
-    assert!(notice.contains("`/nope` is not a command here, so nothing was sent to the model"), "{notice}");
-    assert!(notice.contains("Commands: /help, /echo, /fail"), "{notice}");
+    let refused = notice(&ui);
+    assert!(refused.contains("`/nope` is not a command here, so nothing was sent to the model"), "{refused}");
+    assert!(refused.contains("Commands: /help, /echo, /fail"), "{refused}");
     let text = screen(&ui, 100, 16);
     assert!(text.contains("Commands: /help, /echo, /fail") && text.contains("`//`"), "the refusal wraps into the footer:\n{text}");
     assert_eq!(branch_len(&s), before, "a refusal writes nothing");
     assert!(seen.try_recv().is_err(), "the handler was not called");
 
+    // A multi-line answer opens a panel instead of crowding the hint row.
+    ui.notice = None;
     crate::runtime::run_command(&mut ui, &commands, &s, "help", "");
-    assert_eq!(ui.notice.as_deref(), Some("/help: list these commands\n/echo <text>: repeat the text\n/fail: always refuses"));
+    assert!(ui.notice.is_none());
+    let Some(Overlay::Panel(p)) = ui.overlays.last() else { panic!("{:?}", ui.overlays) };
+    assert_eq!(
+        p.body,
+        PanelBody::Text(vec!["/help: list these commands".into(), "/echo <text>: repeat the text".into(), "/fail: always refuses".into()])
+    );
     let text = screen(&ui, 100, 16);
-    let tail: Vec<&str> = text.lines().rev().take(3).collect();
-    assert!(tail[2].contains("/help: list") && tail[1].contains("/echo <text>") && tail[0].contains("/fail"), "{text}");
+    assert!(text.contains("╭ /help ") && text.contains("/echo <text>: repeat the text"), "{text}");
     assert_eq!(branch_len(&s), before, "/help writes nothing");
     assert_eq!(s.fold().unwrap().turns, 0);
 }
@@ -600,4 +635,165 @@ fn registration_refuses_reserved_duplicate_and_malformed_names() {
     assert!(c.register("echo", "", "", noop.clone()).unwrap_err().contains("already a command"));
     assert!(c.register("Bad Name", "", "", noop).unwrap_err().contains("not a command name"));
     assert_eq!(c.names().collect::<Vec<_>>(), ["echo", "fail"]);
+}
+
+// ───────────────────────────── the `/` menu ─────────────────────────────
+
+fn with_preset(ui: &mut UiState) {
+    ui.commands = vec![CommandInfo {
+        name: "preset".into(),
+        usage: "<name>".into(),
+        help: "switch the session policy".into(),
+        choices: vec![("read-only".into(), "look only".into()), ("dev".into(), "+ network".into()), ("lab".into(), "+ VMs".into())],
+    }];
+}
+
+fn type_str(ui: &mut UiState, text: &str) {
+    for c in text.chars() {
+        on_key(ui, key(KeyCode::Char(c)));
+    }
+}
+
+#[test]
+fn slash_opens_the_menu_under_the_prompt_and_arrows_tab_enter_and_esc_drive_it() {
+    let mut ui = UiState::default();
+    with_preset(&mut ui);
+    type_str(&mut ui, "/");
+    let text = screen(&ui, 100, 24);
+    println!("--- menu after `/` (TestBackend 100x24) ---\n{text}");
+    assert!(text.contains("▸ /help") && text.contains("/tree") && text.contains("commands, views and keys"), "{text}");
+    assert!(text.contains("↑↓ select · tab complete · enter run · esc close"), "{text}");
+
+    // Narrow, move, complete: Tab puts the command in the prompt, then its values are offered.
+    type_str(&mut ui, "pr");
+    assert_eq!(render_frame_json(&ui, 100, 24)["menu"]["items"], json!(["/preset"]));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Tab)), None);
+    assert_eq!(ui.local.draft, "/preset ");
+    let values = screen(&ui, 100, 24);
+    assert!(values.contains("▸ dev") && values.contains("lab") && values.contains("read-only"), "{values}");
+    on_key(&mut ui, key(KeyCode::Down));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Command { name: "preset".into(), args: "lab".into() }));
+    assert!(ui.local.draft.is_empty());
+
+    // Enter on a name that needs its argument completes instead of running without it.
+    type_str(&mut ui, "/pre");
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None);
+    assert_eq!(ui.local.draft, "/preset ");
+    // Up wraps to the last value.
+    on_key(&mut ui, key(KeyCode::Up));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Command { name: "preset".into(), args: "read-only".into() }));
+
+    // Esc closes the menu for this draft; typing opens it again; Tab no longer moves focus.
+    type_str(&mut ui, "/j");
+    on_key(&mut ui, key(KeyCode::Esc));
+    assert!(render_frame_json(&ui, 100, 24)["menu"].is_null());
+    type_str(&mut ui, "o");
+    assert_eq!(render_frame_json(&ui, 100, 24)["menu"]["items"], json!(["/jobs"]));
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None, "/jobs runs from the menu: a view");
+    assert_eq!(front(&ui), "panel");
+}
+
+#[test]
+fn a_prompt_or_a_double_slash_line_never_opens_the_menu() {
+    let mut ui = UiState::default();
+    type_str(&mut ui, "fix the /tree bug");
+    assert!(render_frame_json(&ui, 100, 20)["menu"].is_null());
+    assert_eq!(on_key(&mut ui, key(KeyCode::Tab)), None);
+    assert_eq!(ui.local.draft, "fix the /tree bug", "Tab edits nothing outside the menu");
+    ui.local.draft.clear();
+    ui.local.cursor = 0;
+    type_str(&mut ui, "//tree");
+    assert!(render_frame_json(&ui, 100, 20)["menu"].is_null());
+    assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Prompt("/tree".into())));
+}
+
+// ───────────────────────────── inline: the scrollback ─────────────────────────────
+
+fn user(text: &str) -> (Principal, EntryKind) {
+    (Principal::Operator, EntryKind::UserMessage { form: Form::Prompt, text: text.into(), client_key: None })
+}
+
+fn say(text: &str) -> (Principal, EntryKind) {
+    (model(), EntryKind::AssistantMessage { content: vec![ContentBlock::text(text)], usage: Usage::default(), stop: StopReason::EndTurn })
+}
+
+fn visible(screen: &InlineScreen<TestBackend>) -> String {
+    let buf = screen.backend().buffer().clone();
+    buffer_lines(&buf, buf.area).join("\n")
+}
+
+#[test]
+fn settled_blocks_go_to_the_scrollback_once_and_a_running_card_stays_live_until_its_result() {
+    let call = CallId("c1".into());
+    let entries = log_with(vec![
+        user("first question"),
+        say("first answer"),
+        (
+            model(),
+            EntryKind::ToolCall {
+                call: call.clone(),
+                tool: "bash".into(),
+                args: json!({"command": "sleep 1"}),
+                class: Consequence::SpawnsProcess,
+            },
+        ),
+        say("while it runs"),
+        (
+            Principal::system("tools"),
+            EntryKind::ToolResult {
+                call,
+                outcome: ToolOutcome::Ok,
+                value: json!({}),
+                content: vec![ContentBlock::text("slept")],
+                spill_ref: None,
+                meta: None,
+                late: false,
+            },
+        ),
+    ]);
+    let mut ui = UiState::default();
+    ui.refold(&entries[..4], &Default::default()).unwrap();
+    assert_eq!(ui.transcript.settled(), 2, "the running card holds back itself and what follows");
+
+    let mut inline = InlineScreen::new(TestBackend::new(70, 24), 4).unwrap();
+    let mut probe = Probe::default();
+    inline.draw(&ui, &mut probe).unwrap();
+    assert_eq!(inline.printed(), 2);
+    let text = visible(&inline);
+    println!("--- inline, card running (TestBackend 70x24) ---\n{text}");
+    let at = |needle: &str| text.lines().position(|l| l.contains(needle)).unwrap_or_else(|| panic!("no `{needle}` in\n{text}"));
+    assert!(at("❯ first question") < at("first answer") && at("first answer") < at("⋯ running"), "{text}");
+    assert!(at("while it runs") < at("type a prompt"), "the live part sits above the prompt:\n{text}");
+
+    ui.apply(&entries[4], &Default::default()).unwrap();
+    inline.draw(&ui, &mut probe).unwrap();
+    assert_eq!(inline.printed(), 4, "the result settles the card and what followed it");
+    let text = visible(&inline);
+    assert_eq!(text.matches("first question").count(), 1, "nothing is written twice:\n{text}");
+    assert!(text.contains("✓ slept") && !text.contains("⋯ running"), "{text}");
+
+    // A refold (fork, rewind) keeps what the scrollback already shows.
+    ui.refold(&entries, &Default::default()).unwrap();
+    inline.reanchor(&ui);
+    assert_eq!(inline.printed(), 4);
+    inline.draw(&ui, &mut probe).unwrap();
+    assert_eq!(visible(&inline).matches("while it runs").count(), 1);
+    assert!(probe.anomalies.is_empty(), "{:?}", probe.anomalies);
+}
+
+#[test]
+fn the_inline_viewport_grows_with_the_menu_and_shrinks_back_when_it_closes() {
+    let mut ui = UiState::default();
+    let mut inline = InlineScreen::new(TestBackend::new(80, 30), 4).unwrap();
+    let mut probe = Probe::default();
+    inline.draw(&ui, &mut probe).unwrap();
+    let idle = inline.height();
+    type_str(&mut ui, "/");
+    inline.draw(&ui, &mut probe).unwrap();
+    assert!(inline.height() > idle + 4, "the menu gets rows: {} -> {}", idle, inline.height());
+    assert!(visible(&inline).contains("▸ /help"));
+    on_key(&mut ui, key(KeyCode::Esc));
+    inline.draw(&ui, &mut probe).unwrap();
+    assert_eq!(inline.height(), idle);
+    assert!(!visible(&inline).contains("/help"), "the menu rows are cleared, not left behind");
 }

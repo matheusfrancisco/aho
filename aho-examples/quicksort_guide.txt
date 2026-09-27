@@ -1,0 +1,171 @@
+"""
+QUICKSORT - Complete Visual Guide
+==================================
+
+Array: [8, 3, 1, 7, 0, 10, 2]
+
+┌─────────────────────────────────────────────────────────────────┐
+│                    INITIAL STATE                                │
+├─────────────────────────────────────────────────────────────────┤
+│  Index:    0   1   2   3   4   5   6                           │
+│  Array:  [ 8 | 3 | 1 | 7 | 0 |10 | 2 ]                         │
+│                                  ↑                              │
+│                              Pivot = 2                          │
+└─────────────────────────────────────────────────────────────────┘
+
+STEP 1: Partition around pivot = 2
+───────────────────────────────────
+
+Scan left to right, moving elements ≤ 2 to the left:
+
+  [ 8 | 3 | 1 | 7 | 0 |10 | 2 ]
+    ✗   ✗   ✓           
+  
+  Swap 1 to front:
+  [ 1 | 3 | 8 | 7 | 0 |10 | 2 ]
+        ✗   ✗   ✓
+  
+  Swap 0 to front:
+  [ 1 | 0 | 8 | 7 | 3 |10 | 2 ]
+                        ✗
+  
+  Place pivot:
+  [ 1 | 0 | 2 | 7 | 3 |10 | 8 ]
+          ↑
+      PIVOT IS IN CORRECT POSITION!
+
+Result: [1, 0] | [2] | [7, 3, 10, 8]
+        ────────       ───────────────
+         < 2      =2        > 2
+
+
+RECURSION TREE:
+═══════════════
+
+                    [8,3,1,7,0,10,2]
+                           │
+                      Pivot = 2
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+          [1, 0]                   [7,3,10,8]
+         Pivot=0                   Pivot=8
+              │                         │
+         ┌────┴────┐             ┌──────┴──────┐
+         │         │             │             │
+        []        [1]        [7, 3]          [10]
+                           Pivot=3
+                              │
+                         ┌────┴────┐
+                         │         │
+                        []        [7]
+
+
+FINAL SORTED ARRAY:
+═══════════════════
+
+  [ 0 | 1 | 2 | 3 | 7 | 8 |10 ]
+    ✓   ✓   ✓   ✓   ✓   ✓   ✓
+
+
+KEY CONCEPTS:
+═════════════
+
+1. DIVIDE & CONQUER
+   ┌─────────────────────┐
+   │  Pick Pivot (2)     │
+   └──────────┬──────────┘
+              │
+   ┌──────────▼──────────┐
+   │  Partition Array    │
+   │  [≤2]  [2]  [>2]    │
+   └──────────┬──────────┘
+              │
+   ┌──────────▼──────────┐
+   │  Sort Left & Right  │
+   │  Recursively        │
+   └─────────────────────┘
+
+2. IN-PLACE SORTING
+   • Swaps elements within array
+   • No extra arrays needed
+   • Only O(log n) stack space
+
+3. PARTITION PROCESS
+   
+   i = boundary of small elements
+   j = current element being checked
+   
+   [smaller...] i [larger...] j [...unsorted...] [pivot]
+   
+   If arr[j] ≤ pivot:
+     i++
+     swap arr[i] ↔ arr[j]
+   
+   Finally:
+     swap arr[i+1] ↔ pivot
+
+
+TIME COMPLEXITY ANALYSIS:
+═════════════════════════
+
+Best/Average Case: O(n log n)
+├─ Height of tree: log n
+└─ Work per level: n (partitioning)
+
+      Level 1:  [────────────] n comparisons
+                      │
+      Level 2:  [──────][────] n comparisons
+                   │       │
+      Level 3:  [──][──][─][─] n comparisons
+                ...
+      Height: log₂(n)
+
+Worst Case: O(n²)
+├─ Happens when pivot is always min/max
+└─ Tree becomes linear (like linked list)
+
+      [1,2,3,4,5] with last-element pivot:
+      
+      5: [1,2,3,4] | 5 | []        4 comparisons
+      4: [1,2,3]   | 4 | []        3 comparisons  
+      3: [1,2]     | 3 | []        2 comparisons
+      2: [1]       | 2 | []        1 comparison
+      
+      Total: 4+3+2+1 = 10 = n(n-1)/2 = O(n²)
+
+
+PARTITION SCHEMES:
+══════════════════
+
+Lomuto (simpler):
+  • Pivot = last element
+  • Single pass left to right
+  • More swaps
+
+Hoare (original):
+  • Pivot = first/middle element
+  • Two pointers from both ends
+  • Fewer swaps, faster
+
+3-Way:
+  • Handles duplicates efficiently
+  • Partitions into: <pivot, =pivot, >pivot
+  • Best for many duplicate values
+
+
+WHEN TO USE QUICKSORT:
+══════════════════════
+
+✓ Average/best case performance crucial
+✓ Memory is limited (in-place)
+✓ Cache efficiency matters
+✓ Parallelization needed
+
+✗ Worst-case guarantee required → Use Merge Sort
+✗ Stability needed → Use Merge Sort
+✗ Small arrays → Use Insertion Sort
+
+"""
+
+print(__doc__)

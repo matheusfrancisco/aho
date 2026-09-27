@@ -29,6 +29,24 @@ pub fn commands() -> Result<Commands, String> {
             Ok(format!("preset {args} · epoch {} · allowed {}", view.epoch.0, view.allowed))
         }),
     )?;
+    c.set_choices(
+        "preset",
+        aho_policy::Preset::SWITCHABLE
+            .iter()
+            .map(|p| {
+                let what = match p {
+                    aho_policy::Preset::ReadOnly => "look only: reads, questions",
+                    aho_policy::Preset::Workspace => "edit the workspace and run commands",
+                    aho_policy::Preset::Dev => "workspace + network",
+                    aho_policy::Preset::Lab => "dev + VMs and the desktop",
+                    aho_policy::Preset::Full => "everything the world allows",
+                    aho_policy::Preset::Spec => "read-only outside spec/ plus the checkers",
+                    aho_policy::Preset::Custom => "",
+                };
+                (p.name().to_string(), what.to_string())
+            })
+            .collect(),
+    )?;
     c.register(
         "plan",
         "[reason]",

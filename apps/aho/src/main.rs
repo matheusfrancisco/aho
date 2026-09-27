@@ -107,7 +107,9 @@ async fn dispatch(cli: Cli) -> Result<(), Fail> {
         Verb::Serve(a) if a.stop => serve::stop(&ctx, a.socket.as_deref()).await,
         Verb::Serve(a) => serve::serve(&ctx, ready, a).await,
         Verb::Attach(a) => serve::attach(&ctx, a).await,
-        Verb::Tui { session, headless, width, height } => surfaces::tui(&ctx, session.as_deref(), *headless, *width, *height).await,
+        Verb::Tui { session, headless, fullscreen, width, height } => {
+            surfaces::tui(&ctx, session.as_deref(), *headless, *fullscreen, *width, *height).await
+        }
         Verb::Web { session, bind, cert, key, insecure_loopback } => {
             surfaces::web(&ctx, session.as_deref(), bind, cert.as_deref(), key.as_deref(), *insecure_loopback).await
         }

@@ -3,7 +3,7 @@ name = "surface-tui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ratatui TUI; same tree/inventory JSON as web; frame ring buffer for visual debug"
+description = "ratatui TUI: inline one-column transcript, themed, `/` command menu, closable overlays; frame ring buffer for visual debug"
 
 [dependencies]
 aho-types.workspace = true
@@ -20,9 +20,7 @@ aho-proc.workspace = true
 aho-fs.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-futures.workspace = true
 ratatui.workspace = true
-crossterm = { workspace = true, features = ["event-stream"] }
 unicode-width.workspace = true
 
 [dev-dependencies]

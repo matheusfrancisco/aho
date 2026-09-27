@@ -32,7 +32,7 @@ fn resumed_note(id: aho_types::SessionId, resumed: bool) {
     eprintln!("session {} ({})", hex(id), if resumed { "resumed" } else { "new" });
 }
 
-pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, width: u16, height: u16) -> Result<(), Fail> {
+pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, fullscreen: bool, width: u16, height: u16) -> Result<(), Fail> {
     let inputs = ctx.inputs(&[], false)?;
     let p = ctx.load(&inputs)?;
     if headless {
@@ -47,7 +47,9 @@ pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, width: u16, h
     let commands = crate::slash::commands().map_err(err)?;
     let o = open(ctx, &p, &inputs.home, session, true, true).await?;
     let approvals = o.approvals.ok_or_else(|| err("the session has no approval channel, so the terminal UI cannot answer cards"))?;
-    let ran = surface_tui::run(o.session.clone(), approvals, p, commands).await;
+    // Colours from the terminal: NO_COLOR, COLORTERM/TERM depth, COLORFGBG or AHO_THEME background.
+    let options = surface_tui::RunOptions { fullscreen, theme: surface_tui::Theme::detect(&|k| std::env::var(k).ok()) };
+    let ran = surface_tui::run(o.session.clone(), approvals, p, commands, options).await;
     stop_drivers(o.drivers).await;
     ran.map_err(err)?;
     println!("session {} · {}  (resume: aho tui --session {})", hex(o.id), o.path.display(), &hex(o.id)[..12.min(hex(o.id).len())]);

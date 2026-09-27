@@ -16,6 +16,9 @@ use aho_policy::{ApprovalCard, DecisionReason};
 use aho_proc::OpInfo;
 use aho_types::*;
 
+use crate::slash::CommandInfo;
+use crate::theme::Theme;
+
 // ───────────────────────────── transcript ─────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -259,6 +262,12 @@ impl Transcript {
         self.live_tools.clear();
     }
 
+    /// Blocks before the first tool card still waiting for its result: they will not change
+    /// again, so an inline surface may commit them to the terminal's scrollback.
+    pub fn settled(&self) -> usize {
+        self.blocks.iter().position(|b| matches!(&b.body, Body::Tool(c) if c.result.is_none())).unwrap_or(self.blocks.len())
+    }
+
     pub fn card_for(&self, call: &CallId) -> Option<&ToolCard> {
         self.calls.get(call).and_then(|&i| match &self.blocks.get(i)?.body {
             Body::Tool(c) => Some(c),
@@ -481,33 +490,110 @@ pub struct RewindPicker {
 
 // ───────────────────────────── ui state ─────────────────────────────
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum Focus {
-    #[default]
-    Input,
-    Transcript,
-    Sidebar,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum Tab {
-    #[default]
+/// A live view a panel draws from the fold on every frame (so it updates while open).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum View {
+    /// Commands, views and keys.
+    Help,
     Tree,
     Inventory,
     Jobs,
     Invariants,
 }
 
-pub const TABS: [Tab; 4] = [Tab::Tree, Tab::Inventory, Tab::Jobs, Tab::Invariants];
-
-impl Tab {
-    pub fn name(self) -> &'static str {
+impl View {
+    pub fn title(self) -> &'static str {
         match self {
-            Tab::Tree => "Tree",
-            Tab::Inventory => "Inventory",
-            Tab::Jobs => "Jobs",
-            Tab::Invariants => "Invariants",
+            View::Help => "help",
+            View::Tree => "tree",
+            View::Inventory => "inventory",
+            View::Jobs => "jobs",
+            View::Invariants => "invariants",
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum PanelBody {
+    View(View),
+    /// A command's multi-line answer.
+    Text(Vec<String>),
+}
+
+/// A read-only panel over the transcript; Esc closes it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Panel {
+    pub title: String,
+    pub body: PanelBody,
+    pub scroll: usize,
+    pub tone: Tone,
+}
+
+impl Panel {
+    pub fn view(v: View) -> Panel {
+        Panel { title: v.title().into(), body: PanelBody::View(v), scroll: 0, tone: Tone::Info }
+    }
+    pub fn text(title: impl Into<String>, text: &str, tone: Tone) -> Panel {
+        Panel { title: title.into(), body: PanelBody::Text(text.lines().map(str::to_string).collect()), scroll: 0, tone }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CheckpointItem {
+    pub id: CheckpointId,
+    pub entry: EntryId,
+    pub label: String,
+}
+
+/// `/rewind`: the checkpoints of the current branch, newest first.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CheckpointList {
+    pub items: Vec<CheckpointItem>,
+    pub selected: usize,
+}
+
+/// What a command opened in front of the transcript. The top of the stack gets the keys.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Overlay {
+    Panel(Panel),
+    Checkpoints(CheckpointList),
+    Rewind(RewindPicker),
+}
+
+impl Overlay {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Overlay::Panel(_) => "panel",
+            Overlay::Checkpoints(_) => "checkpoints",
+            Overlay::Rewind(_) => "rewind",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Tone {
+    #[default]
+    Info,
+    Warn,
+    Error,
+}
+
+/// A one-line status message; it clears on the next key.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Notice {
+    pub text: String,
+    pub tone: Tone,
+}
+
+impl Notice {
+    pub fn info(text: impl Into<String>) -> Notice {
+        Notice { text: text.into(), tone: Tone::Info }
+    }
+    pub fn warn(text: impl Into<String>) -> Notice {
+        Notice { text: text.into(), tone: Tone::Warn }
+    }
+    pub fn error(text: impl Into<String>) -> Notice {
+        Notice { text: text.into(), tone: Tone::Error }
     }
 }
 
@@ -517,14 +603,13 @@ pub struct Local {
     pub draft: String,
     /// Cursor in `draft`, in chars.
     pub cursor: usize,
-    /// Transcript lines scrolled up from the tail (0 = follow).
+    /// Transcript lines scrolled up from the tail (0 = follow); full-screen mode only.
     pub scroll: usize,
-    /// Selected transcript block (transcript focus).
-    pub selected: Option<usize>,
-    pub focus: Focus,
-    pub tab: Tab,
-    pub sidebar_scroll: usize,
     pub hud: bool,
+    /// The highlighted row of the `/` menu.
+    pub menu_selected: usize,
+    /// Esc closed the menu for this draft; editing reopens it.
+    pub menu_dismissed: bool,
 }
 
 /// Plan facts the header shows.
@@ -546,14 +631,19 @@ pub struct UiState {
     pub tree: Vec<TreeNode>,
     pub inventory: Vec<InvCard>,
     pub jobs: Vec<OpInfo>,
+    /// The approval card: above every overlay, and answered first.
     pub approval: Option<ApprovalView>,
     /// Cards waiting behind the one shown.
     pub approvals_queued: usize,
-    pub rewind: Option<RewindPicker>,
+    /// Panels and pickers opened by commands; the last one is on top.
+    pub overlays: Vec<Overlay>,
     /// A prompt this surface started is still running.
     pub busy: bool,
-    pub notice: Option<String>,
+    pub notice: Option<Notice>,
     pub tool_caps: BTreeMap<String, String>,
+    /// The app's slash commands (for the menu and `/help`).
+    pub commands: Vec<CommandInfo>,
+    pub theme: Theme,
     pub local: Local,
 }
 
@@ -597,7 +687,6 @@ impl UiState {
     pub fn refold(&mut self, branch: &[Entry], folds: &CustomFolds) -> Result<(), String> {
         self.transcript = Transcript::from_entries(branch, &self.tool_caps);
         self.state = aho_log::fold(branch, folds).map_err(|e| format!("the session log does not fold: {e}"))?;
-        self.clamp_selection();
         Ok(())
     }
 
@@ -609,17 +698,27 @@ impl UiState {
         Ok(())
     }
 
-    pub fn clamp_selection(&mut self) {
-        let n = self.transcript.blocks.len();
-        if let Some(s) = self.local.selected
-            && s >= n
-        {
-            self.local.selected = n.checked_sub(1);
-        }
+    /// Whether anything covers the transcript (then the full screen is drawn).
+    pub fn covered(&self) -> bool {
+        self.approval.is_some() || !self.overlays.is_empty()
     }
 
-    pub fn selected_block(&self) -> Option<&Block> {
-        self.local.selected.and_then(|i| self.transcript.blocks.get(i))
+    /// The checkpoints of this branch as `/rewind` lists them, newest first.
+    pub fn checkpoint_items(&self) -> Vec<CheckpointItem> {
+        let mut items: Vec<CheckpointItem> = self
+            .transcript
+            .blocks
+            .iter()
+            .filter_map(|b| match &b.body {
+                Body::Checkpoint { id, cause, turn } => {
+                    let entry = self.state.checkpoints.iter().find(|c| c.0 == *id).map_or(b.entry, |c| c.2);
+                    Some(CheckpointItem { id: *id, entry, label: format!("c{} · turn {turn} · {cause}", id.0) })
+                }
+                _ => None,
+            })
+            .collect();
+        items.reverse();
+        items
     }
 
     /// Busy = a turn is open in the log, or a prompt from this surface has not returned yet.

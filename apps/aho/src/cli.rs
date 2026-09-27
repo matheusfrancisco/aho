@@ -243,6 +243,10 @@ pub enum Verb {
         session: Option<String>,
         #[arg(long)]
         headless: bool,
+        /// Keep the whole session on the alternate screen instead of inline in the terminal's
+        /// scrollback (the transcript then scrolls with PgUp/PgDn).
+        #[arg(long, conflicts_with = "headless")]
+        fullscreen: bool,
         #[arg(long, default_value_t = 120)]
         width: u16,
         #[arg(long, default_value_t = 32)]

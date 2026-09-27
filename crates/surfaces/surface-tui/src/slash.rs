@@ -28,7 +28,26 @@ pub const HELP: &str = "help";
 struct Command {
     usage: String,
     help: String,
+    choices: Vec<(String, String)>,
     run: Handler,
+}
+
+/// What a surface shows about one command before it runs: its synopsis, what it does, and the
+/// values its argument takes when they are a closed set (the menu offers them).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CommandInfo {
+    pub name: String,
+    pub usage: String,
+    pub help: String,
+    /// `(value, description)`.
+    pub choices: Vec<(String, String)>,
+}
+
+impl CommandInfo {
+    /// The argument is required (`<name>`), not optional (`[reason]`) or absent.
+    pub fn needs_args(&self) -> bool {
+        self.usage.starts_with('<')
+    }
 }
 
 /// The commands a surface dispatches `/name` lines to, filled by the app.
@@ -99,8 +118,25 @@ impl Commands {
         if name == HELP || self.by_name.contains_key(name) {
             return Err(format!("`/{name}` is already a command; the second registration was refused. Pick another name"));
         }
-        self.by_name.insert(name.to_string(), Command { usage: usage.trim().to_string(), help: help.to_string(), run });
+        self.by_name
+            .insert(name.to_string(), Command { usage: usage.trim().to_string(), help: help.to_string(), choices: Vec::new(), run });
         Ok(())
+    }
+
+    /// The closed set of values `/name`'s argument takes, `(value, description)`, for surfaces
+    /// that complete arguments. The handler still validates what it is given.
+    pub fn set_choices(&mut self, name: &str, choices: Vec<(String, String)>) -> Result<(), String> {
+        let c = self.by_name.get_mut(name).ok_or_else(|| format!("`/{name}` is not registered, so its choices were not set"))?;
+        c.choices = choices;
+        Ok(())
+    }
+
+    /// Every registered command, sorted, without the built-in `help`.
+    pub fn info(&self) -> Vec<CommandInfo> {
+        self.by_name
+            .iter()
+            .map(|(name, c)| CommandInfo { name: name.clone(), usage: c.usage.clone(), help: c.help.clone(), choices: c.choices.clone() })
+            .collect()
     }
 
     /// Registered names, sorted, without the built-in `help`.

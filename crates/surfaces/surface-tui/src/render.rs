@@ -1,128 +1,156 @@
 //! Drawing is a pure function of [`UiState`]: [`draw`] fills a `Buffer`, records each area it
 //! laid out on a [`Probe`], and asserts layout invariants with [`Probe::check`]. The runtime and
-//! the tests (ratatui's `TestBackend`) call the same function.
+//! the tests (ratatui's `TestBackend`) call the same functions.
+//!
+//! One column, no sidebar: the transcript, then the prompt box (its top border is the status
+//! line), then the `/` menu while it is open, then one row of key hints or a notice. Commands
+//! open overlays in front of the transcript. Inline (the terminal's own scrollback holds the
+//! finished transcript) only the live bottom is drawn: [`draw_inline`], [`block_lines`].
 
 use aho_inspect::{TreeNode, glyph, render_classes, state_name};
 use aho_log::Verdict;
 use aho_log::{CapState, OpStatus};
 use aho_types::{Consequence, Timestamp};
 use ratatui::buffer::Buffer;
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::layout::{Alignment, Rect};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Widget};
+use ratatui::widgets::{Block, BorderType, Clear, Widget};
 use serde_json::{Value, json};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use crate::frames::{Frame, Probe, buffer_lines};
+use crate::frames::{Frame as Captured, Probe, buffer_lines};
+use crate::markdown;
+use crate::menu::{self, MENU_ROWS, VIEWS};
 use crate::model::{
-    ApprovalView, Body, Focus, MODES, ResultStatus, RewindPicker, TABS, Tab, ToolCard, UiState, compact, mode_doc, mode_name,
-    principal_label,
+    ApprovalView, Body, CheckpointList, MODES, Overlay, Panel, PanelBody, ResultStatus, RewindPicker, Tone, ToolCard, UiState, View,
+    compact, mode_doc, mode_name, principal_label,
 };
+use crate::theme::Theme;
 
 pub const MIN_WIDTH: u16 = 40;
 pub const MIN_HEIGHT: u16 = 10;
-const SIDEBAR_MIN_TOTAL: u16 = 72;
+/// Rows a notice may wrap to in the hint row.
+const NOTICE_MAX: usize = 3;
 
-fn dim() -> Style {
-    Style::default().fg(Color::DarkGray)
-}
-
-/// Renders `ui` into a fresh `w`×`h` buffer. Pure: same state, same cells.
+/// Renders `ui` into a fresh `w`×`h` buffer (the full screen). Pure: same state, same cells.
 pub fn render_to_buffer(ui: &UiState, w: u16, h: u16) -> Buffer {
     capture(ui, w, h).0
 }
 
-/// Renders and captures the frame record (rects, text per area, anomalies).
-pub fn capture(ui: &UiState, w: u16, h: u16) -> (Buffer, Frame) {
+/// Renders the full screen and captures the frame record (rects, text per area, anomalies).
+pub fn capture(ui: &UiState, w: u16, h: u16) -> (Buffer, Captured) {
     let started = std::time::Instant::now();
     let area = Rect::new(0, 0, w, h);
     let mut buf = Buffer::empty(area);
     let mut probe = Probe::default();
     draw(ui, area, &mut buf, &mut probe);
     let ms = started.elapsed().as_millis() as u64;
-    let frame = Frame::from_buffer(&buf, probe, ms);
+    let frame = Captured::from_buffer(&buf, probe, ms);
     (buf, frame)
+}
+
+/// What is in front of the transcript: `approval`, the top overlay, or `none`.
+pub fn front(ui: &UiState) -> &'static str {
+    if ui.approval.is_some() { "approval" } else { ui.overlays.last().map_or("none", Overlay::name) }
 }
 
 /// `aho tui --headless`: normalized screen JSON (rows trimmed, no styles) plus the frame record.
 pub fn render_frame_json(ui: &UiState, w: u16, h: u16) -> Value {
     let (buf, frame) = capture(ui, w, h);
     json!({
-        "v": 1,
+        "v": 2,
         "width": w,
         "height": h,
         "lines": buffer_lines(&buf, buf.area),
         "areas": frame.rects.iter().zip(frame.text.iter()).map(|((n, x, y, rw, rh), (_, t))| json!({"area": n, "x": x, "y": y, "w": rw, "h": rh, "text": t})).collect::<Vec<_>>(),
         "anomalies": frame.anomalies,
-        "focus": format!("{:?}", ui.local.focus).to_lowercase(),
-        "tab": ui.local.tab.name(),
-        "modal": if ui.approval.is_some() { "approval" } else if ui.rewind.is_some() { "rewind" } else { "none" },
+        "overlay": front(ui),
+        "menu": menu::open(ui).map(|(items, sel)| json!({"selected": sel, "items": items.iter().map(|s| s.label.clone()).collect::<Vec<_>>()})),
     })
 }
 
-/// Draws the whole screen; returns the terminal cursor position (input line) if it should show.
+// ───────────────────────────── layout ─────────────────────────────
+
+/// Rows below the transcript: the prompt box, the menu, the hint row.
+fn chrome_heights(ui: &UiState, width: u16) -> (u16, u16, u16) {
+    let notice = ui.notice.as_ref().map_or(1, |n| wrap(&n.text, (width as usize).saturating_sub(1)).len().clamp(1, NOTICE_MAX));
+    (3, menu::height(ui), notice as u16)
+}
+
+fn split_bottom(ui: &UiState, area: Rect) -> (Rect, Rect, Rect, Rect) {
+    let (input_h, menu_h, footer_h) = chrome_heights(ui, area.width);
+    let chrome = (input_h + menu_h + footer_h).min(area.height);
+    let top = Rect { height: area.height - chrome, ..area };
+    let mut y = area.y + top.height;
+    let mut take = |h: u16| {
+        let r = Rect { y, height: h.min(area.bottom().saturating_sub(y)), ..area };
+        y += r.height;
+        r
+    };
+    let input = take(input_h);
+    let menu = take(menu_h);
+    let footer = take(footer_h);
+    (top, input, menu, footer)
+}
+
+/// Draws the whole screen; returns the terminal cursor position (in the prompt) if it should show.
 pub fn draw(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
     probe.check(
         area.width >= MIN_WIDTH && area.height >= MIN_HEIGHT,
         format!("terminal is {}x{}, smaller than {MIN_WIDTH}x{MIN_HEIGHT}; panes are clipped", area.width, area.height),
     );
-    let notice = ui.notice.as_deref().map(|n| notice_rows(n, area.width));
-    let footer_h = notice.as_ref().map_or(1, |rows| rows.len().clamp(1, FOOTER_MAX)) as u16;
-    let [header, body, input, footer] =
-        Layout::vertical([Constraint::Length(1), Constraint::Min(3), Constraint::Length(3), Constraint::Length(footer_h)]).areas(area);
-    probe.area("header", header);
-    draw_header(ui, header, buf);
-
-    let (main, side) = if body.width >= SIDEBAR_MIN_TOTAL {
-        let side_w = (body.width / 3).clamp(30, 48);
-        let [m, s] = Layout::horizontal([Constraint::Min(40), Constraint::Length(side_w)]).areas(body);
-        (m, Some(s))
-    } else {
-        (body, None)
-    };
-    probe.area("transcript", main);
-    draw_transcript(ui, main, buf, probe);
-    if let Some(s) = side {
-        probe.area("sidebar", s);
-        draw_sidebar(ui, s, buf);
+    let (top, input, menu_area, footer) = split_bottom(ui, area);
+    probe.area("transcript", top);
+    draw_transcript(ui, top, buf);
+    let cursor = draw_chrome(ui, input, menu_area, footer, buf, probe);
+    // Only the top overlay shows; the ones under it come back as it closes.
+    match ui.overlays.last() {
+        Some(Overlay::Panel(p)) => draw_panel(ui, p, top, buf, probe),
+        Some(Overlay::Checkpoints(list)) => draw_checkpoints(&ui.theme, list, top, buf, probe),
+        Some(Overlay::Rewind(p)) => draw_rewind(&ui.theme, p, area, buf, probe),
+        None => {}
     }
-    probe.area("input", input);
-    let cursor = draw_input(ui, input, buf, probe);
-    probe.area("footer", footer);
-    draw_footer(ui, notice.as_deref(), footer, buf);
-
     if let Some(card) = &ui.approval {
-        draw_approval(card, ui.approvals_queued, area, buf, probe);
+        draw_approval(&ui.theme, card, ui.approvals_queued, area, buf, probe);
         return None;
     }
-    if let Some(p) = &ui.rewind {
-        draw_rewind(p, area, buf, probe);
+    if !ui.overlays.is_empty() {
         return None;
     }
     cursor
 }
 
-fn draw_header(ui: &UiState, area: Rect, buf: &mut Buffer) {
-    let busy =
-        if ui.is_busy() { Span::styled(" ● running ", Style::default().fg(Color::Yellow)) } else { Span::styled(" ○ idle ", dim()) };
-    let p = &ui.plan;
-    let mut spans = vec![
-        Span::styled(format!(" {} ", p.label), Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(format!(
-            "· plan {} · preset {} (epoch {}) · world {} ",
-            p.hash, ui.state.policy.preset, ui.state.policy.epoch.0, p.world
-        )),
-        busy,
-    ];
-    if ui.local.hud {
-        spans.push(Span::styled(
-            format!("· HUD · preset ← {} · enforced by {}", p.preset_origin, p.enforced_by),
-            Style::default().fg(Color::Magenta),
-        ));
+/// Inline: the live part of the transcript (blocks from `from` on, plus the stream) above the
+/// prompt, sized to what it holds. Everything before `from` is already in the scrollback.
+pub fn draw_inline(ui: &UiState, from: usize, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
+    let (top, input, menu_area, footer) = split_bottom(ui, area);
+    let rows = live_rows(ui, from, top.width as usize);
+    probe.area("live", top);
+    let skip = rows.len().saturating_sub(top.height as usize);
+    for (y, line) in rows.iter().skip(skip).enumerate() {
+        set_row(buf, top, y as u16, line);
     }
-    buf.set_style(area, Style::default().bg(Color::Black));
-    buf.set_line(area.x, area.y, &Line::from(spans), area.width);
+    draw_chrome(ui, input, menu_area, footer, buf, probe)
+}
+
+/// The inline viewport height for the current state: the prompt chrome plus the live rows,
+/// within `max` (a live part taller than that shows its tail).
+pub fn inline_height(ui: &UiState, from: usize, width: u16, max: u16) -> u16 {
+    let (a, b, c) = chrome_heights(ui, width);
+    let live = u16::try_from(live_rows(ui, from, width as usize).len()).unwrap_or(u16::MAX);
+    (a + b + c).saturating_add(live).min(max)
+}
+
+fn set_row(buf: &mut Buffer, area: Rect, y: u16, line: &Line<'_>) {
+    if y >= area.height {
+        return;
+    }
+    let row = Rect { y: area.y + y, height: 1, ..area };
+    if let Some(bg) = line.style.bg {
+        buf.set_style(row, Style::default().bg(bg));
+    }
+    buf.set_line(row.x, row.y, line, row.width);
 }
 
 // ───────────────────────────── transcript ─────────────────────────────
@@ -180,14 +208,12 @@ pub fn trunc(s: &str, width: usize) -> String {
     out
 }
 
-type Row = (Line<'static>, Option<usize>);
-
-fn push_wrapped(rows: &mut Vec<Row>, block: Option<usize>, prefix: &str, text: &str, width: usize, style: Style, prefix_style: Style) {
+fn push_wrapped(rows: &mut Vec<Line<'static>>, prefix: &str, text: &str, width: usize, style: Style, prefix_style: Style) {
     let pw = UnicodeWidthStr::width(prefix);
     let pad = " ".repeat(pw);
     for (i, l) in wrap(text, width.saturating_sub(pw)).into_iter().enumerate() {
         let p = if i == 0 { prefix.to_string() } else { pad.clone() };
-        rows.push((Line::from(vec![Span::styled(p, prefix_style), Span::styled(l, style)]), block));
+        rows.push(Line::from(vec![Span::styled(p, prefix_style), Span::styled(l, style)]));
     }
 }
 
@@ -195,311 +221,187 @@ fn class_name(c: Option<Consequence>) -> &'static str {
     c.map_or("unclassified", |c| c.name())
 }
 
-fn tool_rows(rows: &mut Vec<Row>, i: usize, c: &ToolCard, width: usize) {
+/// A tool card: tinted by its state (running, ok, failed), title, arguments, the result's tail.
+fn tool_rows(t: &Theme, rows: &mut Vec<Line<'static>>, c: &ToolCard, width: usize) {
     let title = match &c.cap {
         Some(cap) => format!("{cap}.{}", c.tool),
         None => c.tool.clone(),
     };
-    let (status, style) = match &c.result {
+    let (status, style, tint) = match &c.result {
         None => (
             match c.op {
                 Some(op) => format!("⋯ running (op {})", op.0),
                 None => "⋯ running".to_string(),
             },
-            Style::default().fg(Color::Yellow),
+            t.warning,
+            t.tool_pending,
         ),
         Some(r) => {
             let late = if r.late { " (late)" } else { "" };
             match r.status {
-                ResultStatus::Ok => (format!("✓ {}{late}", r.summary), Style::default().fg(Color::Green)),
-                ResultStatus::Err => (format!("✕ {}{late}", r.summary), Style::default().fg(Color::Red)),
-                ResultStatus::Cancelled => (format!("⊘ {}{late}", r.summary), dim()),
+                ResultStatus::Ok => (format!("✓ {}{late}", r.summary), t.success, t.tool_ok),
+                ResultStatus::Err => (format!("✕ {}{late}", r.summary), t.error, t.tool_err),
+                ResultStatus::Cancelled => (format!("⊘ {}{late}", r.summary), t.muted, t.tool_pending),
             }
         }
     };
-    let head = format!("╭ {title} · {} ─ ", class_name(c.class));
-    let rest = width.saturating_sub(UnicodeWidthStr::width(head.as_str()));
-    rows.push((Line::from(vec![Span::styled(head, Style::default().fg(Color::Cyan)), Span::styled(trunc(&status, rest), style)]), Some(i)));
-    let bar = || Span::styled("│ ", Style::default().fg(Color::Cyan));
+    let head = format!("▍ {title} ");
+    let class = format!("· {} ", class_name(c.class));
+    let rest = width.saturating_sub(UnicodeWidthStr::width(head.as_str()) + class.len());
+    let row = |spans: Vec<Span<'static>>| Line::from(spans).style(tint);
+    rows.push(row(vec![Span::styled(head, t.title), Span::styled(class, t.muted), Span::styled(trunc(&status, rest), style)]));
+    let bar = || Span::styled("▍ ", t.accent);
     if !c.args.is_null() {
-        rows.push((Line::from(vec![bar(), Span::raw(compact(&c.args, width.saturating_sub(2)))]), Some(i)));
+        rows.push(row(vec![bar(), Span::styled(compact(&c.args, width.saturating_sub(2)), t.muted)]));
     }
     if let Some(r) = &c.result {
         for l in &r.body {
-            rows.push((Line::from(vec![bar(), Span::styled(trunc(l, width.saturating_sub(2)), dim())]), Some(i)));
+            rows.push(row(vec![bar(), Span::styled(trunc(l, width.saturating_sub(2)), t.dim)]));
         }
     }
     if let Some(d) = &c.decision {
-        rows.push((
-            Line::from(vec![bar(), Span::styled(trunc(&format!("⚑ {d}"), width.saturating_sub(2)), Style::default().fg(Color::Magenta))]),
-            Some(i),
-        ));
+        rows.push(row(vec![bar(), Span::styled(trunc(&format!("⚑ {d}"), width.saturating_sub(2)), t.info)]));
     }
-    rows.push((Line::from(Span::styled("╰", Style::default().fg(Color::Cyan))), Some(i)));
 }
 
-fn transcript_rows(ui: &UiState, width: usize) -> Vec<Row> {
-    let mut rows: Vec<Row> = Vec::new();
-    let selected = if ui.local.focus == Focus::Transcript { ui.local.selected } else { None };
-    for (i, b) in ui.transcript.blocks.iter().enumerate() {
-        let start = rows.len();
-        match &b.body {
-            Body::User(t) => push_wrapped(
-                &mut rows,
-                Some(i),
-                "you ▸ ",
-                t,
-                width,
-                Style::default(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-            ),
-            Body::Assistant(t) => push_wrapped(&mut rows, Some(i), "", t, width, Style::default(), Style::default()),
-            Body::Thinking(t) => push_wrapped(&mut rows, Some(i), "thinking ▸ ", t, width, dim().add_modifier(Modifier::ITALIC), dim()),
-            Body::Notice(t) => push_wrapped(&mut rows, Some(i), "· ", t, width, dim(), dim()),
-            Body::Error(t) => {
-                push_wrapped(&mut rows, Some(i), "✕ ", t, width, Style::default().fg(Color::Red), Style::default().fg(Color::Red))
-            }
-            Body::Tool(c) => tool_rows(&mut rows, i, c, width),
-            Body::Checkpoint { id, cause, turn } => {
-                let style = Style::default().fg(Color::Magenta);
-                rows.push((
-                    Line::from(Span::styled(trunc(&format!("◆ checkpoint c{} · turn {turn} · {cause}", id.0), width), style)),
-                    Some(i),
-                ));
-                if selected == Some(i) {
-                    rows.push((Line::from(Span::styled(trunc("  [enter] rewind: both · chat · code", width), style)), Some(i)));
-                }
-            }
-            Body::Restored { from, to, mode, changed, deleted } => {
-                let t =
-                    format!("↺ rewound to c{} ({}) · {changed} changed, {deleted} deleted · undo with c{}", to.0, mode_name(*mode), from.0);
-                push_wrapped(&mut rows, Some(i), "", &t, width, Style::default().fg(Color::Magenta), Style::default());
-            }
+/// Whether a blank row separates block `prev` from `cur` (runs of tool cards and of notices stay
+/// together).
+fn spaced(prev: Option<&Body>, cur: &Body) -> bool {
+    let quiet = |b: &Body| matches!(b, Body::Notice(_) | Body::Checkpoint { .. } | Body::Restored { .. });
+    match prev {
+        None => false,
+        Some(p) => !(matches!((p, cur), (Body::Tool(_), Body::Tool(_))) || (quiet(p) && quiet(cur)) || matches!(p, Body::Thinking(_))),
+    }
+}
+
+fn block_rows(ui: &UiState, i: usize, width: usize, rows: &mut Vec<Line<'static>>) {
+    let t = &ui.theme;
+    let b = &ui.transcript.blocks[i];
+    let prev = i.checked_sub(1).and_then(|p| ui.transcript.blocks.get(p)).map(|b| &b.body);
+    if spaced(prev, &b.body) {
+        rows.push(Line::default());
+    }
+    match &b.body {
+        Body::User(text) => push_wrapped(rows, "❯ ", text, width, t.user, t.accent.add_modifier(Modifier::BOLD)),
+        Body::Assistant(text) => rows.extend(markdown::render(text, width, t)),
+        Body::Thinking(text) => push_wrapped(rows, "∴ ", text, width, t.thinking, t.dim),
+        Body::Notice(text) => push_wrapped(rows, "· ", text, width, t.muted, t.dim),
+        Body::Error(text) => push_wrapped(rows, "✕ ", text, width, t.error, t.error),
+        Body::Tool(c) => tool_rows(t, rows, c, width),
+        Body::Checkpoint { id, cause, turn } => {
+            rows.push(Line::from(vec![
+                Span::styled(trunc(&format!("◆ checkpoint c{} · turn {turn} · {cause}", id.0), width.saturating_sub(10)), t.info),
+                Span::styled("  /rewind", t.dim),
+            ]));
         }
-        if ui.local.hud {
-            let mut hud = format!("  ↳ e{} · by {}", b.entry.0, principal_label(&b.by));
-            if let Body::Tool(c) = &b.body {
-                hud.push_str(&format!(" · cap {} · class {}", c.cap.as_deref().unwrap_or("?"), class_name(c.class)));
-                if let Some(r) = &c.result {
-                    hud.push_str(&format!(" · result e{}", r.entry.0));
-                }
-            }
-            rows.push((
-                Line::from(Span::styled(trunc(&hud, width), Style::default().fg(Color::Magenta).add_modifier(Modifier::DIM))),
-                Some(i),
-            ));
-        }
-        if selected == Some(i) {
-            for r in rows.iter_mut().skip(start) {
-                r.0 = r.0.clone().patch_style(Style::default().add_modifier(Modifier::REVERSED));
-            }
+        Body::Restored { from, to, mode, changed, deleted } => {
+            let text =
+                format!("↺ rewound to c{} ({}) · {changed} changed, {deleted} deleted · undo with c{}", to.0, mode_name(*mode), from.0);
+            push_wrapped(rows, "", &text, width, t.info, t.info);
         }
     }
-    let t = &ui.transcript;
-    if !t.live_thinking.is_empty() {
-        push_wrapped(&mut rows, None, "thinking ▸ ", &t.live_thinking, width, dim().add_modifier(Modifier::ITALIC), dim());
+    if ui.local.hud {
+        let mut hud = format!("  ↳ e{} · by {}", b.entry.0, principal_label(&b.by));
+        if let Body::Tool(c) = &b.body {
+            hud.push_str(&format!(" · cap {} · class {}", c.cap.as_deref().unwrap_or("?"), class_name(c.class)));
+            if let Some(r) = &c.result {
+                hud.push_str(&format!(" · result e{}", r.entry.0));
+            }
+        }
+        rows.push(Line::from(Span::styled(trunc(&hud, width), t.info.add_modifier(Modifier::DIM))));
     }
-    if !t.live_text.is_empty() {
-        push_wrapped(&mut rows, None, "", &t.live_text, width, Style::default(), Style::default());
-    }
-    for name in &t.live_tools {
-        rows.push((Line::from(Span::styled(trunc(&format!("⋯ calling {name}"), width), Style::default().fg(Color::Yellow))), None));
+}
+
+/// Blocks `range` as the rows the scrollback keeps (spacing included).
+pub fn block_lines(ui: &UiState, range: std::ops::Range<usize>, width: usize) -> Vec<Line<'static>> {
+    let mut rows = Vec::new();
+    for i in range.start..range.end.min(ui.transcript.blocks.len()) {
+        block_rows(ui, i, width, &mut rows);
     }
     rows
 }
 
-fn draw_transcript(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
-    let focused = ui.local.focus == Focus::Transcript;
-    let block = Block::bordered().title(" transcript ").border_style(if focused { Style::default().fg(Color::Cyan) } else { dim() });
-    let inner = block.inner(area);
-    block.render(area, buf);
-    probe.check(
-        ui.local.selected.is_none_or(|s| s < ui.transcript.blocks.len()),
-        format!("selected block {:?} is past the transcript ({} blocks)", ui.local.selected, ui.transcript.blocks.len()),
-    );
-    let rows = transcript_rows(ui, inner.width as usize);
-    let h = inner.height as usize;
-    let max_top = rows.len().saturating_sub(h);
-    let mut top = max_top.saturating_sub(ui.local.scroll.min(max_top));
-    if focused && let Some(sel) = ui.local.selected {
-        let first = rows.iter().position(|r| r.1 == Some(sel));
-        let last = rows.iter().rposition(|r| r.1 == Some(sel));
-        if let (Some(f), Some(l)) = (first, last) {
-            if f < top {
-                top = f;
-            } else if l >= top + h {
-                top = (l + 1).saturating_sub(h).min(f);
-            }
-        }
+/// What has not been committed yet: blocks from `from` on, and the stream of the running call.
+fn live_rows(ui: &UiState, from: usize, width: usize) -> Vec<Line<'static>> {
+    let t = &ui.theme;
+    let mut rows = block_lines(ui, from..ui.transcript.blocks.len(), width);
+    let tr = &ui.transcript;
+    if !tr.live_thinking.is_empty() {
+        push_wrapped(&mut rows, "∴ ", &tr.live_thinking, width, t.thinking, t.dim);
     }
+    if !tr.live_text.is_empty() {
+        rows.extend(markdown::render(&tr.live_text, width, t));
+    }
+    for name in &tr.live_tools {
+        rows.push(Line::from(Span::styled(trunc(&format!("⋯ calling {name}"), width), t.warning)));
+    }
+    rows
+}
+
+fn draw_transcript(ui: &UiState, area: Rect, buf: &mut Buffer) {
+    let rows = live_rows(ui, 0, area.width as usize);
+    let h = area.height as usize;
     if rows.is_empty() {
-        buf.set_line(inner.x, inner.y, &Line::from(Span::styled("Type a prompt below and press Enter.", dim())), inner.width);
+        let t = &ui.theme;
+        let hello = Line::from(vec![
+            Span::styled(format!(" {} ", ui.plan.label), t.title),
+            Span::styled("· type a prompt, or / for commands", t.muted),
+        ]);
+        set_row(buf, area, 0, &hello);
+        return;
     }
-    for (y, (line, _)) in rows.iter().skip(top).take(h).enumerate() {
-        buf.set_line(inner.x, inner.y + y as u16, line, inner.width);
-    }
-}
-
-// ───────────────────────────── sidebar ─────────────────────────────
-
-fn state_color(s: &CapState) -> Color {
-    match s {
-        CapState::Active => Color::Green,
-        CapState::Unlocked => Color::Blue,
-        CapState::Locked { .. } => Color::Yellow,
-        CapState::Broken { .. } => Color::Red,
-        CapState::Disabled { .. } => Color::DarkGray,
+    let max_top = rows.len().saturating_sub(h);
+    let top = max_top.saturating_sub(ui.local.scroll.min(max_top));
+    for (y, line) in rows.iter().skip(top).take(h).enumerate() {
+        set_row(buf, area, y as u16, line);
     }
 }
 
-fn tree_rows(nodes: &[TreeNode], depth: usize, width: usize, out: &mut Vec<Line<'static>>) {
-    for n in nodes {
-        let indent = "  ".repeat(depth);
-        let name_w = width.saturating_sub(indent.len() + 2 + 10).max(8);
-        out.push(Line::from(vec![
-            Span::raw(indent.clone()),
-            Span::styled(format!("{} ", glyph(&n.state)), Style::default().fg(state_color(&n.state))),
-            Span::raw(format!("{:<w$} ", trunc(&n.id, name_w), w = name_w)),
-            Span::styled(state_name(&n.state), Style::default().fg(state_color(&n.state))),
-        ]));
-        let sub = format!("{indent}    ");
-        let sub_w = width.saturating_sub(sub.len());
-        for m in &n.missing {
-            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(&m.requirement, sub_w)), dim())));
-            if let Some(f) = &m.fix {
-                out.push(Line::from(Span::styled(format!("{sub}fix: {}", trunc(f, sub_w.saturating_sub(5))), dim())));
-            }
-        }
-        if let CapState::Broken { err } = &n.state {
-            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(err, sub_w)), Style::default().fg(Color::Red))));
-        }
-        if matches!(n.state, CapState::Unlocked | CapState::Disabled { .. })
-            && let Some(a) = &n.action
-        {
-            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(a, sub_w)), dim())));
-        }
-        if let Some(o) = &n.over_preset {
-            out.push(Line::from(Span::styled(
-                format!("{sub}! {}", trunc(&o.requirement, sub_w.saturating_sub(2))),
-                Style::default().fg(Color::Yellow),
-            )));
-        }
-        tree_rows(&n.children, depth + 1, width, out);
-    }
-}
+// ───────────────────────────── prompt, menu, hints ─────────────────────────────
 
-fn sidebar_rows(ui: &UiState, width: usize) -> Vec<Line<'static>> {
-    let mut out = Vec::new();
-    match ui.local.tab {
-        Tab::Tree => tree_rows(&ui.tree, 0, width, &mut out),
-        Tab::Inventory => {
-            for c in &ui.inventory {
-                out.push(Line::from(vec![
-                    Span::styled(format!("{} ", glyph(&c.state)), Style::default().fg(state_color(&c.state))),
-                    Span::styled(trunc(&c.id, width.saturating_sub(2)), Style::default().add_modifier(Modifier::BOLD)),
-                ]));
-                let origin = match &c.source {
-                    Some(s) => format!("{} ({s})", c.origin),
-                    None => c.origin.clone(),
-                };
-                out.push(Line::from(Span::styled(trunc(&format!("  {} · {} · {}", c.kind, origin, state_name(&c.state)), width), dim())));
-                if c.classes.0 != 0 {
-                    out.push(Line::from(Span::raw(trunc(&format!("  consequences: {}", render_classes(c.classes)), width))));
-                }
-                if let Some(e) = &c.equip {
-                    out.push(Line::from(Span::styled(trunc(&format!("  equip: {e}"), width), dim())));
-                }
-                if let Some(f) = &c.fix {
-                    out.push(Line::from(Span::styled(trunc(&format!("  fix: {f}"), width), Style::default().fg(Color::Yellow))));
-                }
-            }
-        }
-        Tab::Jobs => {
-            if ui.jobs.is_empty() {
-                out.push(Line::from(Span::styled("no operations yet", dim())));
-            }
-            let now = Timestamp::now();
-            for j in &ui.jobs {
-                let (status, style) = match &j.status {
-                    None => (format!("running {}s", now.0.saturating_sub(j.started.0) / 1000), Style::default().fg(Color::Yellow)),
-                    Some(OpStatus::Completed { code }) => (format!("✓ exit {code}"), Style::default().fg(Color::Green)),
-                    Some(OpStatus::Failed { err }) => (format!("✕ {err}"), Style::default().fg(Color::Red)),
-                    Some(OpStatus::Cancelled { reason }) => (format!("⊘ {reason:?}").to_lowercase(), dim()),
-                    Some(OpStatus::Uncertain { .. }) => ("? uncertain".to_string(), Style::default().fg(Color::Magenta)),
-                };
-                let head = format!("op{} {} ", j.op.0, j.tool);
-                let rest = width.saturating_sub(UnicodeWidthStr::width(head.as_str()));
-                out.push(Line::from(vec![Span::raw(head), Span::styled(trunc(&status, rest), style)]));
-            }
-        }
-        Tab::Invariants => {
-            let rows = ui.invariant_rows();
-            if rows.is_empty() {
-                out.push(Line::from(Span::styled("no invariants checked in this session", dim())));
-            }
-            for r in rows {
-                let (v, style) = match &r.verdict {
-                    Verdict::Pass => ("Pass".to_string(), Style::default().fg(Color::Green)),
-                    Verdict::Fail { counterexample } => {
-                        (format!("Fail ✕ (cx {})", counterexample.short()), Style::default().fg(Color::Red))
-                    }
-                    Verdict::Unknown { reason } => (format!("Unknown ({reason})"), Style::default().fg(Color::Yellow)),
-                    Verdict::Stale => ("Stale".to_string(), Style::default().fg(Color::Yellow)),
-                    Verdict::Vacuous => ("Vacuous ⚠".to_string(), Style::default().fg(Color::Yellow)),
-                };
-                let head = format!("{} ", trunc(&r.id, width.saturating_sub(12)));
-                out.push(Line::from(vec![Span::raw(head), Span::styled(v, style)]));
-                if r.stale {
-                    out.push(Line::from(Span::styled(trunc("  code changed since the check", width), dim())));
-                }
-            }
-        }
+fn draw_chrome(ui: &UiState, input: Rect, menu_area: Rect, footer: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
+    probe.area("input", input);
+    let cursor = draw_input(ui, input, buf, probe);
+    if menu_area.height > 0 {
+        probe.area("menu", menu_area);
+        draw_menu(ui, menu_area, buf);
     }
-    out
+    probe.area("footer", footer);
+    draw_footer(ui, footer, buf);
+    cursor
 }
-
-fn draw_sidebar(ui: &UiState, area: Rect, buf: &mut Buffer) {
-    let focused = ui.local.focus == Focus::Sidebar;
-    let block = Block::bordered().border_style(if focused { Style::default().fg(Color::Cyan) } else { dim() });
-    let inner = block.inner(area);
-    block.render(area, buf);
-    let mut tabs: Vec<Span> = Vec::new();
-    for (i, t) in TABS.iter().enumerate() {
-        if i > 0 {
-            tabs.push(Span::styled("│", dim()));
-        }
-        let style = if *t == ui.local.tab { Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { dim() };
-        tabs.push(Span::styled(t.name().to_string(), style));
-    }
-    let tabs = Line::from(tabs);
-    let tabs = if tabs.width() <= inner.width as usize {
-        tabs
-    } else {
-        Line::from(Span::styled(format!("◂ {} ▸", ui.local.tab.name()), Style::default().add_modifier(Modifier::BOLD)))
-    };
-    buf.set_line(inner.x, inner.y, &tabs, inner.width);
-    let body = Rect { y: inner.y + 1, height: inner.height.saturating_sub(1), ..inner };
-    let rows = sidebar_rows(ui, body.width as usize);
-    let top = ui.local.sidebar_scroll.min(rows.len().saturating_sub(1));
-    for (y, line) in rows.iter().skip(top).take(body.height as usize).enumerate() {
-        buf.set_line(body.x, body.y + y as u16, line, body.width);
-    }
-}
-
-// ───────────────────────────── input & footer ─────────────────────────────
 
 fn draw_input(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
-    let focused = ui.local.focus == Focus::Input;
-    let title = if ui.is_busy() { " steer (turn running · alt-enter = urgent) " } else { " prompt " };
-    let block = Block::bordered().title(title).border_style(if focused { Style::default().fg(Color::Cyan) } else { dim() });
+    let t = &ui.theme;
+    let p = &ui.plan;
+    let mut status = vec![
+        Span::styled(format!(" {} ", p.label), t.title),
+        Span::styled(format!("· preset {} · epoch {} · world {} ", ui.state.policy.preset, ui.state.policy.epoch.0, p.world), t.muted),
+    ];
+    if ui.local.hud {
+        status.push(Span::styled(format!("· plan {} · preset ← {} · {} ", p.hash, p.preset_origin, p.enforced_by), t.info));
+    }
+    let busy = if ui.is_busy() { Span::styled(" ● running ", t.warning) } else { Span::styled(" ○ idle ", t.dim) };
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(if ui.covered() { t.border } else { t.border_focus })
+        .title(Line::from(status))
+        .title(Line::from(busy).alignment(Alignment::Right));
     let inner = block.inner(area);
     block.render(area, buf);
     if inner.width == 0 || inner.height == 0 {
         return None;
     }
+    let prompt = Span::styled("❯ ", t.accent.add_modifier(Modifier::BOLD));
+    let pw = 2u16;
+    if ui.local.draft.is_empty() {
+        let hint = if ui.is_busy() { "type to steer the running turn" } else { "type a prompt · / for commands" };
+        buf.set_line(inner.x, inner.y, &Line::from(vec![prompt, Span::styled(hint, t.dim)]), inner.width);
+        return (!ui.covered()).then_some((inner.x + pw, inner.y));
+    }
     let chars: Vec<char> = ui.local.draft.chars().collect();
     let cursor = ui.local.cursor.min(chars.len());
-    let avail = inner.width.saturating_sub(1) as usize;
+    let avail = inner.width.saturating_sub(pw + 1) as usize;
     let before_w: usize = chars[..cursor].iter().map(|c| c.width().unwrap_or(0)).sum();
     let mut start = 0usize;
     let mut w = before_w;
@@ -508,38 +410,321 @@ fn draw_input(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> 
         start += 1;
     }
     let visible: String = chars[start..].iter().collect();
-    buf.set_line(inner.x, inner.y, &Line::from(trunc(&visible, inner.width as usize)), inner.width);
-    let cx = inner.x + w as u16;
+    let text_style = if ui.local.draft.starts_with('/') && !ui.local.draft.starts_with("//") { t.accent } else { t.text };
+    buf.set_line(
+        inner.x,
+        inner.y,
+        &Line::from(vec![prompt, Span::styled(trunc(&visible, inner.width.saturating_sub(pw) as usize), text_style)]),
+        inner.width,
+    );
+    let cx = inner.x + pw + w as u16;
     probe.check(cx < inner.x + inner.width, format!("input cursor column {cx} is outside the input box"));
-    focused.then_some((cx.min(inner.right().saturating_sub(1)), inner.y))
+    (!ui.covered()).then_some((cx.min(inner.right().saturating_sub(1)), inner.y))
 }
 
-/// Rows the status line may grow to for a long or multi-line notice (a `/help` listing, a refusal).
-const FOOTER_MAX: usize = 6;
-
-/// The notice wrapped to the footer width (one leading space per row).
-fn notice_rows(notice: &str, width: u16) -> Vec<String> {
-    wrap(notice, (width as usize).saturating_sub(1))
+fn draw_menu(ui: &UiState, area: Rect, buf: &mut Buffer) {
+    let Some((items, selected)) = menu::open(ui) else { return };
+    let t = &ui.theme;
+    let shown = items.len().min(MENU_ROWS);
+    let first = selected.saturating_sub(shown - 1).min(items.len() - shown);
+    let label_w = items.iter().map(|s| UnicodeWidthStr::width(s.label.as_str()) + 1 + s.usage.len()).max().unwrap_or(0).min(28);
+    for (row, (i, s)) in items.iter().enumerate().skip(first).take(shown).enumerate() {
+        let sel = i == selected;
+        let base = if sel { t.selected } else { Style::default() };
+        let mark = if sel { "▸ " } else { "  " };
+        let label = format!("{}{}", s.label, if s.usage.is_empty() { String::new() } else { format!(" {}", s.usage) });
+        let pad = label_w.saturating_sub(UnicodeWidthStr::width(label.as_str()));
+        let line = Line::from(vec![
+            Span::styled(format!(" {mark}"), base.patch(t.accent)),
+            Span::styled(s.label.clone(), base.patch(if sel { t.selected } else { t.accent })),
+            Span::styled(if s.usage.is_empty() { String::new() } else { format!(" {}", s.usage) }, base.patch(t.muted)),
+            Span::styled(" ".repeat(pad + 2), base),
+            Span::styled(trunc(&s.desc, (area.width as usize).saturating_sub(label_w + 6)), base.patch(t.dim)),
+        ])
+        .style(base);
+        set_row(buf, area, row as u16, &line);
+    }
+    if items.len() > shown {
+        let more = Line::from(Span::styled(format!("   {} of {} · ↑↓ to see more", selected + 1, items.len()), t.dim));
+        set_row(buf, area, shown as u16, &more);
+    }
 }
 
-fn draw_footer(ui: &UiState, notice: Option<&[String]>, area: Rect, buf: &mut Buffer) {
-    if let Some(rows) = notice {
-        let style = Style::default().fg(Color::Yellow);
-        for (i, text) in rows.iter().take(area.height as usize).enumerate() {
-            buf.set_line(area.x, area.y + i as u16, &Line::from(Span::styled(format!(" {text}"), style)), area.width);
+fn draw_footer(ui: &UiState, area: Rect, buf: &mut Buffer) {
+    let t = &ui.theme;
+    if let Some(n) = &ui.notice {
+        let style = match n.tone {
+            Tone::Info => t.accent,
+            Tone::Warn => t.warning,
+            Tone::Error => t.error,
+        };
+        for (i, text) in wrap(&n.text, (area.width as usize).saturating_sub(1)).iter().take(area.height as usize).enumerate() {
+            set_row(buf, area, i as u16, &Line::from(Span::styled(format!(" {text}"), style)));
         }
         return;
     }
-    let keys = match ui.local.focus {
-        Focus::Input if ui.is_busy() => " enter steer · alt-enter urgent steer · ctrl-c abort · tab focus · alt-h HUD · ctrl-q quit",
-        Focus::Input => " enter prompt · /help commands · tab focus · alt-1..4 sidebar · alt-h HUD · ctrl-q quit",
-        Focus::Transcript => " ↑↓ select · enter on ◆ rewind · pgup/pgdn scroll · esc input · alt-h HUD",
-        Focus::Sidebar => " ←→ tab · ↑↓ scroll · esc input · alt-h HUD",
+    let keys: &[(&str, &str)] = if ui.approval.is_some() {
+        &[("a", "allow"), ("s", "session"), ("r", "reject"), ("esc", "cancel")]
+    } else if !ui.overlays.is_empty() {
+        &[("esc", "close"), ("↑↓", "move"), ("enter", "choose"), ("ctrl-q", "quit")]
+    } else if menu::open(ui).is_some() {
+        &[("↑↓", "select"), ("tab", "complete"), ("enter", "run"), ("esc", "close")]
+    } else if ui.is_busy() {
+        &[("enter", "steer"), ("alt-enter", "urgent steer"), ("ctrl-c", "abort"), ("/", "commands")]
+    } else {
+        &[("enter", "send"), ("/", "commands"), ("alt-h", "HUD"), ("ctrl-c", "abort"), ("ctrl-q", "quit")]
     };
-    buf.set_line(area.x, area.y, &Line::from(Span::styled(keys, dim())), area.width);
+    let mut spans = vec![Span::raw(" ")];
+    for (i, (k, what)) in keys.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" · ", t.dim));
+        }
+        spans.push(Span::styled(*k, t.muted.add_modifier(Modifier::BOLD)));
+        spans.push(Span::styled(format!(" {what}"), t.dim));
+    }
+    set_row(buf, area, 0, &Line::from(spans));
 }
 
-// ───────────────────────────── modals ─────────────────────────────
+// ───────────────────────────── panels ─────────────────────────────
+
+fn state_style(t: &Theme, s: &CapState) -> Style {
+    match s {
+        CapState::Active => t.success,
+        CapState::Unlocked => t.accent,
+        CapState::Locked { .. } => t.warning,
+        CapState::Broken { .. } => t.error,
+        CapState::Disabled { .. } => t.dim,
+    }
+}
+
+fn tree_rows(t: &Theme, nodes: &[TreeNode], depth: usize, width: usize, out: &mut Vec<Line<'static>>) {
+    for n in nodes {
+        let indent = "  ".repeat(depth);
+        let name_w = width.saturating_sub(indent.len() + 2 + 10).clamp(8, 40);
+        out.push(Line::from(vec![
+            Span::raw(indent.clone()),
+            Span::styled(format!("{} ", glyph(&n.state)), state_style(t, &n.state)),
+            Span::styled(format!("{:<w$} ", trunc(&n.id, name_w), w = name_w), t.text.add_modifier(Modifier::BOLD)),
+            Span::styled(state_name(&n.state), state_style(t, &n.state)),
+        ]));
+        let sub = format!("{indent}    ");
+        let sub_w = width.saturating_sub(sub.len());
+        for m in &n.missing {
+            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(&m.requirement, sub_w)), t.muted)));
+            if let Some(f) = &m.fix {
+                out.push(Line::from(vec![
+                    Span::raw(sub.clone()),
+                    Span::styled("fix: ", t.dim),
+                    Span::styled(trunc(f, sub_w.saturating_sub(5)), t.accent),
+                ]));
+            }
+        }
+        if let CapState::Broken { err } = &n.state {
+            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(err, sub_w)), t.error)));
+        }
+        if matches!(n.state, CapState::Unlocked | CapState::Disabled { .. })
+            && let Some(a) = &n.action
+        {
+            out.push(Line::from(Span::styled(format!("{sub}{}", trunc(a, sub_w)), t.accent)));
+        }
+        if let Some(o) = &n.over_preset {
+            out.push(Line::from(Span::styled(format!("{sub}! {}", trunc(&o.requirement, sub_w.saturating_sub(2))), t.warning)));
+        }
+        tree_rows(t, &n.children, depth + 1, width, out);
+    }
+}
+
+fn help_rows(ui: &UiState, width: usize) -> Vec<Line<'static>> {
+    let t = &ui.theme;
+    let mut out = Vec::new();
+    let section = |out: &mut Vec<Line<'static>>, name: &str| {
+        if !out.is_empty() {
+            out.push(Line::default());
+        }
+        out.push(Line::from(Span::styled(name.to_string(), t.title)));
+    };
+    let row = |out: &mut Vec<Line<'static>>, name: String, what: &str| {
+        let pad = 24usize.saturating_sub(UnicodeWidthStr::width(name.as_str()));
+        out.push(Line::from(vec![
+            Span::styled(format!("  {name}"), t.accent),
+            Span::raw(" ".repeat(pad)),
+            Span::styled(trunc(what, width.saturating_sub(28)), t.muted),
+        ]));
+    };
+    section(&mut out, "views");
+    for (n, h) in VIEWS {
+        row(&mut out, format!("/{n}"), h);
+    }
+    if !ui.commands.is_empty() {
+        section(&mut out, "commands");
+        for c in &ui.commands {
+            let usage = if c.usage.is_empty() { String::new() } else { format!(" {}", c.usage) };
+            row(&mut out, format!("/{}{usage}", c.name), &c.help);
+        }
+    }
+    section(&mut out, "keys");
+    for (k, what) in [
+        ("enter", "send the prompt (steer while a turn runs)"),
+        ("alt-enter", "urgent steer"),
+        ("/  tab  ↑↓", "open, complete and move in the command menu"),
+        ("esc", "close the menu or the panel in front"),
+        ("ctrl-c", "abort the running turn"),
+        ("ctrl-a ctrl-e ctrl-u ctrl-w", "line editing"),
+        ("alt-h", "HUD: entry ids and origins"),
+        ("ctrl-q / ctrl-d", "quit"),
+        ("//text", "send a prompt that starts with /"),
+    ] {
+        row(&mut out, k.to_string(), what);
+    }
+    out
+}
+
+fn panel_rows(ui: &UiState, p: &Panel, width: usize) -> Vec<Line<'static>> {
+    let t = &ui.theme;
+    let mut out = Vec::new();
+    match &p.body {
+        PanelBody::Text(lines) => {
+            let style = if p.tone == Tone::Error { t.error } else { t.text };
+            for l in lines {
+                for w in wrap(l, width) {
+                    out.push(Line::from(Span::styled(w, style)));
+                }
+            }
+        }
+        PanelBody::View(View::Help) => out = help_rows(ui, width),
+        PanelBody::View(View::Tree) => tree_rows(t, &ui.tree, 0, width, &mut out),
+        PanelBody::View(View::Inventory) => {
+            for c in &ui.inventory {
+                out.push(Line::from(vec![
+                    Span::styled(format!("{} ", glyph(&c.state)), state_style(t, &c.state)),
+                    Span::styled(trunc(&c.id, width.saturating_sub(2)), t.text.add_modifier(Modifier::BOLD)),
+                ]));
+                let origin = match &c.source {
+                    Some(s) => format!("{} ({s})", c.origin),
+                    None => c.origin.clone(),
+                };
+                out.push(Line::from(Span::styled(trunc(&format!("  {} · {} · {}", c.kind, origin, state_name(&c.state)), width), t.muted)));
+                if c.classes.0 != 0 {
+                    out.push(Line::from(Span::styled(trunc(&format!("  consequences: {}", render_classes(c.classes)), width), t.text)));
+                }
+                if let Some(e) = &c.equip {
+                    out.push(Line::from(Span::styled(trunc(&format!("  equip: {e}"), width), t.dim)));
+                }
+                if let Some(f) = &c.fix {
+                    out.push(Line::from(Span::styled(trunc(&format!("  fix: {f}"), width), t.warning)));
+                }
+            }
+        }
+        PanelBody::View(View::Jobs) => {
+            if ui.jobs.is_empty() {
+                out.push(Line::from(Span::styled("no operations yet", t.dim)));
+            }
+            let now = Timestamp::now();
+            for j in &ui.jobs {
+                let (status, style) = match &j.status {
+                    None => (format!("running {}s", now.0.saturating_sub(j.started.0) / 1000), t.warning),
+                    Some(OpStatus::Completed { code }) => (format!("✓ exit {code}"), t.success),
+                    Some(OpStatus::Failed { err }) => (format!("✕ {err}"), t.error),
+                    Some(OpStatus::Cancelled { reason }) => (format!("⊘ {reason:?}").to_lowercase(), t.dim),
+                    Some(OpStatus::Uncertain { .. }) => ("? uncertain".to_string(), t.info),
+                };
+                let head = format!("op{} {} ", j.op.0, j.tool);
+                let rest = width.saturating_sub(UnicodeWidthStr::width(head.as_str()));
+                out.push(Line::from(vec![Span::styled(head, t.text), Span::styled(trunc(&status, rest), style)]));
+            }
+        }
+        PanelBody::View(View::Invariants) => {
+            let rows = ui.invariant_rows();
+            if rows.is_empty() {
+                out.push(Line::from(Span::styled("no invariants checked in this session", t.dim)));
+            }
+            for r in rows {
+                let (v, style) = match &r.verdict {
+                    Verdict::Pass => ("Pass".to_string(), t.success),
+                    Verdict::Fail { counterexample } => (format!("Fail ✕ (cx {})", counterexample.short()), t.error),
+                    Verdict::Unknown { reason } => (format!("Unknown ({reason})"), t.warning),
+                    Verdict::Stale => ("Stale".to_string(), t.warning),
+                    Verdict::Vacuous => ("Vacuous ⚠".to_string(), t.warning),
+                };
+                out.push(Line::from(vec![
+                    Span::styled(format!("{} ", trunc(&r.id, width.saturating_sub(12))), t.text),
+                    Span::styled(v, style),
+                ]));
+                if r.stale {
+                    out.push(Line::from(Span::styled(trunc("  code changed since the check", width), t.dim)));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The frame of an overlay box.
+struct Frame<'a> {
+    title: &'a str,
+    border: Style,
+    hint: &'a str,
+}
+
+/// A box in front of `area`, full width and bottom-anchored (over the transcript, above the
+/// prompt), cleared, with a rounded border; returns its inside.
+fn boxed(t: &Theme, area: Rect, height: u16, f: Frame<'_>, buf: &mut Buffer) -> Rect {
+    let Frame { title, border, hint } = f;
+    let w = area.width;
+    let h = height.min(area.height.saturating_sub(1)).max(area.height.min(3));
+    let rect = Rect { x: area.x + (area.width - w) / 2, y: area.y + area.height.saturating_sub(h), width: w, height: h };
+    Clear.render(rect, buf);
+    buf.set_style(rect, t.panel);
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(border)
+        .title(Line::from(Span::styled(format!(" {title} "), t.title)))
+        .title_bottom(Line::from(Span::styled(format!(" {hint} "), t.dim)).alignment(Alignment::Right));
+    let inner = block.inner(rect);
+    block.render(rect, buf);
+    inner
+}
+
+fn draw_panel(ui: &UiState, p: &Panel, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
+    let t = &ui.theme;
+    let width = area.width;
+    let rows = panel_rows(ui, p, width.saturating_sub(4) as usize);
+    let height = (rows.len() as u16 + 2).max(5).min(area.height);
+    let visible = height.saturating_sub(2) as usize;
+    let max_top = rows.len().saturating_sub(visible);
+    let top = p.scroll.min(max_top);
+    let pos =
+        if rows.len() > visible { format!("{}-{} of {} · ", top + 1, (top + visible).min(rows.len()), rows.len()) } else { String::new() };
+    let border = if p.tone == Tone::Error { t.error } else { t.border_focus };
+    let hint = format!("{pos}esc close · ↑↓ scroll");
+    let inner = boxed(t, area, height, Frame { title: &p.title, border, hint: &hint }, buf);
+    probe.area("panel", inner);
+    let inner = Rect { x: inner.x + 1, width: inner.width.saturating_sub(2), ..inner };
+    for (y, line) in rows.iter().skip(top).take(inner.height as usize).enumerate() {
+        buf.set_line(inner.x, inner.y + y as u16, line, inner.width);
+    }
+}
+
+fn draw_checkpoints(t: &Theme, list: &CheckpointList, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
+    let shown = list.items.len().min(area.height.saturating_sub(3) as usize).max(1);
+    let inner = boxed(t, area, shown as u16 + 2, Frame { title: "rewind to…", border: t.info, hint: "enter choose · esc close" }, buf);
+    probe.area("checkpoints", inner);
+    let first = list.selected.saturating_sub(shown - 1);
+    for (row, (i, item)) in list.items.iter().enumerate().skip(first).take(shown).enumerate() {
+        let sel = i == list.selected;
+        let style = if sel { t.selected } else { t.text };
+        let line =
+            Line::from(Span::styled(trunc(&format!("{} ◆ {}", if sel { "▸" } else { " " }, item.label), inner.width as usize), style))
+                .style(style);
+        let r = Rect { y: inner.y + row as u16, height: 1, ..inner };
+        if sel {
+            buf.set_style(r, t.selected);
+        }
+        buf.set_line(r.x, r.y, &line, r.width);
+    }
+}
+
+// ───────────────────────────── modal cards ─────────────────────────────
 
 fn centered(area: Rect, w: u16, h: u16) -> Rect {
     let w = w.min(area.width);
@@ -547,8 +732,17 @@ fn centered(area: Rect, w: u16, h: u16) -> Rect {
     Rect { x: area.x + (area.width - w) / 2, y: area.y + (area.height - h) / 2, width: w, height: h }
 }
 
+fn card_frame(t: &Theme, rect: Rect, title: String, border: Style, buf: &mut Buffer) -> Rect {
+    Clear.render(rect, buf);
+    buf.set_style(rect, t.panel);
+    let block = Block::bordered().border_type(BorderType::Rounded).title(Line::from(Span::styled(title, t.title))).border_style(border);
+    let inner = block.inner(rect);
+    block.render(rect, buf);
+    inner
+}
+
 /// The approval card.
-fn draw_approval(card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
+fn draw_approval(t: &Theme, card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
     let width = area.width.saturating_sub(2).min(78);
     let inner_w = width.saturating_sub(2) as usize;
     let mut lines: Vec<Line<'static>> = Vec::new();
@@ -556,21 +750,21 @@ fn draw_approval(card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffe
     let cls = format!("class: {}", card.class.name());
     let gap = inner_w.saturating_sub(1 + UnicodeWidthStr::width(title.as_str()) + cls.len()).max(2);
     lines.push(Line::from(vec![
-        Span::styled(format!(" {title}"), Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" {title}"), t.text.add_modifier(Modifier::BOLD)),
         Span::raw(" ".repeat(gap)),
-        Span::styled(cls, Style::default().fg(Color::Yellow)),
+        Span::styled(cls, t.warning),
     ]));
     for (i, l) in wrap(&card.args, inner_w.saturating_sub(7)).into_iter().take(3).enumerate() {
-        lines.push(Line::from(format!(" {}{l}", if i == 0 { "args: " } else { "      " })));
+        lines.push(Line::from(vec![Span::styled(format!(" {}", if i == 0 { "args: " } else { "      " }), t.muted), Span::raw(l)]));
     }
     let why = format!("{}      (reason: {})", card.why, card.reason);
     for (i, l) in wrap(&why, inner_w.saturating_sub(7)).into_iter().take(4).enumerate() {
-        lines.push(Line::from(format!(" {}{l}", if i == 0 { "why:  " } else { "      " })));
+        lines.push(Line::from(vec![Span::styled(format!(" {}", if i == 0 { "why:  " } else { "      " }), t.muted), Span::raw(l)]));
     }
     let world = if card.enforced_by.is_empty() { card.world.clone() } else { format!("{} ({})", card.world, card.enforced_by) };
-    lines.push(Line::from(format!(" world: {world}  ·  lease: {}", card.lease)));
+    lines.push(Line::from(Span::styled(format!(" world: {world}  ·  lease: {}", card.lease), t.muted)));
     lines.push(Line::from(""));
-    let key = |k: &str| Span::styled(k.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    let key = |k: &str| Span::styled(k.to_string(), t.key);
     lines.push(Line::from(vec![
         Span::raw(" "),
         key("[a]"),
@@ -597,7 +791,7 @@ fn draw_approval(card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffe
     }
     probe.check(inner_w < 40 || lines.iter().all(|l| l.width() <= inner_w), "an approval card row is wider than the card and is cut off");
     if queued > 0 {
-        lines.push(Line::from(Span::styled(format!(" (+{queued} more waiting)"), dim())));
+        lines.push(Line::from(Span::styled(format!(" (+{queued} more waiting)"), t.dim)));
     }
     let height = lines.len() as u16 + 2;
     let rect = centered(area, width, height);
@@ -606,32 +800,28 @@ fn draw_approval(card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffe
         height <= area.height && width >= 40,
         format!("approval card needs {width}x{height}; the terminal is {}x{}", area.width, area.height),
     );
-    Clear.render(rect, buf);
-    let block = Block::bordered().title(" approval ").border_style(Style::default().fg(Color::Yellow));
-    let inner = block.inner(rect);
-    block.render(rect, buf);
+    let inner = card_frame(t, rect, " approval ".into(), t.warning, buf);
     for (y, l) in lines.iter().take(inner.height as usize).enumerate() {
         buf.set_line(inner.x, inner.y + y as u16, l, inner.width);
     }
 }
 
-fn draw_rewind(p: &RewindPicker, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
+fn draw_rewind(t: &Theme, p: &RewindPicker, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
     let width = area.width.saturating_sub(2).min(78);
     let inner_w = width.saturating_sub(2) as usize;
     let mut lines: Vec<Line<'static>> = Vec::new();
     for (i, m) in MODES.iter().enumerate() {
         let sel = *m == p.selected;
         let text = format!("{} [{}] {:<5} {}", if sel { "▸" } else { " " }, i + 1, mode_name(*m), mode_doc(*m));
-        let style = if sel { Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED) } else { Style::default() };
-        lines.push(Line::from(Span::styled(trunc(&text, inner_w), style)));
+        lines.push(Line::from(Span::styled(trunc(&text, inner_w), if sel { t.selected } else { t.text })));
     }
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(format!(" plan ({}):", mode_name(p.selected)), Style::default().add_modifier(Modifier::BOLD))));
+    lines.push(Line::from(Span::styled(format!(" plan ({}):", mode_name(p.selected)), t.text.add_modifier(Modifier::BOLD))));
     match &p.plan {
-        None => lines.push(Line::from(Span::styled("   computing the plan…", dim()))),
+        None => lines.push(Line::from(Span::styled("   computing the plan…", t.dim))),
         Some(Err(e)) => {
             for l in wrap(&format!("cannot rewind: {e}"), inner_w.saturating_sub(3)) {
-                lines.push(Line::from(Span::styled(format!("   {l}"), Style::default().fg(Color::Red))));
+                lines.push(Line::from(Span::styled(format!("   {l}"), t.error)));
             }
         }
         Some(Ok(plan)) => {
@@ -653,18 +843,15 @@ fn draw_rewind(p: &RewindPicker, area: Rect, buf: &mut Buffer, probe: &mut Probe
             if !plan.kill.is_empty() {
                 lines.push(Line::from(trunc(&format!("   kill {} running job(s): {}", plan.kill.len(), plan.kill.join(", ")), inner_w)));
             }
-            lines.push(Line::from(Span::styled("   a PreRewind checkpoint is taken first, so this rewind can be undone", dim())));
+            lines.push(Line::from(Span::styled("   a PreRewind checkpoint is taken first, so this rewind can be undone", t.dim)));
         }
     }
-    lines.push(Line::from(Span::styled(" [enter] apply   [↑↓ 1-3] mode   [esc] cancel", Style::default().fg(Color::Cyan))));
+    lines.push(Line::from(Span::styled(" [enter] apply   [↑↓ 1-3] mode   [esc] cancel", t.accent)));
     let height = lines.len() as u16 + 2;
     let rect = centered(area, width, height);
     probe.area("rewind", rect);
     probe.check(height <= area.height, format!("rewind picker needs {height} rows; the terminal has {}", area.height));
-    Clear.render(rect, buf);
-    let block = Block::bordered().title(format!(" rewind to c{} ", p.checkpoint.0)).border_style(Style::default().fg(Color::Magenta));
-    let inner = block.inner(rect);
-    block.render(rect, buf);
+    let inner = card_frame(t, rect, format!(" rewind to c{} ", p.checkpoint.0), t.info, buf);
     for (y, l) in lines.iter().take(inner.height as usize).enumerate() {
         buf.set_line(inner.x, inner.y + y as u16, l, inner.width);
     }
