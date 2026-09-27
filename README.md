@@ -31,7 +31,8 @@ aho/
 │   ├── aho-compose      plan(Composition, inputs) → (Loadout, Plan), plan diff, saved loadouts, lock file
 │   ├── aho-session      pure core (Input/Effect/step), async driver, tool dispatch with grace window + late results,
 │   │                    abort, compaction, hooks, checkpoints & rewind, resume, PTC nested calls, session ceiling
-│   │                    (plan mode), prompt_as (driver attribution), verify_replay, canary
+│   │                    (plan mode), prompt_as (driver attribution), verify_replay, canary, step guards (empty-stop
+│   │                    retry, loop guard, budget wrap-up); prompts/ holds its model-facing prose
 │   ├── aho-inspect      folds over the log: tree, inventory, explain, why, status, orphans, catch-up, invariants
 │   │
 │   ├── seams/           traits + handle newtypes, no I/O
@@ -81,9 +82,10 @@ aho/
 │                        status rpc spec invariants doctor selfdev schedule ralph plan-mode gc credential login logout add
 │                        net sandbox export lease media
 ├── formal/              Log · Policy · Turn · Tasks (.tla/.cfg; TasksVerify.cfg), checked by formal-tlc
+├── docs/                how it works: architecture, authority, session-log, worlds, prompts, extending, formal
 ├── imgs/                logo
 ├── sdk/                 schema/aho-rpc.schema.json · ts/ · python/ (aho-sdk generates them and checks for drift)
-└── scripts/             gate.sh; ratchets/*.json baselines (panic, swallowed, long, wildcard, layers);
+└── scripts/             gate.sh; ratchets/*.json baselines (panic, swallowed, long, wildcard, prose, layers);
                         models.py regenerates crates/seams/aho-llm/models.tsv (model names, list prices)
 ```
 
@@ -128,9 +130,14 @@ started when a sandbox attaches. `aho net status|allow|map` changes it live thro
   `aho add recipe`, `aho set vm.recipe <name>`, `aho lease grant`. Machines listen on unix sockets under
   `vm.dir` (default `~/.aho/vm`); keep that path short.
 
-## Not implemented
+## Prompts
 
-- `aho session import` and `aho craft`.
+aho tells the model as little as possible and enforces the rest: checkable rules live in the
+decision chain, guards, and the session driver; facts the harness knows are generated from live
+state; only unjudgeable prose ships as text, as files under `crates/**/prompts/` pinned by the
+`prose` ratchet (growth fails the gate). Subagents take `role: scout | reviewer` — reporting
+shape from bundled prose, authority from a defaulted `read-only` preset. See
+[docs/prompts.md](docs/prompts.md).
 
 ## Design notes
 
@@ -139,15 +146,8 @@ started when a sandbox attaches. `aho net status|allow|map` changes it live thro
 - A blocked flow's unlock names what blocked it: `aho net allow <dest>` for the egress list, and
   `aho net allow host-lan|other-sessions|internet` for an isolation rule.
 
-## Known gaps
+## Gaps and direction
 
-- Tests cover `subagent-claude` / `subagent-codex` with recorded transcript fixtures and fake CLIs in real
-  tmux. We never launched the real `claude` and `codex` binaries with a prompt, since that spends the
-  operator's credits.
-- Under `world = vm`, `aho shell` without a command opens no PTY into the guest (use `aho shell -- <cmd>`),
-  and you get no workspace checkpoints. The guest agent serves one host channel, so `aho export` from the VM
-  fails while the session holds it.
-- The namespace sandbox's recipe root is an overlay whose writes last while its keeper runs; `/workspace` and
-  `/session` persist across keeper restarts.
-- The VM tests and smokes run against a stub `qemu-system-*` (real QMP, the real supervisor and guest agent);
-  we have not booted a real QEMU guest. The namespace world ran on Linux in a privileged container.
+Unfinished work, known gaps, and validation debt (nothing hidden: the VM stack has never booted
+a real guest; the real `claude`/`codex` binaries were never launched) are tracked in
+[TODO.md](TODO.md). Direction is in [ROADMAP.md](ROADMAP.md).
