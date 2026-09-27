@@ -13,6 +13,7 @@ use std::sync::Arc;
 use aho_cap::{Handle, HandleKind};
 use aho_types::{BoxFuture, CallId, ContentBlock, Hash, Message, StopReason, ToolSpec, Usage, Value};
 
+pub mod models;
 pub mod sse;
 
 pub const SEAM: &str = "llm";
@@ -62,6 +63,14 @@ pub struct AdapterInfo {
     /// The route name this instance serves (`openai`, `ollama`, `anthropic`, a `provider.<name>` row).
     pub route: String,
 }
+/// Model reasoning requested for the next answer. Adapters translate this into their native
+/// control; adapters without a compatible control ignore it but still surface reasoning events
+/// the provider sends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Reasoning {
+    /// Token budget for providers with an explicit budget (Anthropic).
+    pub budget_tokens: u32,
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Request {
@@ -71,6 +80,7 @@ pub struct Request {
     pub messages: Vec<Message>,
     pub tools: Vec<ToolSpec>,
     pub max_tokens: u32,
+    pub reasoning: Option<Reasoning>,
     /// Provider-side cache routing key (e.g. the session id); adapters that support one forward it.
     pub cache_key: Option<String>,
 }

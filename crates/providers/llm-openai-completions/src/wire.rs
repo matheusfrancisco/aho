@@ -419,6 +419,7 @@ mod tests {
                 class: Consequence::ReadOnly,
             }],
             max_tokens: 512,
+            reasoning: None,
             cache_key: Some("session-7".into()),
         }
     }

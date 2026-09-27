@@ -40,6 +40,8 @@ impl Session {
             },
             tools: vec![],
             max_tokens: 4096,
+            // Compaction is bookkeeping: do not spend reasoning tokens on it.
+            reasoning: None,
             cache_key: None,
         };
         let result = self.llm.stream(req, Box::new(|_| {})).await;

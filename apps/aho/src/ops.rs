@@ -197,6 +197,7 @@ pub async fn doctor_provider(ctx: &Ctx, id: &str, tier: &str, json_out: bool) ->
                 messages: vec![Message { role: Role::User, content: vec![ContentBlock::text("Reply with the single word: ok")] }],
                 tools: Vec::new(),
                 max_tokens: 16,
+                reasoning: None,
                 cache_key: None,
             };
             match tokio::time::timeout(Duration::from_secs(60), r.0.stream(req, Box::new(|_| {}))).await {

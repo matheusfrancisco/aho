@@ -19,6 +19,7 @@ fn request() -> Request {
         messages: vec![Message::user("say hello")],
         tools: vec![],
         max_tokens: 256,
+        reasoning: None,
         cache_key: Some("sess-1".into()),
     }
 }

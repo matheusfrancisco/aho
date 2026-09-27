@@ -27,6 +27,7 @@ mod slash;
 mod theme;
 
 use aho_cap::*;
+use aho_config::{ConfigKey, Ty};
 
 pub use frames::{Frame, FrameCapture, LAYOUT_OSCILLATION, Probe, buffer_lines};
 pub use inline::{InlineScreen, Reopen};
@@ -45,13 +46,32 @@ pub use slash::{CommandInfo, Commands, HELP, Handler, Parsed, Reply, parse_line}
 pub use theme::{ColorMode, Theme};
 
 pub struct SurfaceTui;
+#[derive(Clone, Debug)]
+pub struct TuiConfig;
+
+impl Config for TuiConfig {
+    const PREFIX: &'static str = "tui";
+
+    fn keys() -> Vec<ConfigKey> {
+        vec![ConfigKey::new(
+            "tui.thinking",
+            Ty::Bool,
+            Some(serde_json::json!(true)),
+            "Show model reasoning in the TUI transcript; `/thinking` toggles it for one run.",
+        )]
+    }
+
+    fn from_loadout(_: &aho_config::Loadout) -> Result<Self, ConfigError> {
+        Ok(TuiConfig)
+    }
+}
 
 impl Capability for SurfaceTui {
     const ID: CapabilityId = Self::ID_;
     const MANIFEST: &'static Manifest = &Self::MANIFEST_;
     type Deps = ();
-    type Config = ();
-    fn build(_: (), _: ()) -> Result<Self, BuildError> {
+    type Config = TuiConfig;
+    fn build(_: (), _: TuiConfig) -> Result<Self, BuildError> {
         Ok(SurfaceTui)
     }
     fn register(&self, _r: &mut Registrar<'_>) {}
@@ -64,17 +84,20 @@ declare_capability!(
     provides = [],
     requires = [],
     tools = &[],
-    doc = "Terminal UI: one column (transcript, prompt with status line, hints), inline in the terminal's scrollback; themed tool cards and checkpoint markers; `/` command menu with Tab completion; /tree /inventory /jobs /invariants /rewind /help as closable overlays; approval card; HUD."
+    doc = "Terminal UI: one column (transcript, prompt whose border is the status line: model, workspace, spend, context gauge; hints), inline in the terminal's scrollback; themed tool cards and checkpoint markers; `/` command menu with Tab completion; /tree /inventory /jobs /invariants /rewind /help as closable overlays; approval card; HUD."
 );
 
 /// `aho tui --headless`: the screen the TUI would draw for `session` right now, as normalized JSON.
+/// `workspace` is the path the status line shows (see [`RunOptions::workspace`]).
 pub fn headless(
     session: &aho_session::Session,
     planned: &aho_compose::Planned,
+    workspace: &str,
     width: u16,
     height: u16,
 ) -> Result<serde_json::Value, String> {
-    let ui = ui_from_session(session, planned)?;
+    let mut ui = ui_from_session(session, planned)?;
+    ui.plan.workspace = workspace.to_string();
     Ok(render_frame_json(&ui, width, height))
 }
 

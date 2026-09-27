@@ -52,6 +52,9 @@ pub fn encode_request(req: &Request, flavor: Flavor, route: &str) -> Value {
         body.insert("include".into(), json!(["reasoning.encrypted_content"]));
         body.insert("tool_choice".into(), json!("auto"));
         body.insert("parallel_tool_calls".into(), json!(true));
+        if req.reasoning.is_some() {
+            body.insert("reasoning".into(), json!({"effort": "medium", "summary": "auto"}));
+        }
         // Codex does not accept max_output_tokens; pi's Codex endpoint deliberately omits it.
     } else {
         if req.max_tokens > 0 {

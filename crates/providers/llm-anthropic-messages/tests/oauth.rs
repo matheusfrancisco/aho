@@ -44,6 +44,7 @@ fn request() -> Request {
             class: Consequence::ReadOnly,
         }],
         max_tokens: 128,
+        reasoning: None,
         cache_key: None,
     }
 }

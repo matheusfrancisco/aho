@@ -99,6 +99,7 @@ async fn ask(route: &LlmRoute, model: &str, section: &str, system: &str, prompt:
         messages: vec![Message::user(prompt)],
         tools: Vec::new(),
         max_tokens,
+        reasoning: None,
         cache_key: None,
     };
     let resp = route.0.stream(req, Box::new(|_| {})).await.map_err(|e| e.to_string())?;

@@ -25,6 +25,7 @@ fn request(messages: Vec<Message>) -> Request {
         messages,
         tools: vec![],
         max_tokens: 1024,
+        reasoning: None,
         cache_key: None,
     }
 }

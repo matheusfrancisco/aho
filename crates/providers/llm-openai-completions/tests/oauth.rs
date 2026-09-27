@@ -24,6 +24,7 @@ fn request(model: &str) -> Request {
         messages: vec![Message::user("run a tool")],
         tools: vec![],
         max_tokens: 256,
+        reasoning: None,
         cache_key: None,
     }
 }

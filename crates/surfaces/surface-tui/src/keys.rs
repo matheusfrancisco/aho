@@ -233,6 +233,15 @@ fn view_command(ui: &mut UiState, name: &str) -> Option<Option<Action>> {
             ui.notice = Some(Notice::info(if ui.local.hud { "HUD on: entry ids and origins" } else { "HUD off" }));
             Some(None)
         }
+        "thinking" => {
+            ui.local.show_thinking = !ui.local.show_thinking;
+            ui.notice = Some(Notice::info(if ui.local.show_thinking {
+                "Thinking shown for new output; `/thinking` hides it"
+            } else {
+                "Thinking hidden for new output; terminal scrollback already printed is unchanged"
+            }));
+            Some(None)
+        }
         "quit" | "exit" => Some(Some(Action::Quit)),
         _ => None,
     }

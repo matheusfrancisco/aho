@@ -28,6 +28,16 @@ fn read_pem(p: &Path, what: &str) -> Result<String, Fail> {
     std::fs::read_to_string(p).map_err(|e| err(format!("the TLS {what} {} cannot be read ({e}); nothing was served", p.display())))
 }
 
+/// The workspace as the TUI's status line shows it: under the home directory as `~/…`.
+fn workspace_label(ctx: &Ctx, p: &aho_compose::Planned, home: &Path) -> String {
+    let root = crate::ctx::workspace_of(&ctx.project, p);
+    match root.strip_prefix(home) {
+        Ok(rest) if rest.as_os_str().is_empty() => "~".into(),
+        Ok(rest) => format!("~/{}", rest.display()),
+        Err(_) => root.display().to_string(),
+    }
+}
+
 fn resumed_note(id: aho_types::SessionId, resumed: bool) {
     eprintln!("session {} ({})", hex(id), if resumed { "resumed" } else { "new" });
 }
@@ -39,7 +49,7 @@ pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, fullscreen: b
         // "Visual debug": the normalized screen of the session as it is now; nothing runs.
         // The drivers are hosted for the boot so the schedule/workflow tools are not logged Broken.
         let o = open(ctx, &p, &inputs.home, session, false, true).await?;
-        let frame = surface_tui::headless(&o.session, &p, width, height).map_err(err);
+        let frame = surface_tui::headless(&o.session, &p, &workspace_label(ctx, &p, &inputs.home), width, height).map_err(err);
         stop_drivers(o.drivers).await;
         println!("{}", serde_json::to_string_pretty(&frame?)?);
         return Ok(());
@@ -48,7 +58,11 @@ pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, fullscreen: b
     let o = open(ctx, &p, &inputs.home, session, true, true).await?;
     let approvals = o.approvals.ok_or_else(|| err("the session has no approval channel, so the terminal UI cannot answer cards"))?;
     // Colours from the terminal: NO_COLOR, COLORTERM/TERM depth, COLORFGBG or AHO_THEME background.
-    let options = surface_tui::RunOptions { fullscreen, theme: surface_tui::Theme::detect(&|k| std::env::var(k).ok()) };
+    let options = surface_tui::RunOptions {
+        fullscreen,
+        theme: surface_tui::Theme::detect(&|k| std::env::var(k).ok()),
+        workspace: workspace_label(ctx, &p, &inputs.home),
+    };
     let ran = surface_tui::run(o.session.clone(), approvals, p, commands, options).await;
     stop_drivers(o.drivers).await;
     ran.map_err(err)?;

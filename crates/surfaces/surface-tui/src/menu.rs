@@ -15,6 +15,7 @@ pub const VIEWS: &[(&str, &str)] = &[
     ("invariants", "invariant verdicts against the latest checkpoint"),
     ("rewind", "go back to a checkpoint: chat, code, or both"),
     ("hud", "show or hide entry ids and origins in the transcript"),
+    ("thinking", "show or hide new model reasoning (shown by default)"),
     ("quit", "leave the TUI; the session keeps its log"),
 ];
 

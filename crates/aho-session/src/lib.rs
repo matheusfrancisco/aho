@@ -45,6 +45,8 @@ pub struct SessionConfig {
     pub provider: String,
     pub model: String,
     pub max_tokens: u32,
+    /// `Some`: this catalogued model supports reasoning and `model.thinking` is on.
+    pub reasoning: Option<aho_llm::Reasoning>,
     pub grace_ms: u64,
     pub heartbeat_s: u64,
     pub max_parallel: usize,
@@ -61,10 +63,16 @@ impl SessionConfig {
     pub fn from_loadout(l: &Loadout, spill_dir: PathBuf) -> Self {
         let u = |k: &str, d: u64| l.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
         let f = |k: &str, d: f64| l.get(k).and_then(|v| v.as_f64()).unwrap_or(d);
+        let provider = l.str("model.provider").unwrap_or("openai").to_string();
+        let model = l.str("model.name").unwrap_or("gpt-4.1-mini").to_string();
+        let reasoning = (l.get("model.thinking").and_then(|v| v.as_bool()).unwrap_or(true)
+            && aho_llm::models::lookup(&provider, &model).is_some_and(|m| m.reasoning))
+        .then(|| aho_llm::Reasoning { budget_tokens: u("model.thinking_budget", 4096) as u32 });
         SessionConfig {
-            provider: l.str("model.provider").unwrap_or("openai").to_string(),
-            model: l.str("model.name").unwrap_or("gpt-4.1-mini").to_string(),
+            provider,
+            model,
             max_tokens: u("model.max_tokens", 8192) as u32,
+            reasoning,
             grace_ms: u("tools.grace_ms", 1000),
             heartbeat_s: u("tools.heartbeat_s", 600),
             max_parallel: u("tools.max_parallel", 10) as usize,
@@ -367,6 +375,10 @@ impl Session {
     }
     pub fn registry(&self) -> &Registry {
         &self.reg
+    }
+    /// The model route, model id and budgets this session runs with.
+    pub fn config(&self) -> &SessionConfig {
+        &self.cfg
     }
     pub fn subscribe(&self) -> broadcast::Receiver<SessionEvent> {
         self.events.subscribe()
@@ -785,6 +797,7 @@ impl Session {
             messages,
             tools,
             max_tokens: self.cfg.max_tokens,
+            reasoning: self.cfg.reasoning,
             cache_key: Some(self.id.0.to_string()),
         };
         Ok((req, header))

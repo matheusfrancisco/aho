@@ -18,7 +18,7 @@ use aho_fs::SnapshotHandle;
 use aho_log::{CustomFolds, EntryKind, GrantScope, RewindMode, Transition};
 use aho_policy::{Operator, OperatorProof};
 use aho_session::{Session, SessionError, SessionEvent};
-use aho_types::{CheckpointId, EntryId};
+use aho_types::{CheckpointId, EntryId, Usage};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::event::{self, DisableBracketedPaste, EnableBracketedPaste, Event};
@@ -38,7 +38,8 @@ use crate::theme::Theme;
 pub const FRAME_RING: usize = 256;
 
 /// Builds the screen state from the session: the fold of the current branch plus the plan's
-/// tree and inventory and the live operations table.
+/// tree and inventory, the live operations table, and the model facts of the status line (its
+/// catalog name and price, the spend over the whole log, the context budget).
 pub fn ui_from_session(session: &Session, planned: &Planned) -> Result<UiState, String> {
     let id = format!("{:x}", session.id.0);
     let short = if id.len() > 8 { format!("{}…", &id[..8]) } else { id };
@@ -50,6 +51,12 @@ pub fn ui_from_session(session: &Session, planned: &Planned) -> Result<UiState, 
     ui.refold(&branch, &session.registry().entry_kinds)?;
     ui.refresh_tree(&planned.plan, &planned.loadout);
     ui.jobs = session.ops().list();
+    ui.model_facts(session.config());
+    // Abandoned branches were paid for too.
+    ui.spent = session.log().read_from(None).iter().fold(Usage::default(), |sum, e| match &e.kind {
+        EntryKind::AssistantMessage { usage, .. } => sum + *usage,
+        _ => sum,
+    });
     Ok(ui)
 }
 
@@ -99,6 +106,8 @@ pub struct RunOptions {
     pub fullscreen: bool,
     /// The colours; the app detects them from the terminal ([`Theme::detect`]).
     pub theme: Theme,
+    /// The workspace as the status line shows it (`~/…`); empty hides it.
+    pub workspace: String,
 }
 
 type Crossterm = CrosstermBackend<Stdout>;
@@ -197,6 +206,7 @@ pub async fn run(
     let mut ui = ui_from_session(&session, &planned)?;
     ui.commands = commands.info();
     ui.theme = options.theme.clone();
+    ui.plan.workspace = options.workspace.clone();
     let (done, mut done_rx) = mpsc::unbounded_channel();
     let mut rt = Runtime {
         folds: session.registry().entry_kinds.clone(),
@@ -348,6 +358,7 @@ impl Runtime {
                 fresh.notice = self.ui.notice.take();
                 fresh.commands = std::mem::take(&mut self.ui.commands);
                 fresh.theme = self.ui.theme.clone();
+                fresh.plan.workspace = std::mem::take(&mut self.ui.plan.workspace);
                 self.ui = fresh;
                 self.refolded = true;
             }

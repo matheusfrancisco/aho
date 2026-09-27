@@ -7,15 +7,24 @@
 //! shrinks with what it shows; ratatui's inline viewports have a fixed height, so a new height
 //! re-creates the terminal at the old viewport's top row.
 //!
+//! Resizing: the emulator rewraps the screen before aho hears about it, so the old viewport's
+//! rows (full-width borders) may now take more rows, and nothing on screen says where the
+//! viewport starts. Terminals keep the cursor on its logical line through a rewrap, so the
+//! hardware cursor is hidden and parked at the viewport's top-left between frames (the prompt
+//! shows a drawn cursor instead): after a resize the cursor *is* the viewport's new top, and
+//! everything from it down is erased and redrawn. Without the parking, each resize would leave
+//! the rewrapped part of the old border above the new viewport.
+//!
 //! [`Transcript::settled`]: crate::Transcript::settled
 
 use std::io;
 
 use aho_types::EntryId;
+use ratatui::backend::ClearType;
 use ratatui::backend::{Backend, TestBackend};
 use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::layout::{Position, Rect, Size};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::{Terminal, TerminalOptions, Viewport};
 
@@ -54,14 +63,14 @@ impl Reopen for ratatui::backend::CrosstermBackend<std::io::Stdout> {
     /// a tinted row fills with erase-to-end-of-line), from the viewport's top row down, letting
     /// the terminal scroll them into its history.
     fn history(term: &mut Terminal<Self>, lines: &[Line<'static>]) -> io::Result<bool> {
-        use ratatui::crossterm::cursor::MoveTo;
         use ratatui::crossterm::queue;
         use ratatui::crossterm::style::{Attribute, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor};
         use ratatui::crossterm::terminal::{Clear, ClearType};
         use ratatui::style::Modifier;
         let top = term.get_frame().area().y;
+        let bottom = term.size()?.height;
         let out = term.backend_mut();
-        queue!(out, MoveTo(0, top), Clear(ClearType::FromCursorDown))?;
+        erase_rows(out, top, bottom)?;
         let attrs = |out: &mut Self, m: Modifier| -> io::Result<()> {
             for (bit, a) in [
                 (Modifier::BOLD, Attribute::Bold),
@@ -118,6 +127,8 @@ pub struct InlineScreen<B: Reopen> {
     /// The entry of the last written block: after a refold (fork, rewind) the blocks up to it are
     /// still on screen and are not written again.
     printed_upto: Option<EntryId>,
+    /// The terminal size the viewport was laid out for.
+    size: Size,
 }
 
 impl<B: Reopen> InlineScreen<B> {
@@ -125,11 +136,17 @@ impl<B: Reopen> InlineScreen<B> {
     pub fn new(backend: B, height: u16) -> io::Result<Self> {
         let height = height.max(1);
         let term = Terminal::with_options(backend, TerminalOptions { viewport: Viewport::Inline(height) })?;
-        Ok(InlineScreen { term, height, printed: 0, printed_upto: None })
+        let size = term.size()?;
+        Ok(InlineScreen { term, height, printed: 0, printed_upto: None, size })
     }
 
     pub fn backend(&self) -> &B {
         self.term.backend()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn backend_mut(&mut self) -> &mut B {
+        self.term.backend_mut()
     }
 
     /// Blocks written to the scrollback.
@@ -149,15 +166,31 @@ impl<B: Reopen> InlineScreen<B> {
         };
     }
 
-    /// The screen under an overlay was replaced (alternate screen): repaint the viewport fully.
+    /// The screen under an overlay was replaced (alternate screen), and may have been resized
+    /// and rewrapped meanwhile: repaint the viewport from the parked cursor.
     pub fn invalidate(&mut self) -> io::Result<()> {
-        self.term.clear()
+        self.reflowed()
+    }
+
+    /// The viewport starts at the parked cursor (wherever the rewrap moved it): erase from there
+    /// down and open the viewport again at that row.
+    fn reflowed(&mut self) -> io::Result<()> {
+        let top = self.term.backend_mut().get_cursor_position()?.y;
+        let bottom = self.term.size()?.height;
+        erase_rows(self.term.backend_mut(), top, bottom)?;
+        let backend = self.term.backend().reopen();
+        self.term = Terminal::with_options(backend, TerminalOptions { viewport: Viewport::Inline(self.height) })?;
+        self.size = self.term.size()?;
+        Ok(())
     }
 
     /// Writes newly settled blocks to the scrollback, sizes the viewport, draws the live bottom;
     /// returns the viewport as drawn.
     pub fn draw(&mut self, ui: &UiState, probe: &mut Probe) -> io::Result<Buffer> {
-        let size = self.term.size()?;
+        if self.term.size()? != self.size {
+            self.reflowed()?;
+        }
+        let size = self.size;
         let settled = ui.transcript.settled().max(self.printed.min(ui.transcript.blocks.len()));
         if settled > self.printed {
             let lines = block_lines(ui, self.printed..settled, size.width as usize);
@@ -184,25 +217,52 @@ impl<B: Reopen> InlineScreen<B> {
         let printed = self.printed;
         let done = self.term.draw(|f| {
             let area = f.area();
-            if let Some(pos) = draw_inline(ui, printed, area, f.buffer_mut(), probe) {
-                f.set_cursor_position(pos);
+            if let Some(pos) = draw_inline(ui, printed, area, f.buffer_mut(), probe)
+                && let Some(cell) = f.buffer_mut().cell_mut(pos)
+            {
+                cell.modifier.insert(Modifier::REVERSED);
             }
         })?;
-        Ok(done.buffer.clone())
+        let buffer = done.buffer.clone();
+        let top = self.term.get_frame().area().y;
+        // No frame cursor: ratatui hid it. Park it where a rewrap keeps the viewport's top.
+        self.term.set_cursor_position(Position { x: 0, y: top })?;
+        self.term.backend_mut().flush()?;
+        Ok(buffer)
+    }
+
+    /// Blanks the viewport's rows; the cursor is left at its top-left.
+    fn erase_viewport(&mut self) -> io::Result<()> {
+        let area = self.term.get_frame().area();
+        erase_rows(self.term.backend_mut(), area.y, area.bottom())
     }
 
     /// A new viewport height: clear the old viewport and open the new one at its top row.
     fn resize(&mut self, height: u16) -> io::Result<()> {
-        self.term.clear()?;
+        self.erase_viewport()?;
         let backend = self.term.backend().reopen();
         self.term = Terminal::with_options(backend, TerminalOptions { viewport: Viewport::Inline(height) })?;
         self.height = height;
+        self.size = self.term.size()?;
         Ok(())
     }
 
     /// Leaves the transcript in the scrollback and the cursor below it: the viewport is cleared.
     pub fn finish(&mut self) -> io::Result<()> {
-        self.term.clear()?;
+        self.erase_viewport()?;
         self.term.show_cursor()
     }
+}
+
+/// Blanks rows `from..to` one line at a time and leaves the cursor at `(0, from)`. Never an
+/// erase-below: from the top-left corner that is "clear the screen", which tmux
+/// (`scroll-on-clear`, on by default) first copies into the scrollback, leaving a stale copy of
+/// the viewport in the history.
+fn erase_rows<B: Backend>(b: &mut B, from: u16, to: u16) -> io::Result<()> {
+    for y in from..to {
+        b.set_cursor_position(Position { x: 0, y })?;
+        b.clear_region(ClearType::CurrentLine)?;
+    }
+    b.set_cursor_position(Position { x: 0, y: from })?;
+    b.flush()
 }

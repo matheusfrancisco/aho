@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use aho_llm::{LlmError, Request, Response, Sink, StreamEvent};
+use aho_llm::{LlmError, Reasoning, Request, Response, Sink, StreamEvent};
 use aho_types::{CallId, ContentBlock, Message, Role, StopReason, Usage, Value};
 use llm_openai_responses::{Flavor, StreamDecoder, classify, encode_request};
 use serde_json::json;
@@ -91,6 +91,21 @@ fn terminal_snapshots_backfill_reasoning_and_replay_only_to_the_same_route_and_m
     assert_eq!(other["input"], json!([{"type":"function_call", "call_id":"a", "name":"read", "arguments":"{}"}]));
     req.model = "gpt-5.2".into();
     assert_eq!(encode_request(&req, Flavor::Codex, "openai-codex")["input"], other["input"]);
+}
+
+#[test]
+fn codex_requests_reasoning_summaries_only_when_reasoning_is_enabled() {
+    let mut req = Request {
+        model: "gpt-5".into(),
+        messages: vec![Message::user("think")],
+        reasoning: Some(Reasoning { budget_tokens: 4096 }),
+        ..Default::default()
+    };
+    let codex = encode_request(&req, Flavor::Codex, "openai-codex");
+    assert_eq!(codex["reasoning"], json!({"effort": "medium", "summary": "auto"}));
+    assert!(encode_request(&req, Flavor::Generic, "meta").get("reasoning").is_none());
+    req.reasoning = None;
+    assert!(encode_request(&req, Flavor::Codex, "openai-codex").get("reasoning").is_none());
 }
 
 #[test]

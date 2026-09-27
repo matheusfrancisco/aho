@@ -8,6 +8,7 @@ use aho_cap::{Plan, Registry};
 use aho_config::Loadout;
 use aho_inspect::{Card as InvCard, InvariantRow, TreeNode};
 use aho_llm::StreamEvent;
+use aho_llm::models::Price;
 use aho_log::{
     ApprovalOutcome, CapDeltaOp, CapState, CheckpointCause, CustomFolds, Entry, EntryKind, GrantScope, RewindMode, State, ToolOutcome,
     Transition,
@@ -598,7 +599,7 @@ impl Notice {
 }
 
 /// Surface-local state: the only thing the TUI holds that the log does not.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Local {
     pub draft: String,
     /// Cursor in `draft`, in chars.
@@ -606,10 +607,18 @@ pub struct Local {
     /// Transcript lines scrolled up from the tail (0 = follow); full-screen mode only.
     pub scroll: usize,
     pub hud: bool,
+    /// Whether model reasoning is visible. Default on; `/thinking` changes it for this run.
+    pub show_thinking: bool,
     /// The highlighted row of the `/` menu.
     pub menu_selected: usize,
     /// Esc closed the menu for this draft; editing reopens it.
     pub menu_dismissed: bool,
+}
+
+impl Default for Local {
+    fn default() -> Self {
+        Local { draft: String::new(), cursor: 0, scroll: 0, hud: false, show_thinking: true, menu_selected: 0, menu_dismissed: false }
+    }
 }
 
 /// Plan facts the header shows.
@@ -621,6 +630,15 @@ pub struct PlanInfo {
     pub enforced_by: String,
     /// The origin of `policy.preset` (HUD).
     pub preset_origin: String,
+    /// The model as the status line names it: its catalog name, else its id.
+    pub model: String,
+    /// The model's list price on its route; `None` (not in the catalog) shows token counts.
+    pub price: Option<Price>,
+    /// The context budget (`model.context_window`) and the ratio of it compaction starts at.
+    pub context_window: u64,
+    pub compact_at: f64,
+    /// The workspace as the status line shows it (`~/…`); empty hides it.
+    pub workspace: String,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -644,6 +662,11 @@ pub struct UiState {
     /// The app's slash commands (for the menu and `/help`).
     pub commands: Vec<CommandInfo>,
     pub theme: Theme,
+    /// Tokens every model answer in the session log reported, all branches (the spend).
+    pub spent: Usage,
+    /// Tokens in the context at the last model answer on this branch; `None` before the first
+    /// answer and after compaction replaced part of the context (until the next answer).
+    pub context_used: Option<u64>,
     pub local: Local,
 }
 
@@ -657,12 +680,25 @@ impl UiState {
                 world: plan.world.name.clone(),
                 enforced_by: plan.world.enforced_by.clone(),
                 preset_origin: loadout.config.get("policy.preset").map(|s| s.winner.render()).unwrap_or_else(|| "default".into()),
+                ..PlanInfo::default()
             },
             tool_caps,
+            local: Local { show_thinking: loadout.get("tui.thinking").and_then(|v| v.as_bool()).unwrap_or(true), ..Local::default() },
             ..UiState::default()
         };
         ui.refresh_tree(plan, loadout);
+        ui.model_facts(&aho_session::SessionConfig::from_loadout(loadout, std::path::PathBuf::new()));
         ui
+    }
+
+    /// The status line's model name, list price and context budget, from the config the session
+    /// runs with.
+    pub fn model_facts(&mut self, cfg: &aho_session::SessionConfig) {
+        let listed = aho_llm::models::lookup(&cfg.provider, &cfg.model);
+        self.plan.model = listed.map_or_else(|| cfg.model.clone(), |m| m.name.to_string());
+        self.plan.price = listed.map(|m| m.price);
+        self.plan.context_window = cfg.context_window;
+        self.plan.compact_at = cfg.compaction_threshold;
     }
 
     /// Tree and inventory: the plan's nodes governed by resolved config, with runtime state
@@ -687,7 +723,22 @@ impl UiState {
     pub fn refold(&mut self, branch: &[Entry], folds: &CustomFolds) -> Result<(), String> {
         self.transcript = Transcript::from_entries(branch, &self.tool_caps);
         self.state = aho_log::fold(branch, folds).map_err(|e| format!("the session log does not fold: {e}"))?;
+        self.spent = self.state.usage;
+        self.context_used = None;
+        for e in branch {
+            self.meter_context(e);
+        }
         Ok(())
+    }
+
+    fn meter_context(&mut self, e: &Entry) {
+        match &e.kind {
+            EntryKind::AssistantMessage { usage, .. } => {
+                self.context_used = Some(usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens + usage.output_tokens)
+            }
+            EntryKind::SurfaceReplace { .. } => self.context_used = None,
+            _ => {}
+        }
     }
 
     /// Folds one entry of the current branch. `Err` means the fold failed; refold from the log.
@@ -695,6 +746,10 @@ impl UiState {
         self.transcript.apply(e, &self.tool_caps);
         let prev = std::mem::take(&mut self.state);
         self.state = aho_log::step(prev, e, folds).map_err(|err| format!("entry {} does not fold: {err}", e.id.0))?;
+        if let EntryKind::AssistantMessage { usage, .. } = &e.kind {
+            self.spent = self.spent + *usage;
+        }
+        self.meter_context(e);
         Ok(())
     }
 

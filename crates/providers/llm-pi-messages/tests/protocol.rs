@@ -114,6 +114,7 @@ fn normalized_system_tools_and_mixed_result_history_use_native_message_roles() {
             Message { role: Role::Tool, content: vec![result("late result")] },
         ],
         max_tokens: 321,
+        reasoning: None,
         cache_key: Some("session-stable".into()),
     };
     let body = encode_request(&request);

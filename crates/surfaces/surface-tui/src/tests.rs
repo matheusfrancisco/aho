@@ -512,7 +512,7 @@ async fn live_events_fold_to_the_same_screen_as_a_fresh_fold() {
     let after = ui_from_session(&s, &r.planned).unwrap();
     assert!(after.transcript.blocks.iter().any(|b| matches!(b.body, Body::Restored { mode: RewindMode::ChatOnly, .. })));
 
-    let json = headless(&s, &r.planned, 100, 24).unwrap();
+    let json = headless(&s, &r.planned, "~/ws", 100, 24).unwrap();
     assert!(json["lines"].as_array().unwrap().iter().any(|l| l.as_str().unwrap().contains("↺ rewound to c")));
 }
 
@@ -796,4 +796,222 @@ fn the_inline_viewport_grows_with_the_menu_and_shrinks_back_when_it_closes() {
     inline.draw(&ui, &mut probe).unwrap();
     assert_eq!(inline.height(), idle);
     assert!(!visible(&inline).contains("/help"), "the menu rows are cleared, not left behind");
+}
+
+// ───────────────────────────── status line ─────────────────────────────
+
+fn session_cfg(provider: &str, model: &str) -> aho_session::SessionConfig {
+    let mut cfg = aho_session::SessionConfig::from_loadout(
+        &aho_config::resolve(&aho_config::ResolveInputs::default(), &aho_config::Schema::default(), false).unwrap(),
+        std::path::PathBuf::new(),
+    );
+    (cfg.provider, cfg.model, cfg.context_window, cfg.compaction_threshold) = (provider.into(), model.into(), 200_000, 0.8);
+    cfg
+}
+
+fn answer(usage: Usage) -> (Principal, EntryKind) {
+    (model(), EntryKind::AssistantMessage { content: vec![ContentBlock::text("ok")], usage, stop: StopReason::EndTurn })
+}
+
+fn border(ui: &UiState, w: u16) -> String {
+    screen(ui, w, 12).lines().find(|l| l.contains('╭')).unwrap_or_default().to_string()
+}
+
+#[test]
+fn status_line_names_the_model_prices_the_spend_and_gauges_the_last_answer_against_the_budget() {
+    let mut ui = UiState::default();
+    ui.model_facts(&session_cfg("anthropic", "claude-sonnet-4-5"));
+    ui.plan.workspace = "~/m/projects/study-harness".into();
+    ui.plan.world = "host".into();
+    let price = aho_llm::models::lookup("anthropic", "claude-sonnet-4-5").unwrap().price;
+    let first = Usage { input_tokens: 100_000, output_tokens: 2_000, cache_read_tokens: 0, cache_write_tokens: 20_000 };
+    let second = Usage { input_tokens: 1_000, output_tokens: 4_000, cache_read_tokens: 150_000, cache_write_tokens: 0 };
+    let entries = log_with(vec![user("go"), answer(first), answer(second)]);
+    ui.refold(&entries[..2], &Default::default()).unwrap();
+    assert_eq!(ui.context_used, Some(122_000));
+    ui.apply(&entries[2], &Default::default()).unwrap();
+    let line = border(&ui, 140);
+    println!("{line}");
+    let cost = price.cost(&first) + price.cost(&second);
+    for needle in [
+        "aho › Claude Sonnet 4.5 › ~/m/projects/study-harness › ",
+        &crate::render::dollars(cost),
+        "preset",
+        "world host",
+        "78% of 200k",
+        "○ idle",
+    ] {
+        assert!(line.contains(needle), "{needle:?} missing from {line}");
+    }
+
+    // After compaction the last answer no longer describes the context: unknown until the next one.
+    let replaced = log_with(vec![
+        user("go"),
+        answer(first),
+        (
+            Principal::system("compaction"),
+            EntryKind::SurfaceReplace { start: EntryId(1), end: EntryId(2), shadow_price: 1, summary: None, by_cap: "c".into() },
+        ),
+    ]);
+    ui.refold(&replaced, &Default::default()).unwrap();
+    assert!(border(&ui, 140).contains("–% of 200k"), "{}", border(&ui, 140));
+}
+
+#[test]
+fn a_model_without_a_list_price_shows_token_counts_never_a_guessed_cost() {
+    let mut ui = UiState::default();
+    ui.model_facts(&session_cfg("ollama", "claude-sonnet-4-5"));
+    let entries = log_with(vec![answer(Usage { input_tokens: 400, output_tokens: 340, cache_read_tokens: 200, cache_write_tokens: 0 })]);
+    ui.refold(&entries, &Default::default()).unwrap();
+    let line = border(&ui, 120);
+    assert!(line.contains("claude-sonnet-4-5 › ↑600 ↓340"), "the id stands in for the name: {line}");
+    assert!(line.contains(" <1% of 200k"), "940 of 200k is not an empty context: {line}");
+    assert!(!line.contains('$'), "{line}");
+}
+
+#[test]
+fn a_narrow_status_line_keeps_the_model_and_the_gauge_and_drops_the_rest_in_order() {
+    let mut ui = UiState::default();
+    ui.model_facts(&session_cfg("anthropic", "claude-sonnet-4-5"));
+    ui.plan.workspace = "~/m/projects/study-harness".into();
+    ui.plan.world = "host".into();
+    ui.state.policy.preset = "workspace".into();
+    let wide = border(&ui, 140);
+    assert!(wide.contains("world host") && wide.contains("~/m/projects/study-harness"), "{wide}");
+    let mid = border(&ui, 90);
+    assert!(!mid.contains("world host") && !mid.contains("aho ›"), "the world and the mark go first: {mid}");
+    assert!(mid.contains("› …/study-harness ›") && mid.contains("preset workspace"), "then the workspace shortens: {mid}");
+    let narrow = border(&ui, 60);
+    assert!(narrow.contains("Claude Sonnet 4.5") && narrow.contains("–% of 200k") && narrow.contains("○ idle"), "{narrow}");
+    assert!(!narrow.contains("study-harness"), "{narrow}");
+    let tiny = border(&ui, 40);
+    assert!(tiny.contains("Claude Sonnet …") && tiny.contains(" –% of 200k · ○ idle ╮"), "the name is cut, never the gauge: {tiny}");
+    for w in [140u16, 90, 60, 40] {
+        assert_eq!(border(&ui, w).chars().count(), w as usize, "the border is exactly the box width at {w}");
+    }
+}
+
+#[test]
+fn token_counts_and_dollars_print_short_without_rounding_into_the_wrong_unit() {
+    use crate::render::{dollars, tokens};
+    let cases = [
+        (999, "999"),
+        (1_000, "1k"),
+        (1_250, "1.2k"),
+        (9_949, "9.9k"),
+        (9_950, "10k"),
+        (128_000, "128k"),
+        (999_499, "999k"),
+        (999_500, "1M"),
+        (1_047_576, "1M"),
+        (2_500_000, "2.5M"),
+        (12_400_000, "12M"),
+    ];
+    for (n, want) in cases {
+        assert_eq!(tokens(n), want, "{n}");
+    }
+    assert_eq!(
+        (dollars(0.0), dollars(0.0042), dollars(0.01), dollars(89.834)),
+        ("$0.00".into(), "$0.004".into(), "$0.01".into(), "$89.83".into())
+    );
+}
+
+#[test]
+fn a_resize_redraws_the_viewport_from_the_parked_cursor_and_leaves_no_rewrapped_border_behind() {
+    use ratatui::backend::Backend;
+    use ratatui::buffer::Cell;
+    use ratatui::layout::Position;
+    use ratatui::style::Modifier;
+    let ui = UiState::default();
+    let mut backend = TestBackend::new(80, 20);
+    backend.set_cursor_position(Position::new(0, 3)).unwrap();
+    let mut inline = InlineScreen::new(backend, 4).unwrap();
+    let mut probe = Probe::default();
+    let top = 3u16;
+    let drawn = inline.draw(&ui, &mut probe).unwrap();
+    assert_eq!(inline.backend_mut().get_cursor_position().unwrap(), Position::new(0, top), "parked at the viewport's top-left");
+    let prompt: Vec<&Cell> = (0..80).filter_map(|x| drawn.cell(Position::new(x, top + 1))).collect();
+    assert!(prompt.iter().any(|c| c.modifier.contains(Modifier::REVERSED)), "the prompt draws its own cursor");
+
+    // The window narrows: the emulator rewraps the old 80-column rows (each border takes two rows
+    // now), and the parked cursor moves with the viewport's first line, here one row down.
+    inline.backend_mut().resize(50, 20);
+    let stale = Cell::new("#");
+    let junk: Vec<(u16, u16, &Cell)> = (top..top + 9).flat_map(|y| (0..50).map(move |x| (x, y))).map(|(x, y)| (x, y, &stale)).collect();
+    inline.backend_mut().draw(junk.into_iter()).unwrap();
+    inline.backend_mut().set_cursor_position(Position::new(0, top + 1)).unwrap();
+    inline.draw(&ui, &mut probe).unwrap();
+    let rows: Vec<String> = visible(&inline).lines().map(str::to_string).collect();
+    println!("{}", rows.join("\n"));
+    assert!(rows[top as usize].starts_with('#'), "rows above the anchor are history, left to the terminal");
+    assert!(rows[top as usize + 1].starts_with("╭") && rows[top as usize + 1].chars().count() == 50, "{}", rows[top as usize + 1]);
+    assert!(
+        rows[top as usize + 1..].iter().all(|r| !r.contains('#')),
+        "no rewrapped remnant at or below the viewport:\n{}",
+        rows.join("\n")
+    );
+    assert_eq!(inline.backend_mut().get_cursor_position().unwrap(), Position::new(0, top + 1));
+}
+
+#[test]
+fn thinking_is_shown_by_default_and_slash_thinking_hides_live_and_durable_reasoning() {
+    let mut ui = UiState::default();
+    let entries = log_with(vec![
+        user("solve it"),
+        (
+            model(),
+            EntryKind::AssistantMessage {
+                content: vec![
+                    ContentBlock::Thinking { text: "reasoning-first\n\nreasoning-second".into() },
+                    ContentBlock::text("visible answer"),
+                ],
+                usage: Usage::default(),
+                stop: StopReason::EndTurn,
+            },
+        ),
+    ]);
+    ui.refold(&entries, &Default::default()).unwrap();
+    ui.transcript.stream(&aho_llm::StreamEvent::Thinking("live-reasoning".into()));
+    let shown = screen(&ui, 90, 20);
+    assert!(shown.contains("∴ reasoning-first") && shown.contains("reasoning-second") && shown.contains("∴ live-reasoning"), "{shown}");
+    assert!(shown.contains("visible answer"));
+
+    assert!(typed(&mut ui, "/thinking").is_none());
+    assert!(!ui.local.show_thinking);
+    let hidden = screen(&ui, 90, 20);
+    for private in ["reasoning-first", "reasoning-second", "live-reasoning"] {
+        assert!(!hidden.contains(private), "{private} leaked while hidden:\n{hidden}");
+    }
+    assert!(hidden.contains("visible answer") && hidden.contains("Thinking hidden"), "{hidden}");
+
+    assert!(typed(&mut ui, "/thinking").is_none());
+    assert!(ui.local.show_thinking);
+    assert!(screen(&ui, 90, 20).contains("reasoning-first"));
+}
+
+#[test]
+fn thinking_settings_default_on_and_can_disable_generation_and_display() {
+    use aho_config::{FileSnapshot, Layer, ResolveInputs, Schema, resolve};
+    let mut schema = Schema::default();
+    for key in aho_cap::core_keys().into_iter().chain(TuiConfig::keys()) {
+        schema.add(key);
+    }
+    let load = |extra: &str| {
+        let mut inputs = ResolveInputs::default();
+        inputs.files.push(FileSnapshot {
+            path: "aho.toml".into(),
+            layer: Layer::FileProject,
+            text: format!("[model]\nprovider = \"anthropic\"\nname = \"claude-sonnet-4-5\"\n{extra}"),
+        });
+        resolve(&inputs, &schema, false).unwrap()
+    };
+    let defaults = load("");
+    let cfg = aho_session::SessionConfig::from_loadout(&defaults, std::path::PathBuf::new());
+    assert_eq!(cfg.reasoning, Some(aho_llm::Reasoning { budget_tokens: 4096 }));
+    assert_eq!(defaults.get("tui.thinking").and_then(|v| v.as_bool()), Some(true));
+
+    let disabled = load("thinking = false\nthinking_budget = 2048\n[tui]\nthinking = false\n");
+    let cfg = aho_session::SessionConfig::from_loadout(&disabled, std::path::PathBuf::new());
+    assert_eq!(cfg.reasoning, None, "model.thinking=false avoids the provider-side reasoning cost");
+    assert!(!disabled.get("tui.thinking").and_then(|v| v.as_bool()).unwrap());
 }

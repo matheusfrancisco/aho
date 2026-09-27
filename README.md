@@ -83,7 +83,8 @@ aho/
 ├── formal/              Log · Policy · Turn · Tasks (.tla/.cfg; TasksVerify.cfg), checked by formal-tlc
 ├── imgs/                logo
 ├── sdk/                 schema/aho-rpc.schema.json · ts/ · python/ (aho-sdk generates them and checks for drift)
-└── scripts/             gate.sh; ratchets/*.json baselines (panic, swallowed, long, wildcard, layers)
+└── scripts/             gate.sh; ratchets/*.json baselines (panic, swallowed, long, wildcard, layers);
+                        models.py regenerates crates/seams/aho-llm/models.tsv (model names, list prices)
 ```
 
 ## Provider accounts (`aho login`)
@@ -148,8 +149,5 @@ started when a sandbox attaches. `aho net status|allow|map` changes it live thro
   fails while the session holds it.
 - The namespace sandbox's recipe root is an overlay whose writes last while its keeper runs; `/workspace` and
   `/session` persist across keeper restarts.
-- `aho tui` (inline): shrinking the terminal window can leave one copy of the prompt's top border above
-  the prompt (the emulator rewraps the old viewport before aho redraws it); it scrolls away with the
-  next output. `aho tui --fullscreen` has no such artifact.
 - The VM tests and smokes run against a stub `qemu-system-*` (real QMP, the real supervisor and guest agent);
   we have not booted a real QEMU guest. The namespace world ran on Linux in a privileged container.

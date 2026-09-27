@@ -273,11 +273,17 @@ fn spaced(prev: Option<&Body>, cur: &Body) -> bool {
         Some(p) => !(matches!((p, cur), (Body::Tool(_), Body::Tool(_))) || (quiet(p) && quiet(cur)) || matches!(p, Body::Thinking(_))),
     }
 }
+fn visible(ui: &UiState, body: &Body) -> bool {
+    ui.local.show_thinking || !matches!(body, Body::Thinking(_))
+}
 
 fn block_rows(ui: &UiState, i: usize, width: usize, rows: &mut Vec<Line<'static>>) {
     let t = &ui.theme;
     let b = &ui.transcript.blocks[i];
-    let prev = i.checked_sub(1).and_then(|p| ui.transcript.blocks.get(p)).map(|b| &b.body);
+    if !visible(ui, &b.body) {
+        return;
+    }
+    let prev = ui.transcript.blocks[..i].iter().rev().find(|b| visible(ui, &b.body)).map(|b| &b.body);
     if spaced(prev, &b.body) {
         rows.push(Line::default());
     }
@@ -326,7 +332,7 @@ fn live_rows(ui: &UiState, from: usize, width: usize) -> Vec<Line<'static>> {
     let t = &ui.theme;
     let mut rows = block_lines(ui, from..ui.transcript.blocks.len(), width);
     let tr = &ui.transcript;
-    if !tr.live_thinking.is_empty() {
+    if ui.local.show_thinking && !tr.live_thinking.is_empty() {
         push_wrapped(&mut rows, "∴ ", &tr.live_thinking, width, t.thinking, t.dim);
     }
     if !tr.live_text.is_empty() {
@@ -371,22 +377,138 @@ fn draw_chrome(ui: &UiState, input: Rect, menu_area: Rect, footer: Rect, buf: &m
     cursor
 }
 
-fn draw_input(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
+/// Token counts the way the status line prints them: `950`, `4.2k`, `128k`, `1M`, `2.5M`.
+pub(crate) fn tokens(n: u64) -> String {
+    let short = |v: f64, unit: &str| {
+        let s = format!("{v:.1}");
+        format!("{}{unit}", s.strip_suffix(".0").unwrap_or(&s))
+    };
+    // Each bound is where the rounded value would print as the next unit (999.5k is `1M`).
+    match n {
+        0..1_000 => n.to_string(),
+        1_000..9_950 => short(n as f64 / 1e3, "k"),
+        9_950..999_500 => format!("{}k", (n as f64 / 1e3).round() as u64),
+        999_500..9_950_000 => short(n as f64 / 1e6, "M"),
+        _ => format!("{}M", (n as f64 / 1e6).round() as u64),
+    }
+}
+
+/// US dollars: cents, or a tenth of a cent below one cent so a first cheap call is not `$0.00`.
+pub(crate) fn dollars(v: f64) -> String {
+    if v > 0.0 && v < 0.01 { format!("${v:.3}") } else { format!("${v:.2}") }
+}
+
+/// A piece of the status line, dropped by `rank` (lowest first) when the line is too narrow.
+struct Seg {
+    rank: u8,
+    sep: &'static str,
+    spans: Vec<Span<'static>>,
+}
+
+fn width_of(spans: &[Span<'_>]) -> usize {
+    spans.iter().map(|s| s.content.width()).sum()
+}
+
+/// The prompt box's top border: model › workspace › spend · preset · world on the left, the
+/// context gauge and the busy state on the right. Narrow terminals drop the HUD facts, the `aho`
+/// mark and the world, then shorten the workspace to its last component, then drop it, the
+/// preset and the spend; the model and the right side stay (the border clips what still overflows).
+fn status_line(ui: &UiState, width: u16) -> (Line<'static>, Line<'static>) {
     let t = &ui.theme;
     let p = &ui.plan;
-    let mut status = vec![
-        Span::styled(format!(" {} ", p.label), t.title),
-        Span::styled(format!("· preset {} · epoch {} · world {} ", ui.state.policy.preset, ui.state.policy.epoch.0, p.world), t.muted),
+    let window = tokens(p.context_window);
+    let mut right = match ui.context_used {
+        Some(used) if p.context_window > 0 => {
+            let ratio = used as f64 / p.context_window as f64;
+            let tone = if ratio >= p.compact_at {
+                t.error
+            } else if ratio >= p.compact_at * 0.75 {
+                t.warning
+            } else {
+                t.success
+            };
+            // A first short exchange is not an empty context.
+            let pct = if used > 0 && ratio < 0.005 { "<1%".to_string() } else { format!("{:.0}%", ratio * 100.0) };
+            vec![Span::styled(format!(" {pct}"), tone), Span::styled(format!(" of {window} "), t.muted)]
+        }
+        _ => vec![Span::styled(format!(" –% of {window} "), t.dim)],
+    };
+    right.push(if ui.is_busy() { Span::styled("· ● running ", t.warning) } else { Span::styled("· ○ idle ", t.dim) });
+
+    let u = &ui.spent;
+    let spend = match p.price {
+        Some(price) => Span::styled(dollars(price.cost(u)), t.cost),
+        None => Span::styled(
+            format!("↑{} ↓{}", tokens(u.input_tokens + u.cache_read_tokens + u.cache_write_tokens), tokens(u.output_tokens)),
+            t.muted,
+        ),
+    };
+    let mut segs = vec![
+        Seg { rank: 2, sep: "", spans: vec![Span::styled("aho", t.dim)] },
+        Seg { rank: 9, sep: " › ", spans: vec![Span::styled(p.model.clone(), t.title)] },
     ];
-    if ui.local.hud {
-        status.push(Span::styled(format!("· plan {} · preset ← {} · {} ", p.hash, p.preset_origin, p.enforced_by), t.info));
+    if !p.workspace.is_empty() {
+        segs.push(Seg { rank: 5, sep: " › ", spans: vec![Span::styled(p.workspace.clone(), t.text)] });
     }
-    let busy = if ui.is_busy() { Span::styled(" ● running ", t.warning) } else { Span::styled(" ○ idle ", t.dim) };
+    segs.push(Seg { rank: 8, sep: " › ", spans: vec![spend] });
+    segs.push(Seg { rank: 6, sep: " · ", spans: vec![Span::styled(format!("preset {}", ui.state.policy.preset), t.muted)] });
+    segs.push(Seg { rank: 3, sep: " · ", spans: vec![Span::styled(format!("world {}", p.world), t.muted)] });
+    if ui.local.hud {
+        let hud = format!(
+            "{} · epoch {} · plan {} · preset ← {} · {} · ↑{} ↓{} cached {}",
+            p.label,
+            ui.state.policy.epoch.0,
+            p.hash,
+            p.preset_origin,
+            p.enforced_by,
+            tokens(u.input_tokens),
+            tokens(u.output_tokens),
+            tokens(u.cache_read_tokens)
+        );
+        segs.push(Seg { rank: 1, sep: " · ", spans: vec![Span::styled(hud, t.info)] });
+    }
+    // Two corners, the padding around each side.
+    let room = (width as usize).saturating_sub(2 + width_of(&right) + 2);
+    let total =
+        |segs: &[Seg]| segs.iter().enumerate().map(|(i, s)| if i == 0 { 0 } else { s.sep.width() } + width_of(&s.spans)).sum::<usize>();
+    let mut shortened = false;
+    while total(&segs) > room {
+        let Some(at) = segs.iter().enumerate().filter(|(_, s)| s.rank < 9).min_by_key(|(_, s)| s.rank).map(|(i, _)| i) else {
+            break;
+        };
+        if segs[at].rank == 5 && !shortened {
+            shortened = true;
+            let last = p.workspace.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+            segs[at].spans = vec![Span::styled(format!("…/{last}"), t.text)];
+            continue;
+        }
+        segs.remove(at);
+    }
+    if total(&segs) > room {
+        // Only the model is left and it is still too wide: the gauge wins, the name is cut.
+        for s in segs.iter_mut().filter(|s| s.rank == 9) {
+            s.spans = vec![Span::styled(trunc(&p.model, room), t.title)];
+        }
+    }
+    let mut left = vec![Span::raw(" ")];
+    for (i, s) in segs.into_iter().enumerate() {
+        if i > 0 {
+            left.push(Span::styled(s.sep, t.dim));
+        }
+        left.extend(s.spans);
+    }
+    left.push(Span::raw(" "));
+    (Line::from(left), Line::from(right).alignment(Alignment::Right))
+}
+
+fn draw_input(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
+    let t = &ui.theme;
+    let (status, gauge) = status_line(ui, area.width);
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(if ui.covered() { t.border } else { t.border_focus })
-        .title(Line::from(status))
-        .title(Line::from(busy).alignment(Alignment::Right));
+        .title(status)
+        .title(gauge);
     let inner = block.inner(area);
     block.render(area, buf);
     if inner.width == 0 || inner.height == 0 {

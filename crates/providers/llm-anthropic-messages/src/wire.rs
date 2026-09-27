@@ -71,9 +71,17 @@ pub(crate) fn encode_authenticated_request(req: &Request, claude_oauth: bool) ->
         .collect();
 
     let mut body = Map::new();
+    let max_tokens = if req.max_tokens == 0 { DEFAULT_MAX_TOKENS } else { req.max_tokens };
     body.insert("model".into(), json!(req.model));
-    body.insert("max_tokens".into(), json!(if req.max_tokens == 0 { DEFAULT_MAX_TOKENS } else { req.max_tokens }));
+    body.insert("max_tokens".into(), json!(max_tokens));
     body.insert("stream".into(), json!(true));
+    if let Some(reasoning) = req.reasoning
+        && max_tokens > 1024
+    {
+        // Anthropic requires at least 1024 thinking tokens and max_tokens > budget_tokens.
+        let budget_tokens = reasoning.budget_tokens.clamp(1024, max_tokens - 1);
+        body.insert("thinking".into(), json!({"type": "enabled", "budget_tokens": budget_tokens}));
+    }
     if !system.is_empty() {
         body.insert("system".into(), Value::Array(system));
     }
@@ -427,6 +435,25 @@ mod tests {
         req.system = (0..6).map(|i| (format!("s{i}"), format!("t{i}"), true)).collect();
         let marked = encode_request(&req)["system"].as_array().map(|a| a.iter().filter(|b| b.get("cache_control").is_some()).count());
         assert_eq!(marked, Some(4), "the API accepts at most four breakpoints");
+    }
+
+    #[test]
+    fn reasoning_uses_anthropics_budget_and_keeps_it_below_max_tokens() {
+        let mut req = Request {
+            model: "claude-sonnet-4-5".into(),
+            messages: vec![Message::user("think")],
+            max_tokens: 8192,
+            reasoning: Some(aho_llm::Reasoning { budget_tokens: 4096 }),
+            ..Default::default()
+        };
+        assert_eq!(encode_request(&req)["thinking"], json!({"type": "enabled", "budget_tokens": 4096}));
+        req.max_tokens = 1025;
+        assert_eq!(encode_request(&req)["thinking"]["budget_tokens"], 1024);
+        req.max_tokens = 1024;
+        assert!(encode_request(&req).get("thinking").is_none(), "Anthropic cannot fit its minimum reasoning budget");
+        req.reasoning = None;
+        req.max_tokens = 8192;
+        assert!(encode_request(&req).get("thinking").is_none());
     }
 
     #[test]
