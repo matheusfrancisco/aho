@@ -1,5 +1,5 @@
 //! `aho gc --dry-run` output: one table row per orphan (owner, kind, age, size, path), then what
-//! was kept and why, owners waiting for their second scan, and notes (doc 12 message voice).
+//! was kept and why, owners waiting for their second scan, and notes.
 
 use crate::{GcOutcome, GcReport, Orphan};
 

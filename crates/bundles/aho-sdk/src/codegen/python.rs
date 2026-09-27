@@ -113,7 +113,7 @@ pub fn protocol(p: &Protocol) -> String {
     let mut o = String::new();
     header(
         &mut o,
-        "The aho rpc protocol (08, 12) as typed dicts over the wire JSON.\n\nReaders ignore unknown fields, so a newer server's additive fields never break these types.\n",
+        "The aho rpc protocol as typed dicts over the wire JSON.\n\nReaders ignore unknown fields, so a newer server's additive fields never break these types.\n",
     );
     o.push_str("from typing import Any, Literal, NotRequired, Optional, TypedDict, Union\n\n");
     o.push_str(&format!("VERSION_MIN = {}\nVERSION_MAX = {}\n\nJson = Any\n\"\"\"Any JSON value.\"\"\"\n", p.version_min, p.version_max));
@@ -160,7 +160,7 @@ fn takes_params(p: &Protocol, params: Option<&str>) -> Option<(&'static str, boo
 
 pub fn client(p: &Protocol) -> String {
     let mut o = String::new();
-    header(&mut o, "A typed asyncio client for `aho rpc` (08): one coroutine per rpc method, the Session API 1:1.");
+    header(&mut o, "A typed asyncio client for `aho rpc`: one coroutine per rpc method, the Session API 1:1.");
     o.push_str(
         "from typing import Any, AsyncIterator, Optional, Unpack, cast
 

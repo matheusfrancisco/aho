@@ -1,6 +1,6 @@
 //! Everything the TUI draws. [`Transcript`] and [`UiState::state`] are folds of the session log
 //! (plus the transient stream of the in-flight model call); [`Local`] is the only state the
-//! surface owns (12: draft, cursor, scroll, focus, zoom).
+//! surface owns (draft, cursor, scroll, focus, zoom).
 
 use std::collections::BTreeMap;
 
@@ -323,7 +323,7 @@ fn result_view(entry: EntryId, outcome: &ToolOutcome, content: &[ContentBlock], 
 
 // ───────────────────────────── approval card ─────────────────────────────
 
-/// The doc-05 card, built from the card payload and the fold only (never a live tool object).
+/// The approval card, built from the card payload and the fold only (never a live tool object).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApprovalView {
     pub tool: String,
@@ -396,7 +396,7 @@ pub fn reason_label(r: &DecisionReason) -> &'static str {
     }
 }
 
-/// `{ name: "ubuntu-24" }` — keys bare, values JSON, cut at `max` chars.
+/// `{ name: "ubuntu-24" }`: keys bare, values JSON, cut at `max` chars.
 pub fn compact(v: &Value, max: usize) -> String {
     fn go(v: &Value, out: &mut String) {
         match v {
@@ -450,7 +450,7 @@ pub fn mode_name(m: RewindMode) -> &'static str {
     }
 }
 
-/// Doc 11's table, one line per mode.
+/// What each rewind mode does, one line per mode.
 pub fn mode_doc(m: RewindMode) -> &'static str {
     match m {
         RewindMode::Both => "fork the log here and restore the files",
@@ -459,7 +459,7 @@ pub fn mode_doc(m: RewindMode) -> &'static str {
     }
 }
 
-/// What a rewind would do, computed before anything is applied (plan-then-apply, 05/11).
+/// The effect of a rewind, computed before anything is applied (plan-then-apply).
 #[derive(Clone, Debug, PartialEq)]
 pub struct RewindPlan {
     pub checkpoint: CheckpointId,
@@ -534,7 +534,7 @@ pub struct PlanInfo {
     pub hash: String,
     pub world: String,
     pub enforced_by: String,
-    /// Where `policy.preset` came from (HUD).
+    /// The origin of `policy.preset` (HUD).
     pub preset_origin: String,
 }
 

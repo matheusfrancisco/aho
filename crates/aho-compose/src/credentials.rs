@@ -1,4 +1,4 @@
-//! `12` — credential presence (what `Requirement::Credential` checks) and the guarantee that a
+//! Credential presence (what `Requirement::Credential` checks) and the guarantee that a
 //! credential value never reaches the log, even when no capability declared its key secret.
 
 use std::collections::BTreeMap;
@@ -12,8 +12,8 @@ use crate::{CRED_ENV_PREFIX, Inputs};
 /// Well-known provider variables, by the credential name requirements use.
 const WELL_KNOWN_ENV: &[(&str, &str)] = &[("OPENAI_API_KEY", "openai"), ("ANTHROPIC_API_KEY", "anthropic"), ("GITHUB_TOKEN", "github")];
 
-/// Where a credential was found. Closed; the consent-gated origins (external files, CLI
-/// sessions) belong to import flows and are never produced by plain loading.
+/// The place a credential was found. Closed; the consent-gated origins (external files, CLI
+/// sessions) belong to import flows, and plain loading never produces them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "from", rename_all = "snake_case")]
 pub enum CredentialOrigin {

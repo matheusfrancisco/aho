@@ -43,7 +43,7 @@ pub struct Injection {
     pub addresses: Vec<TaskId>,
 }
 
-/// What `dispatch` decided for one worker.
+/// The decision `dispatch` made for one worker.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Dispatch {
     /// A node started (possibly after releasing a stale gate the worker held).
@@ -70,7 +70,7 @@ pub enum Dispatch {
     Finished,
 }
 
-/// Seeded vs grown, by origin (12: an under-explored plan is visible).
+/// Seeded vs grown, by origin, so an under-explored plan is visible.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Growth {
     pub seed: usize,
@@ -223,7 +223,7 @@ impl Graph {
     }
 
     /// Only the owner, only while Running & unexpanded. Explore/synthesize children get a Critique
-    /// gate, code children a Verify gate, between them and the parent — which is re-queued as the
+    /// gate, code children a Verify gate, between them and the parent, which is re-queued as the
     /// synthesis join with affinity to the planner that expanded it.
     pub fn expand(&self, by: AgentId, parent: &TaskId, children: Vec<ChildSpec>) -> Result<Vec<Event>, TaskError> {
         let mut specs = Vec::new();

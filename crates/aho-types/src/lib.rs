@@ -1,5 +1,5 @@
-//! Leaf DTO crate. Everything here is plain data shared by every other crate.
-//! Rule (12): `aho-types` depends only on serde/serde_json/blake3; no runtime crate is reachable from it.
+//! Leaf DTO crate. Everything here is plain data shared across crates.
+//! Rule: `aho-types` depends only on serde/serde_json/blake3; no runtime crate is reachable from it.
 
 #![forbid(unsafe_code)]
 
@@ -8,7 +8,7 @@ use std::pin::Pin;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// Boxed future used by dyn-compatible seam traits (02: "accept the boxing").
+/// Boxed future used by dyn-compatible seam traits.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// JSON value; the canonical data shape for args, results, config values, custom log bodies.
@@ -135,7 +135,7 @@ macro_rules! wide_id {
 }
 
 id!(
-    /// Monotonic per log. `06`: reconnect replays from the last seen id.
+    /// Monotonic per log. Reconnect replays from the last seen id.
     EntryId(u64)
 );
 wide_id!(SessionId);
@@ -144,7 +144,7 @@ id!(TurnId(u64));
 id!(StepId(u64));
 id!(Epoch(u32));
 id!(
-    /// Operation behind a tool call (16).
+    /// Operation behind a tool call.
     OpId(u64)
 );
 id!(JobId(u64));
@@ -167,7 +167,7 @@ impl Timestamp {
 #[serde(transparent)]
 pub struct CallId(pub String);
 
-/// `04`: who caused an entry. Mutating APIs take the typed principals in `aho-policy`.
+/// The principal that caused an entry. Mutating APIs take the typed principals in `aho-policy`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Principal {
@@ -183,13 +183,13 @@ impl Principal {
     }
 }
 
-/// Closed enum over what a tool can do (02). Non-optional on every `ToolDecl`.
+/// Closed enum over what a tool can do. Non-optional on every `ToolDecl`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Consequence {
     ReadOnly,
     WorkspaceWrite,
-    /// Reachable by an agent only under `world = host` (07).
+    /// Reachable by an agent only under `world = host`.
     HostWrite,
     NetworkEgress,
     SpawnsProcess,
@@ -243,7 +243,7 @@ impl ConsequenceSet {
     pub const fn without(self, c: Consequence) -> Self {
         Self(self.0 & !(1 << c as u16))
     }
-    /// Meet. The only combinator the policy lattice exposes to non-operators (04).
+    /// Meet. The only combinator the policy lattice exposes to non-operators.
     pub const fn intersect(self, other: Self) -> Self {
         Self(self.0 & other.0)
     }
@@ -360,7 +360,7 @@ impl Message {
     }
 }
 
-/// What the model sees for a tool (02: derived from `ToolDecl`).
+/// The model's view of a tool, derived from `ToolDecl`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ToolSpec {
     pub name: String,
@@ -400,7 +400,7 @@ pub enum StopReason {
     Error,
 }
 
-/// `10`: source labelling for injected context; UIs read metadata, never prose.
+/// Source labelling for injected context; UIs read metadata, never prose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Form {
@@ -411,7 +411,7 @@ pub enum Form {
     Notice,
 }
 
-/// A rendered UI card intent (10: `present_call` / `present_result` are pure).
+/// A rendered UI card intent (`present_call` / `present_result` are pure).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "card", rename_all = "snake_case")]
 pub enum Card {

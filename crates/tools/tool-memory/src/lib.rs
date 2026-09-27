@@ -1,4 +1,4 @@
-//! `12` — model-facing long-term memory: `memory_search` and `memory_save` over the `memory`
+//! Model-facing long-term memory: `memory_search` and `memory_save` over the `memory`
 //! handle (provided by `memory-local`).
 //!
 //! `memory_save` is classed `WorkspaceWrite`: the store is aho-owned state under
@@ -245,5 +245,5 @@ declare_capability!(
     provides = [],
     requires = [Requirement::Seam(aho_memory::SEAM)],
     tools = TOOLS,
-    doc = "memory_search (ReadOnly) and memory_save (WorkspaceWrite; the store is aho-owned state under ~/.aho/memory) over the memory handle (12)."
+    doc = "memory_search (ReadOnly) and memory_save (WorkspaceWrite; the store is aho-owned state under ~/.aho/memory) over the memory handle."
 );

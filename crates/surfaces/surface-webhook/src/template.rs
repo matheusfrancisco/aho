@@ -1,4 +1,4 @@
-//! Prompt templates and the `Untrusted` frame (04).
+//! Prompt templates and the `Untrusted` frame.
 //!
 //! A template is operator-authored text with `{{path.to.field}}` placeholders resolved against the
 //! event payload in one pass: a payload value containing `{{…}}` is inserted verbatim, never
@@ -73,7 +73,7 @@ pub fn render(template: &str, payload: &Value) -> String {
     out
 }
 
-/// Where an untrusted prompt came from; shown in the frame header (validated names only).
+/// The origin of an untrusted prompt; shown in the frame header (validated names only).
 pub struct Provenance<'a> {
     pub event: &'a str,
     pub delivery: &'a str,

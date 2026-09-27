@@ -3,7 +3,7 @@ name = "tool-inspect"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "aho_why / aho_inspect / unlock_request: the agent reads the same projection the operator sees (05)"
+description = "aho_why / aho_inspect / unlock_request: the agent reads the same projection the operator sees"
 
 [dependencies]
 aho-types.workspace = true

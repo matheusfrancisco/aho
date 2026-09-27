@@ -123,7 +123,7 @@ async fn a_schedule_the_agent_created_fires_as_a_real_turn_once_despite_missed_o
     let es = entries(&r.session);
     let prompt_at = keyed(&es, "schedule:sched-1:1").expect("the fired prompt carries its key");
     let EntryKind::UserMessage { text, .. } = &es[prompt_at].kind else { unreachable!() };
-    assert!(text.starts_with("[Scheduled prompt sched-1 \"ci\" — every 1m, occurrence 1") && text.ends_with("check the build"), "{text}");
+    assert!(text.starts_with("[Scheduled prompt sched-1 \"ci\": every 1m, occurrence 1") && text.ends_with("check the build"), "{text}");
     assert!(text.contains("2 later occurrence(s)"), "{text}");
     let (fired_at, fired) = custom(&es, "schedule", "Fired")[0];
     assert_eq!(fired.by, Principal::system("schedule"));

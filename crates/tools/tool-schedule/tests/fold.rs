@@ -80,7 +80,7 @@ fn a_late_driver_fires_once_and_counts_what_it_missed() {
     apply(&mut s, &e);
     assert_eq!(s.next_due(Timestamp(t0().0 + 59_999)).unwrap(), None, "nothing is due before the first occurrence");
 
-    // down from 10:00 to 10:05:30 — occurrences 10:01 … 10:05 are due
+    // down from 10:00 to 10:05:30: occurrences 10:01 … 10:05 are due
     let now = t("2026-09-26T10:05:30Z");
     let due = s.next_due(now).unwrap().unwrap();
     assert_eq!((due.id.as_str(), due.n, due.due, due.skipped), ("sched-1", 1, t("2026-09-26T10:01:00Z"), 4));

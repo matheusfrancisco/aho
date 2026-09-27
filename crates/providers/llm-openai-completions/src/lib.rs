@@ -1,9 +1,9 @@
-//! Protocol-keyed adapter (01, 16): any vendor speaking chat-completions is a config row here.
+//! Protocol-keyed adapter: any vendor speaking chat-completions is a config row here.
 //!
 //! Routes, each registered as the service `llm:<name>`:
-//! * `openai` — when `provider.openai.key` resolves; `provider.openai.base_url` defaults to
+//! * `openai`: when `provider.openai.key` resolves; `provider.openai.base_url` defaults to
 //!   `https://api.openai.com/v1`.
-//! * `ollama` — built in, keyless, at `http://localhost:11434/v1`; on when `provider.ollama.enabled = true`.
+//! * `ollama`: built in, keyless, at `http://localhost:11434/v1`; on when `provider.ollama.enabled = true`.
 //! * any `provider.<name>` row with `protocol = "openai-completions"` and a `base_url`
 //!   (`key` optional; `cred:<n>` reads `credentials.<n>`).
 //!
@@ -29,7 +29,7 @@ use serde_json::json;
 pub use wire::{Flavor, StreamDecoder, classify, encode_request};
 
 pub const PROTOCOL: Protocol = Protocol::OpenAiCompletions;
-/// `16`: a late result is a second `tool` message with the original `tool_call_id`.
+/// A late result is a second `tool` message with the original `tool_call_id`.
 pub const LATE_RESULTS: LateResults = LateResults::ToolMessage;
 pub const OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const OLLAMA_BASE_URL: &str = "http://localhost:11434/v1";

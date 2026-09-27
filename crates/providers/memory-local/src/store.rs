@@ -68,13 +68,13 @@ impl Store {
             Ok(bytes) => {
                 let f: FileIn = serde_json::from_slice(&bytes).map_err(|e| {
                     MemoryError::Store(format!(
-                        "`{}` is not a valid memory store ({e}); aho left it untouched — repair it or move it aside to start an empty store",
+                        "`{}` is not a valid memory store ({e}); aho left it untouched. Repair it or move it aside to start an empty store",
                         path.display()
                     ))
                 })?;
                 if f.version != VERSION {
                     return Err(MemoryError::Store(format!(
-                        "`{}` has store version {} and this aho reads version {VERSION}; aho left it untouched — upgrade aho or move the file aside",
+                        "`{}` has store version {} and this aho reads version {VERSION}; aho left it untouched. Upgrade aho or move the file aside",
                         path.display(),
                         f.version
                     )));

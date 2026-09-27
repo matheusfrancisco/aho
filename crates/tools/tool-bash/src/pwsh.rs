@@ -1,9 +1,9 @@
-//! `00` — pwsh parity: `caps.tool-bash.shell = pwsh` runs the same two tools in PowerShell 7.
+//! Pwsh parity: `caps.tool-bash.shell = pwsh` runs the same two tools in PowerShell 7.
 //!
 //! The blast-radius classifier (`aho_policy::shell`) parses POSIX shell only. It cannot clear a
 //! PowerShell command, so under pwsh every command is held at the most conservative level that
 //! still runs: its `Catastrophic` matches are still denied, and everything else asks the operator
-//! (a `justification` does not skip the ask — nothing classified the command). The core's step-5
+//! (a `justification` does not skip the ask, since nothing classified the command). The core's step-5
 //! safety check still runs on the `command` text as it does for every tool.
 
 use aho_cap::*;
@@ -83,7 +83,7 @@ pub(crate) fn base64(bytes: &[u8]) -> String {
     out
 }
 
-/// `04` step 3 under pwsh: `Catastrophic` still denies; everything else asks.
+/// Decision-chain step 3 under pwsh: `Catastrophic` still denies; everything else asks.
 pub fn check_pwsh(args: &Value, view: &PolicyView) -> Option<Decision> {
     let command = args.get("command").and_then(Value::as_str)?;
     let risk = assess(command, &view.workspace, &view.home);
@@ -100,7 +100,7 @@ pub fn check_pwsh(args: &Value, view: &PolicyView) -> Option<Decision> {
 pub static PWSH_TOOLS: &[ToolDecl] = &[
     ToolDecl::new(
         "bash",
-        "Run a PowerShell 7 command (`pwsh -NoProfile -NonInteractive -Command`) in the workspace — this session's shell is pwsh. Returns combined output and the exit code. Each call is a fresh process. Every command asks the operator first.",
+        "Run a PowerShell 7 command (`pwsh -NoProfile -NonInteractive -Command`) in the workspace (this session's shell is pwsh). Returns combined output and the exit code. Each call is a fresh process. Every command asks the operator first.",
         Consequence::SpawnsProcess,
     )
     .schema(schema_bash)

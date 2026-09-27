@@ -1,6 +1,6 @@
 -------------------------------- MODULE Turn --------------------------------
 (***************************************************************************)
-(* The async-first turn loop (docs 01, 12, 16): aho_session::core::next    *)
+(* The async-first turn loop: aho_session::core::next                      *)
 (* and the driver around it (Session::prompt, run_turn, record_result).    *)
 (* Every call starts when issued; after a response with tool calls a grace *)
 (* window is armed; queued inputs are injected only at the request         *)

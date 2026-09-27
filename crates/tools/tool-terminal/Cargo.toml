@@ -3,7 +3,7 @@ name = "tool-terminal"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "terminal_open/send/read/resize/close/list over the Terminals seam; screen + transcript cursor reads with wait-for-regex (00, 07)"
+description = "terminal_open/send/read/resize/close/list over the Terminals seam; screen + transcript cursor reads with wait-for-regex"
 
 [dependencies]
 aho-types.workspace = true

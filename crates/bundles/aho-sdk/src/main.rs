@@ -1,4 +1,4 @@
-//! `aho-sdk` — the aho-sdk-min product as a binary, and the SDK generator (xtask-style).
+//! `aho-sdk`: the aho-sdk-min product as a binary, and the SDK generator (xtask-style).
 //!
 //! * `aho-sdk [--project DIR] [--set K=V]… [--disable ID]… rpc [--session HEX] [--memory]`:
 //!   serves the rpc protocol on stdio for one session, exactly as `aho rpc` does for its product.

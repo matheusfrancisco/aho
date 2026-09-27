@@ -8,7 +8,7 @@
 //!
 //! Host keys: aho passes `BatchMode=yes` and never sets `StrictHostKeyChecking`, so an unknown or
 //! changed host key fails the connection, which [`classify`] turns into a `Locked` error naming
-//! `ssh-keyscan` / `ssh-keygen -R` and the known_hosts file ssh actually reads.
+//! `ssh-keyscan` / `ssh-keygen -R` and the effective known_hosts file.
 
 use std::collections::hash_map::RandomState;
 use std::ffi::OsString;
@@ -27,7 +27,7 @@ pub const MAX_CONTROL_PATH: usize = 103 - 17;
 /// ssh's own exit status for "could not connect / authenticate"; no aho script exits with it.
 pub const SSH_FAILED: i32 = 255;
 
-/// Where to connect. `host` may be an alias from the ssh config.
+/// The connection target. `host` may be an alias from the ssh config.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Target {
     pub host: String,
@@ -166,7 +166,7 @@ pub fn quote(s: &str) -> String {
     if out.is_empty() { "''".into() } else { out }
 }
 
-/// `exec /bin/sh -c '<script>' aho-ssh '<arg>'…` — the only shape of remote command aho sends.
+/// `exec /bin/sh -c '<script>' aho-ssh '<arg>'…`, the only shape of remote command aho sends.
 pub fn sh_command(script: &str, args: &[&str]) -> String {
     let mut cmd = format!("exec /bin/sh -c {} aho-ssh", quote(script));
     for a in args {
@@ -470,7 +470,7 @@ fn create_private_dir(dir: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    /// What `/bin/sh` makes of a quoted word.
+    /// The word `/bin/sh` reads from a quoted one.
     fn sh_echo(word: &str) -> String {
         let out = std::process::Command::new("/bin/sh").arg("-c").arg(format!("printf %s {}", quote(word))).output().unwrap();
         String::from_utf8(out.stdout).unwrap()

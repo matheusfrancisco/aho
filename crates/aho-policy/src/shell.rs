@@ -1,5 +1,5 @@
-//! `12` — blast-radius classifier for shell commands. Class stays `SpawnsProcess`; this is the
-//! content refinement feeding `04` step 5.
+//! Blast-radius classifier for shell commands. Class stays `SpawnsProcess`; this is the
+//! content refinement feeding step 5 of the decision chain.
 //!
 //! ```text
 //! tokenize into pipeline segments → unwrap wrappers (sudo, env, xargs, timeout, VAR=x) → recurse into `sh -c "…"`
@@ -41,7 +41,7 @@ pub fn assess(command: &str, workspace: &str, home: &str) -> Risk {
     Risk { level, findings: st.findings.into_iter().map(|(_, what, target)| (what, target)).collect() }
 }
 
-/// `12` — the reflection prompt for `Confirm`; the refusal line for `Catastrophic`.
+/// The reflection prompt for `Confirm`; the refusal line for `Catastrophic`.
 pub fn reflection_prompt(r: &Risk) -> String {
     let found: Vec<String> = r.findings.iter().map(|(what, _)| format!("- {what}")).collect();
     let found = if found.is_empty() { String::new() } else { format!("{}\n", found.join("\n")) };
@@ -152,7 +152,7 @@ const AFFIRMATIONS: &[&str] = &[
     "ok.",
 ];
 
-/// `12` — at least 25 characters and not a bare affirmation (needs three distinct words that
+/// At least 25 characters and not a bare affirmation (needs three distinct words that
 /// are not affirmation/filler).
 pub fn justification_ok(j: &str) -> bool {
     let j = j.trim();

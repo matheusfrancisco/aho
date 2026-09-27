@@ -22,7 +22,7 @@ fs2 = "0.4"
 if-addrs = "0.13"
 
 [dev-dependencies]
-# A real userspace guest stack on the other end of the NIC socket (07: tests need no hypervisor or root).
+# A real userspace guest stack on the other end of the NIC socket, so tests need no hypervisor or root.
 smoltcp = { version = "0.12", default-features = false, features = ["std", "medium-ethernet", "proto-ipv4", "proto-dhcpv4", "socket-dhcpv4", "socket-udp", "socket-tcp"] }
 
 [lints]

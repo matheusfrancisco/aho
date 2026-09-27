@@ -3,7 +3,7 @@ name = "tool-web"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "web_fetch / web_search over the bound world's egress, with the operator's host allow/deny list (00, 02, 07)"
+description = "web_fetch / web_search over the bound world's egress, with the operator's host allow/deny list"
 
 [dependencies]
 aho-types.workspace = true

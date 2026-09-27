@@ -1,10 +1,10 @@
-//! `10` — the model-facing goal tools over `aho-goals`.
+//! The model-facing goal tools over `aho-goals`.
 //!
-//! * `create_goal {objective, title?, max_rounds?}` — an agent creates an agent goal; an operator a
+//! * `create_goal {objective, title?, max_rounds?}`: an agent creates an agent goal; an operator a
 //!   user goal (which pauses an active agent goal: user goals have priority).
-//! * `get_goal {id?}` — without an id, the earliest Active goal, or a sentence saying none is
+//! * `get_goal {id?}`: without an id, the earliest Active goal, or a sentence saying none is
 //!   active (and which goals are paused or blocked).
-//! * `update_goal {id, action, revision?, objective?, title?, max_rounds?, reason?}` — `edit`,
+//! * `update_goal {id, action, revision?, objective?, title?, max_rounds?, reason?}`: `edit`,
 //!   `pause`, `resume`, `complete`, `block`, `clear`. An agent updating a goal that is not the
 //!   current one is told which goal is active. `revision`, when given, must be the current one.
 //!
@@ -39,7 +39,7 @@ pub fn schema_create(_: &BoundWorld) -> RootSchema {
     RootSchema(json!({
         "type": "object",
         "properties": {
-            "objective": {"type": "string", "description": "What done looks like, concretely."},
+            "objective": {"type": "string", "description": "The concrete result that counts as done."},
             "title": {"type": "string", "description": "Short name; defaults to the objective's first line."},
             "max_rounds": {"type": "integer", "minimum": 1, "description": "Continuation rounds allowed before the goal blocks."}
         },
@@ -87,7 +87,7 @@ pub static TOOLS: &[ToolDecl] = &[
     .safe(),
     ToolDecl::new(
         "update_goal",
-        "Update the current goal: edit, pause, resume, complete (only when the objective is actually achieved), block (name the \
+        "Update the current goal: edit, pause, resume, complete (only once the objective is achieved), block (name the \
          concrete blocking condition in reason), or clear. You may complete or block a goal you are driving; edit, pause, resume \
          and clear only goals you created.",
         Consequence::ReadOnly,
@@ -159,7 +159,7 @@ declare_capability!(
     requires = [],
     tools = TOOLS,
     entry_kinds = ["Goal/Changed", "Goal/Round"],
-    doc = "create_goal / get_goal / update_goal: one active goal, fold-validated transitions, user goals first (10)."
+    doc = "create_goal / get_goal / update_goal: one active goal, fold-validated transitions, user goals first."
 );
 
 fn lock(m: &Mutex<Goals>) -> MutexGuard<'_, Goals> {
@@ -318,7 +318,7 @@ fn update(goals: &Mutex<Goals>, view: &ExecView) -> ExecOutcome {
             return ExecOutcome::err(
                 "not_current",
                 format!(
-                    "`{id}` is not the current goal — `{}` (\"{}\") is active; nothing was changed. Call get_goal and update the \
+                    "`{id}` is not the current goal: `{}` (\"{}\") is active; nothing was changed. Call get_goal and update the \
                          active goal, or ask the operator to switch goals",
                     cur.id, cur.title
                 ),

@@ -1,17 +1,17 @@
-//! `00` (Knowledge: `web_search`, `web_fetch`), `02` (both are `NetworkEgress`, treated like any
-//! MCP tool of that class), `07` (the egress allow/deny list is enforced by aho on these tools;
-//! under `world = host` that is policy only — `bash` can `curl` anything).
+//! Web tools: `web_search` and `web_fetch`. Both are `NetworkEgress`, treated like any MCP tool
+//! of that class. aho enforces the egress allow/deny list on these tools; under `world = host`
+//! that is policy only (`bash` can `curl` anything).
 //!
-//! Two capabilities, so each locks honestly on its own:
+//! Two capabilities, so each locks on its own:
 //! * [`WebFetch`] (`tool-web-fetch`, tool `web_fetch`): URL → readable text. HTML becomes markdown
 //!   ([`html`]), other text types are decoded by charset, raster images come back as image blocks,
-//!   other binaries are described, never dumped. `max_inline` spills long pages (10).
+//!   other binaries are described, never dumped. `max_inline` spills long pages.
 //! * [`WebSearch`] (`tool-web-search`, tool `web_search`): query → results through a real API
 //!   ([`search`]: Brave Search with `Credential(brave)`, or a SearXNG instance at
 //!   `web.search.searxng_url`). With neither configured it is `Locked` with the fix, while
 //!   `web_fetch` stays active.
 //!
-//! Both hold only `Egress(Route::Sandbox)` — the bound world's network (under `host`, world-host
+//! Both hold only `Egress(Route::Sandbox)`, the bound world's network (under `host`, world-host
 //! provides it with `enforced by: policy only`).
 //!
 //! The egress list (`egress.allow` / `egress.deny`, see `aho_egress::HostList`) is checked before
@@ -41,7 +41,7 @@ use crate::search::{BRAVE_URL, Backend, Hit};
 
 pub const FETCH: &str = "web_fetch";
 pub const SEARCH: &str = "web_search";
-/// Characters of converted text kept inline before the session spills the rest (10).
+/// Characters of converted text kept inline before the session spills the rest.
 pub const MAX_INLINE: usize = 50_000;
 
 // ───────────────────────────── declarations ─────────────────────────────
@@ -69,7 +69,7 @@ fn search_schema(_: &BoundWorld) -> RootSchema {
     }))
 }
 
-/// The tool's own opinion (04 step 3): refuses what aho never fetches. The operator's host list
+/// The tool's own opinion (decision-chain step 3): refuses what aho never fetches. The operator's host list
 /// needs configuration and is enforced by the guard.
 fn check_fetch(args: &Value, _: &PolicyView) -> Option<Decision> {
     match args.get("url").and_then(Value::as_str) {

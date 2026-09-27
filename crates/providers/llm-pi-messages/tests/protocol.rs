@@ -65,7 +65,7 @@ fn live_tools_complete_once_and_native_metadata_survives_history_replay() {
             StreamEvent::Usage(response.usage),
         ]
     );
-    // Exercise durable serialization, not just in-memory forwarding of the metadata value.
+    // Exercise durable serialization beyond in-memory forwarding of the metadata value.
     let stored = serde_json::to_string(&Message::assistant(response.content)).unwrap();
     let restored: Message = serde_json::from_str(&stored).unwrap();
     assert_eq!(restored.text(), "PlanRead café");

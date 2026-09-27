@@ -3,7 +3,7 @@ name = "tool-mcp-resources"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "list_mcp_resources, list_mcp_resource_templates, read_mcp_resource over running MCP servers (10)"
+description = "list_mcp_resources, list_mcp_resource_templates, read_mcp_resource over running MCP servers"
 
 [dependencies]
 aho-types.workspace = true

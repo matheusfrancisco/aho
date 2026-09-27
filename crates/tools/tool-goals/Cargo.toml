@@ -3,7 +3,7 @@ name = "tool-goals"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "create_goal / get_goal / update_goal over the fold-validated goal log (10)"
+description = "create_goal / get_goal / update_goal over the fold-validated goal log"
 
 [dependencies]
 aho-types.workspace = true

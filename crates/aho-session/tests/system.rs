@@ -1,4 +1,4 @@
-//! Harness system test (01): a real client↔loop round trip against a scripted model, the host
+//! Harness system test: a real client↔loop round trip against a scripted model, the host
 //! world, and the fs/bash/jobs tools. Every scenario also proves replay equality.
 #![allow(clippy::unwrap_used, clippy::expect_used)] // integration-test helpers may panic on setup failure
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design

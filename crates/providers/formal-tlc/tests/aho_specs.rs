@@ -1,4 +1,4 @@
-//! aho's own specs (`aho/formal/`, doc 13) offline: every one is trace-validatable by the
+//! aho's own specs (`aho/formal/`) offline: every one is trace-validatable by the
 //! provider's conventions, its model config parses, and the mutation generator finds work in it.
 #![allow(clippy::unwrap_used, clippy::expect_used)] // integration-test helpers may panic on setup failure
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design

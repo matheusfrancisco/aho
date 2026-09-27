@@ -1,5 +1,5 @@
-//! `01`/`16` — the model seam. Keyed by *protocol*, not vendor: adding an OpenAI-compatible
-//! vendor is a new `provider.<name>` config row on an existing adapter, not new streaming code.
+//! The model seam, keyed by *protocol* rather than vendor: an OpenAI-compatible vendor is a new
+//! `provider.<name>` config row on an existing adapter, with no new streaming code.
 //!
 //! Adapters register one [`LlmRoute`] per configured route as the Registry service
 //! `llm:<route>` ([`service_name`]); the session picks one by `model.provider`.
@@ -42,7 +42,7 @@ impl Protocol {
     }
 }
 
-/// How an adapter represents a tool result that arrives after later turns (16).
+/// The way an adapter represents a tool result that arrives after later turns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LateResults {
     /// A second output item for the same call id (Responses API).
@@ -82,7 +82,7 @@ pub struct Response {
     pub stop: StopReason,
 }
 
-/// Live, non-durable stream events (01: the durable record is the final [`Response`]).
+/// Live, non-durable stream events (the durable record is the final [`Response`]).
 #[derive(Clone, Debug, PartialEq)]
 pub enum StreamEvent {
     Text(String),
@@ -91,7 +91,7 @@ pub enum StreamEvent {
         id: CallId,
         name: String,
     },
-    /// A tool may start the moment its block finishes streaming (16). `args` are the model's
+    /// A tool may start the moment its block finishes streaming. `args` are the model's
     /// bytes parsed as JSON; unparseable bytes arrive as a JSON string so the tool's schema check
     /// reports them instead of the adapter guessing.
     ToolUseEnd {
@@ -174,16 +174,16 @@ impl fmt::Debug for LlmRoute {
     }
 }
 
-/// `16`: `derive_messages` places a late `Tool/Result` at its log position — a second
+/// `derive_messages` places a late `Tool/Result` at its log position: a second
 /// `ToolResult` for an id whose first occurrence was the [`aho_log::TOOL_CALL_RUNNING`]
 /// placeholder. This renders every such repeat the way `policy` says the protocol can carry it:
 ///
-/// * `SameCallId`, `ToolMessage` — unchanged; the adapter encodes the repeat natively
+/// * `SameCallId`, `ToolMessage`: unchanged; the adapter encodes the repeat natively
 ///   (a second `function_call_output`, a `tool` message with the original `tool_call_id`).
-/// * `AsUserBlock` — the late block becomes user text `[result for call <id> (<tool>)]\n<content>`
+/// * `AsUserBlock`: the late block becomes user text `[result for call <id> (<tool>)]\n<content>`
 ///   (images kept as separate blocks), so the protocol's "results directly follow their call"
 ///   rule holds while the placeholder stays where the model saw it.
-/// * `Unsupported` — unchanged; such adapters cannot show placeholders at all, so the loop waits.
+/// * `Unsupported`: unchanged; such adapters cannot show placeholders, so the loop waits.
 pub fn normalize_late_results(messages: &[Message], policy: LateResults) -> Vec<Message> {
     if policy != LateResults::AsUserBlock {
         return messages.to_vec();
@@ -232,7 +232,7 @@ pub fn is_placeholder(block: &ContentBlock) -> bool {
         if content.len() == 1 && content[0].as_text() == Some(aho_log::TOOL_CALL_RUNNING))
 }
 
-/// `12`: client-side prefix-hash tracker; works for providers that report no cache metrics.
+/// Client-side prefix-hash tracker; works for providers that report no cache metrics.
 ///
 /// `hashes[0]` covers what providers cache ahead of the conversation (system sections and the
 /// tool list); `hashes[i]` for `i >= 1` chains message `i - 1` onto `hashes[i - 1]`, so equal

@@ -1,7 +1,7 @@
 //! `POST /github`: size fence → signature → headers → subscription → dedupe → queue. The
 //! response never waits on the model: an accepted delivery answers 202 and a single worker hands
-//! prompts to the sink in arrival order. Log lines carry status, event, delivery id, and peer —
-//! never the body, and never a header value that failed validation.
+//! prompts to the sink in arrival order. Log lines carry status, event, delivery id, and peer,
+//! never the body or a header value that failed validation.
 
 use std::collections::{HashSet, VecDeque};
 use std::net::SocketAddr;

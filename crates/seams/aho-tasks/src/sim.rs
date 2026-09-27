@@ -1,4 +1,4 @@
-//! Deterministic simulator (12): scripted worker closures drive seed/expand/complete/inject
+//! Deterministic simulator: scripted worker closures drive seed/expand/complete/inject
 //! through the real engine without a model. Every event goes through the same JSON body and
 //! `fold_tasks` path the session log uses, so a run is also a replay test.
 
@@ -13,7 +13,7 @@ use crate::invariant::InvariantSeen;
 use crate::model::{Actor, GateKind, HandoffArtifact, Kind, Node, Settings, TaskId};
 use crate::render::Hydrate;
 
-/// What a scripted worker sees for one turn.
+/// The view a scripted worker gets for one turn.
 pub struct Turn<'a> {
     pub graph: &'a Graph,
     pub node: &'a Node,
@@ -84,7 +84,7 @@ impl Sim {
         Ok(s)
     }
 
-    /// What every verify gate completed from now on reports as the invariants covering its files.
+    /// Sets the invariants each verify gate completed from now on reports as covering its files.
     pub fn set_invariants(&mut self, seen: Vec<InvariantSeen>) {
         self.invariants = seen;
     }

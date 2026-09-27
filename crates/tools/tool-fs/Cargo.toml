@@ -3,7 +3,7 @@ name = "tool-fs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "read/write/edit/glob/grep/read_image/str_replace_editor with read ledger and applied diffs (10)"
+description = "read/write/edit/glob/grep/read_image/str_replace_editor with read ledger and applied diffs"
 
 [dependencies]
 aho-types.workspace = true

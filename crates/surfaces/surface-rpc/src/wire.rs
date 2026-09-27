@@ -1,4 +1,4 @@
-//! The frame shapes (08, 12): the envelope, every method's params, and the JSON projections of
+//! The frame shapes: the envelope, every method's params, and the JSON projections of
 //! session events. `tests/fixtures/frames.json` snapshots all of them; a diff there is a
 //! protocol change and needs a version decision (minor = additive fields, major = handshake).
 
@@ -191,7 +191,7 @@ pub fn idle_payload(turn: TurnId, transition: &Transition) -> Value {
     json!({ "turn": turn.0, "transition": transition })
 }
 
-/// The approval card as data (05): the same fields every surface renders.
+/// The approval card as data: the same fields every surface renders.
 pub fn approval_payload(id: u64, card: &ApprovalCard, cap: Option<&str>, epoch_next: u32) -> Value {
     json!({
         "id": id,

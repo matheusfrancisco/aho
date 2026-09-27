@@ -3,7 +3,7 @@ name = "aho-config"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Sourced<T>, layers, pure resolve() -> Loadout, diagnostics, plan hash (03)."
+description = "Sourced<T>, layers, pure resolve() -> Loadout, diagnostics, plan hash."
 
 [dependencies]
 aho-types.workspace = true

@@ -1,4 +1,4 @@
-//! The network as a session capability (07): one userspace network per session, in
+//! The network as a session capability: one userspace network per session, in
 //! `<sessions>/<id>.net/`, started only when a sandbox world first attaches (a host-world session
 //! never creates it). Every flow decision becomes a `Net/Flow` entry in the session log; a
 //! blocked flow also becomes one Notice naming its unlock, so the agent can ask the operator.
@@ -127,7 +127,7 @@ impl NetSettings {
     }
 }
 
-/// Where session `id`'s network lives.
+/// The state directory of session `id`'s network.
 pub fn state_dir(sessions_dir: &Path, id: SessionId) -> PathBuf {
     sessions_dir.join(format!("{:x}.net", id.0))
 }
@@ -236,7 +236,7 @@ impl Network for Lazy {
     }
 }
 
-/// What the network needs from the session: where its logs live, its id, and its log.
+/// The network's needs from the session: where its logs live, its id, and its log.
 pub struct NetDeps {
     pub sessions_dir: Option<PathBuf>,
     pub session: Option<SessionId>,
@@ -284,5 +284,5 @@ declare_capability!(
     provides_handles = [HandleKind::NetAttach],
     enforced_by = crate::ENFORCED_BY,
     entry_kinds = ["Net/Flow", "Net/Configured"],
-    doc = "The sandbox's only network (07): userspace switch with DHCP/DHCPv6/RA, `<name>.aho` DNS, NTP, NAT44/NAT66, port maps, isolation and egress policy; starts when a sandbox world attaches."
+    doc = "The sandbox's only network: userspace switch with DHCP/DHCPv6/RA, `<name>.aho` DNS, NTP, NAT44/NAT66, port maps, isolation and egress policy; starts when a sandbox world attaches."
 );

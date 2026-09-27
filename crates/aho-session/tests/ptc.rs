@@ -1,5 +1,5 @@
-//! Scratch smoke test (not a repo file): proves the proposed aho-session diff end to end —
-//! a scripted model calls `run_code`; the program calls `read` back through the session.
+//! End-to-end smoke test: a scripted model calls `run_code`; the program calls `read` back
+//! through the session.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
 

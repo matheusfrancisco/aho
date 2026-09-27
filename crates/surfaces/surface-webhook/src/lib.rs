@@ -1,4 +1,4 @@
-//! `08` — the webhook surface: GitHub events become `prompt`s on one bound session.
+//! The webhook surface: GitHub events become `prompt`s on one bound session.
 //!
 //! A second HTTP listener (not the web surface's port) serves `POST /github`. Each request passes,
 //! in order: a body size fence (413), GitHub's `X-Hub-Signature-256` HMAC-SHA256 checked in
@@ -8,7 +8,7 @@
 //! `X-GitHub-Delivery` (a replay answers 200 and prompts nothing). An accepted delivery answers
 //! 202 at once; a single worker hands prompts to the [`PromptSink`] in arrival order.
 //!
-//! Authority (04): webhook text is written by whoever can open an issue. The rendered template is
+//! Authority: webhook text is written by whoever can open an issue. The rendered template is
 //! an [`Untrusted<String>`](aho_policy::Untrusted) whose only exit is a frame that labels it
 //! external content without operator authority and quotes every line. The surface holds no
 //! `Operator`, answers no approvals, and runs no operator commands; widening policy stays behind
@@ -97,7 +97,7 @@ impl WebhookPrompt {
     }
 }
 
-/// Where accepted deliveries go. The CLI passes a [`SessionSink`] over the bound session.
+/// The destination of accepted deliveries. The CLI passes a [`SessionSink`] over the bound session.
 pub trait PromptSink: Send + Sync + 'static {
     fn deliver(&self, prompt: WebhookPrompt) -> BoxFuture<'_, Result<(), String>>;
 }
@@ -114,7 +114,7 @@ impl SessionSink {
     }
 }
 
-/// How long to wait for an `Idle` event before trying the session again anyway.
+/// Maximum wait for an `Idle` event before trying the session again anyway.
 const BUSY_RETRY: Duration = Duration::from_secs(2);
 
 impl PromptSink for SessionSink {

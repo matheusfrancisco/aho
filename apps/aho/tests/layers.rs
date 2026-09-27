@@ -1,4 +1,4 @@
-//! Layer guard (12): `aho-types` and every seam definition crate (`crates/seams/*`) may depend only
+//! Layer guard: `aho-types` and every seam definition crate (`crates/seams/*`) may depend only
 //! on `aho-types`, `aho-log`, `aho-config`, `aho-cap`, other seams, and a tiny allowlist of
 //! third-party crates. A dependency on a provider, tool, surface, bundle, or app fails. Edges that
 //! predate the guard live in `scripts/ratchets/layers.json`; that list may only shrink.

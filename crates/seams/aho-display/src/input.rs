@@ -1,4 +1,4 @@
-//! What the `mouse`/`keyboard` tools (session desktop and `vm_*`) mean, over any `Desktop`:
+//! The meaning of the `mouse`/`keyboard` tools (session desktop and `vm_*`) over any `Desktop`:
 //! text and key names become X keysyms (RFB's key vocabulary), clicks become button-mask
 //! sequences. Pure translation plus the ordered events; the desktop checks its own authority.
 

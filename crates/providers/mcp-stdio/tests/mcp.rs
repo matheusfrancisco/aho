@@ -242,7 +242,7 @@ async fn resources_render_blobs_as_placeholders_and_keep_bytes_in_value() {
     let listed = call(&reg, tool_mcp_resources::LIST, json!({})).await;
     assert_eq!(
         text(&listed),
-        "server `fx`:\n- mem://readme  readme (text/plain) — The readme\n- mem://logo  logo (image/png)",
+        "server `fx`:\n- mem://readme  readme (text/plain): The readme\n- mem://logo  logo (image/png)",
         "both pages"
     );
     let ExecOutcome::Done { value, .. } = &listed else { panic!() };
@@ -250,7 +250,7 @@ async fn resources_render_blobs_as_placeholders_and_keep_bytes_in_value() {
     assert_eq!(value[1]["server"], "fx");
 
     let templates = call(&reg, tool_mcp_resources::TEMPLATES, json!({"server": "fx"})).await;
-    assert_eq!(text(&templates), "server `fx`:\n- mem://notes/{id}  note — A note by id");
+    assert_eq!(text(&templates), "server `fx`:\n- mem://notes/{id}  note: A note by id");
 
     let logo = call(&reg, tool_mcp_resources::READ, json!({"server": "fx", "uri": "mem://logo"})).await;
     assert_eq!(text(&logo), "mem://logo (image/png)\n[binary resource: 8 bytes; available to programmatic callers]");

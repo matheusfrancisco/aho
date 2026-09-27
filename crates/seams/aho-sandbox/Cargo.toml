@@ -3,7 +3,7 @@ name = "aho-sandbox"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Sandbox seam: the policy hinge, writable roots, world conformance suite (07, 15)"
+description = "Sandbox seam: the policy hinge, writable roots, world conformance suite"
 
 [dependencies]
 aho-types.workspace = true

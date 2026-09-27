@@ -1,4 +1,4 @@
-//! `12` "Process topology: one daemon, thin surfaces" from the CLI: `aho serve` owns every
+//! "Process topology: one daemon, thin surfaces" from the CLI: `aho serve` owns every
 //! session of the project; `aho attach` (and `aho run` when a daemon is serving) is a thin client
 //! over the daemon's unix socket, rendering the same transcript `aho run` prints.
 
@@ -57,7 +57,7 @@ pub async fn serve(ctx: &Ctx, ready: Option<ReadyFd>, a: &ServeArgs) -> Result<(
         r = &mut served => r,
         _ = tokio::signal::ctrl_c() => {
             // A clean stop: the daemon winds turns down and closes them in the logs. The daemon
-            // future keeps being polled meanwhile — it is what accepts this shutdown request.
+            // future keeps being polled meanwhile: it accepts this shutdown request.
             let asked = shutdown(&socket);
             tokio::pin!(asked);
             tokio::select! {
@@ -286,7 +286,7 @@ fn stream_event(v: &Value) -> Option<StreamEvent> {
 
 const CARD_W: usize = 74;
 
-/// The approval card from the daemon's `approval.request` payload (log data only, 05).
+/// The approval card from the daemon's `approval.request` payload (log data only).
 fn render_card(p: &Value) -> String {
     let inner = CARD_W - 4;
     let s = |k: &str| p.get(k).and_then(Value::as_str).unwrap_or("").to_string();
@@ -304,7 +304,7 @@ fn render_card(p: &Value) -> String {
         rows.push(if i == 0 { format!("why:  {l}") } else { format!("      {l}") });
     }
     if let Some(cut) = p.get("suggested_cut").and_then(Value::as_str) {
-        rows.push(format!("fix:  {cut} — a lasting change; this answer covers one call"));
+        rows.push(format!("fix:  {cut} (a lasting change; this answer covers one call)"));
     }
     rows.push(String::new());
     rows.push("[y] allow once   [s] allow for session   [r] reject   [Esc] cancel".into());
@@ -402,7 +402,7 @@ impl Client {
     async fn answer(&mut self, p: &Value) -> Result<(), Fail> {
         let Some(id) = p.get("id").and_then(Value::as_u64) else { return Ok(()) };
         if self.json || !stdin_tty() {
-            // No one at a terminal: the card is rejected, never silently allowed (04).
+            // No one at a terminal: the card is rejected, never silently allowed.
             if self.json {
                 println!("{}", serde_json::to_string(&json!({"v": 1, "event": "approval.request", "payload": p}))?);
             }

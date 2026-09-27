@@ -1,5 +1,5 @@
-//! Docs 09, 13 in a live session: "a Verify gate cannot pass while a covering invariant is `Fail`
-//! or `Stale`". A scripted model works a code task through the real loop (tool-tasks, tool-fs
+//! In a live session, a Verify gate cannot pass while a covering invariant is `Fail` or `Stale`.
+//! A scripted model works a code task through the real loop (tool-tasks, tool-fs
 //! over the host world, per-call checkpoints); the invariant covering the written file is
 //! registered and checked the way tool-formal records it. The gate is refused while the check is
 //! of older code (Stale) and while it fails, and passes once it passes against the current code;
@@ -111,7 +111,7 @@ fn results(log: &dyn LogStore) -> Vec<(String, bool, String)> {
 
 const INV: &str = "inv.parser.total";
 
-/// What tool-formal appends for a check of `INV`, bound to `code`.
+/// The entry tool-formal appends for a check of `INV`, bound to `code`.
 fn checked(log: &dyn LogStore, verdict: Verdict, code: Hash) {
     let kind = EntryKind::InvariantChecked { id: INV.into(), mode: CheckMode::Bounded(4), verdict, code_hash: code };
     log.append(None, Principal::system("spec_check"), kind).unwrap();

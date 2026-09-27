@@ -1,5 +1,5 @@
-//! Typed refusals. Every message says what happened, what the graph did (nothing — refusals never
-//! half-apply), and how to change it (12, message voice).
+//! Typed refusals. Each message says what happened, what the graph did (nothing: refusals never
+//! half-apply), and how to change it.
 
 use std::fmt;
 
@@ -8,9 +8,9 @@ use aho_types::AgentId;
 use crate::invariant::{InvariantSeen, InvariantStatus};
 use crate::model::{Actor, Control, Status, TaskId, agent_label};
 
-/// Why a gate verdict was refused. A passing gate names every done task in scope, never passes
-/// over a LOW-confidence sibling, is stale when its scope grew after it started, and — a verify
-/// gate — never passes while an invariant covering its files is Fail or Stale (docs 09, 13).
+/// The reason a gate verdict was refused. A passing gate names every done task in scope, never
+/// passes over a LOW-confidence sibling, is stale when its scope grew after it started, and, for a
+/// verify gate, never passes while an invariant covering its files is Fail or Stale.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GateError {
     UncoveredSiblings(Vec<TaskId>),
@@ -183,7 +183,7 @@ impl fmt::Display for TaskError {
                 let fix = match *field {
                     "findings" => "Say what you found in `findings`",
                     "what_i_did_not_check" => {
-                        "List what you did not verify in `what_i_did_not_check` — every hand-off has blind spots; name them"
+                        "List what you did not verify in `what_i_did_not_check`: every hand-off has blind spots, so name them"
                     }
                     "confidence" => "Set `confidence` to low, medium or high",
                     "contract.outputs" => "Name every output in `contract.outputs` with its path and format",

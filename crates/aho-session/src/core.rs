@@ -1,10 +1,10 @@
-//! Sans-io core of the loop (01, 16). Pure: given what is pending, decide what the driver does next.
-//! The driver owns I/O (model calls, tools, the log); every "when do we call the model again"
-//! decision is made here so it is testable without a runtime.
+//! Sans-io core of the loop. Pure: given what is pending, decide what the driver does next.
+//! The driver owns I/O (model calls, tools, the log); this module makes every "when do we call
+//! the model again" decision, so it is testable without a runtime.
 
 use aho_types::CallId;
 
-/// What the loop is waiting on right now.
+/// Everything the loop is waiting on right now.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Pending {
     /// Calls issued and not yet resulted.
@@ -39,7 +39,7 @@ pub enum Next {
     MaxTurns,
 }
 
-/// Why the driver is consulting the core.
+/// The event that made the driver consult the core.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Wake {
     Response,
@@ -49,7 +49,7 @@ pub enum Wake {
     HeartbeatDue,
 }
 
-/// The whole "should we call the model now" rule set from doc 16:
+/// The whole "should we call the model now" rule set:
 /// * during grace, only "all graced calls done" or an input ends the window early;
 /// * after grace, any landed result or queued input triggers the next request;
 /// * a turn that ended without tool calls while calls still run sleeps until one lands;
@@ -80,7 +80,7 @@ pub fn next(p: &Pending, wake: Wake, max_steps: u64) -> Next {
     }
 }
 
-/// Heartbeat eligibility: only open calls pending, no model call, no inputs (16).
+/// Heartbeat eligibility: only open calls pending, no model call, no inputs.
 pub fn waiting_on_calls_only(p: &Pending) -> bool {
     !p.open_calls.is_empty() && p.inputs == 0 && p.results_since_request == 0
 }

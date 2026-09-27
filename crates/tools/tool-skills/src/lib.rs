@@ -1,8 +1,8 @@
-//! `10` — the `skill` tool and the skill catalog context.
+//! The `skill` tool and the skill catalog context.
 //!
 //! * `skill{name, arguments?}` (ReadOnly, concurrency-safe) returns the template's
 //!   `<skill_content name=..><skill_resources>..</skill_resources><skill_instructions>..
-//!   </skill_instructions></skill_content>` with `$ARGUMENTS` substituted — the same render
+//!   </skill_instructions></skill_content>` with `$ARGUMENTS` substituted: the same render
 //!   [`slash_invocation`] produces for `/name`.
 //! * A `Registrar::context` publishes the `<available_skills>` catalog only when its digest
 //!   changes. Conditional skills (`paths:`) join the catalog once a tool call touched a matching
@@ -179,7 +179,7 @@ declare_capability!(
     provides = [],
     requires = [Requirement::Seam(aho_skills::SEAM)],
     tools = TOOLS,
-    doc = "`skill` tool and the digest-deduped <available_skills> catalog (10)."
+    doc = "`skill` tool and the digest-deduped <available_skills> catalog."
 );
 
 #[cfg(test)]

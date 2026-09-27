@@ -1,4 +1,4 @@
-//! Content rules under the class lattice (04): `deny bash(rm *)`, `ask write(src/**)`,
+//! Content rules under the class lattice: `deny bash(rm *)`, `ask write(src/**)`,
 //! `allow mcp__github__*`, `deny SpawnsProcess`.
 
 use std::fmt;
@@ -97,7 +97,7 @@ fn parse_one(t: &str, origin: &str) -> Result<Rule, String> {
     Ok(Rule { behavior, tool: tool.to_string(), content, origin: origin.to_string() })
 }
 
-/// What a content pattern is matched against: the tool's primary argument.
+/// The value a content pattern matches: the tool's primary argument.
 pub(crate) enum Subject {
     /// `command` (bash-like): the whole line plus every simple command in it.
     Command { whole: String, parts: Vec<(String, String)> },

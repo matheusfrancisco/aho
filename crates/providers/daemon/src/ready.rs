@@ -1,10 +1,10 @@
-//! `12` "Reload = exec-in-place with a readiness fd": the parent learns that a new binary is
+//! Exec-in-place reload with a readiness fd: the parent learns that a new binary is
 //! serving from exactly one byte ([`READY_BYTE`]) written on a descriptor it passed down. The
 //! descriptor number travels in [`READY_FD_ENV`].
 //!
 //! Descriptors cross `exec` only when their close-on-exec flag is clear, and std opens every
 //! descriptor with it set and has no API to clear it; that `fcntl` (in this process, or in a
-//! forked child before exec) is the whole reason this module is allowed `unsafe`.
+//! forked child before exec) is why this module is allowed `unsafe`.
 //!
 //! The environment variable is never removed from the process environment (`remove_var` is
 //! unsound once threads exist). Instead the descriptor is taken with close-on-exec set, so no
@@ -30,7 +30,7 @@ pub struct ReadyFd(OwnedFd);
 ///
 /// Call once, at startup, before spawning anything. Returns `None` when the variable is unset or
 /// malformed, names a standard stream, names a closed descriptor, or names a descriptor that has
-/// close-on-exec set — a descriptor passed across `exec` never has it, so a set flag means the
+/// close-on-exec set. A descriptor passed across `exec` never has it, so a set flag means the
 /// descriptor already belongs to someone in this process (for example an earlier call). The
 /// taken descriptor gets close-on-exec so no subprocess inherits it.
 #[allow(clippy::disallowed_methods, reason = "authority: daemon-ready-env")]
@@ -68,8 +68,7 @@ impl AsFd for ReadyFd {
     }
 }
 
-/// Clears close-on-exec on `fd` so it survives `exec` — "passing the fd across exec". std has no
-/// API for this.
+/// Clears close-on-exec on `fd` so it survives `exec`. std has no API for this.
 pub fn inheritable(fd: BorrowedFd<'_>) -> io::Result<()> {
     set_cloexec(fd, false)
 }
@@ -93,7 +92,7 @@ fn set_cloexec(fd: BorrowedFd<'_>, on: bool) -> io::Result<()> {
     Ok(())
 }
 
-/// Why waiting for readiness failed. `Display` is operator-facing.
+/// The reason waiting for readiness failed. `Display` is operator-facing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReadyError {
     /// End of file without the byte: the new binary died (or dropped the descriptor) before it
@@ -221,7 +220,7 @@ fn clear_cloexec_raw(raw: RawFd) -> io::Result<()> {
 /// Replaces this process image with `cmd`, handing it `fd` as its readiness descriptor (same
 /// pid: exec in place). Returns only when exec failed; `fd` then gets close-on-exec back so
 /// later subprocesses do not inherit it, and the standard streams are put back: `exec` applies
-/// `cmd`'s stdio redirections to this very process before `execve`, so without that a failed
+/// `cmd`'s stdio redirections to this process before `execve`, so without that a failed
 /// reload would leave the daemon writing its log to wherever the new image's streams pointed.
 /// Between marking `fd` inheritable and exec, a subprocess spawned by another thread would
 /// inherit it: stop spawning first.

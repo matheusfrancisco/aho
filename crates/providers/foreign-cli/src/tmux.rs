@@ -13,7 +13,7 @@ use tokio::process::Command;
 /// One tmux command may take this long before it is abandoned (and killed).
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// What `list-sessions` says about one session.
+/// One session, as `list-sessions` reports it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SessionState {
     pub name: String,
@@ -57,7 +57,7 @@ impl Tmux {
     async fn run(&self, args: &[String], stdin: Option<&[u8]>) -> Result<(bool, String, String), String> {
         let mut cmd = Command::new(&self.bin);
         cmd.arg(self.socket_flag()).arg(&self.socket).args(args);
-        cmd.env_remove("AHO_READY_FD"); // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write (12)
+        cmd.env_remove("AHO_READY_FD"); // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write
         cmd.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() }).stdout(Stdio::piped()).stderr(Stdio::piped());
         cmd.kill_on_drop(true);
         let mut child = cmd.spawn().map_err(|e| format!("could not run {} ({e})", self.bin.display()))?;

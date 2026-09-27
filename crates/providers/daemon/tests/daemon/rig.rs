@@ -84,7 +84,7 @@ pub async fn boot(
     .map_err(|e| e.to_string())
 }
 
-/// What the app would be: sessions under `dir`, all booted with one scripted model. `journal`
+/// Stands in for the app: sessions under `dir`, all booted with one scripted model. `journal`
 /// records every hook the daemon calls (`boot <id>`, `closing <id>`, `before_exec`,
 /// `exec_failed`, `call <method>`), in order.
 pub struct Host {

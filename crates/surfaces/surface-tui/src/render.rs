@@ -547,7 +547,7 @@ fn centered(area: Rect, w: u16, h: u16) -> Rect {
     Rect { x: area.x + (area.width - w) / 2, y: area.y + (area.height - h) / 2, width: w, height: h }
 }
 
-/// The doc-05 approval card.
+/// The approval card.
 fn draw_approval(card: &ApprovalView, queued: usize, area: Rect, buf: &mut Buffer, probe: &mut Probe) {
     let width = area.width.saturating_sub(2).min(78);
     let inner_w = width.saturating_sub(2) as usize;

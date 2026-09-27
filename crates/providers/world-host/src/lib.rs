@@ -1,9 +1,9 @@
-//! `07` — the host world: `Fs + Subprocess + Sandbox + Snapshot + Egress` on your own disk and
-//! network, as your user. Nothing is confined; `aho plan` prints `enforced by: policy only`, and
-//! that honesty is the point. The workspace is the configured directory, or a git worktree on branch
-//! `aho/<name>` under `.aho/worktrees/<name>` with `workspace.layout = worktree`. Egress is the host
-//! network (`HostEgress`); the operator's `egress.allow`/`egress.deny` list is enforced per hop for
-//! the tools that use it (`web_fetch`, MCP over HTTP) — `bash` can still reach anything.
+//! The host world: `Fs + Subprocess + Sandbox + Snapshot + Egress` on your own disk and network,
+//! as your user. Nothing is confined, and `aho plan` says so: `enforced by: policy only`. The
+//! workspace is the configured directory, or a git worktree on branch `aho/<name>` under
+//! `.aho/worktrees/<name>` with `workspace.layout = worktree`. Egress is the host network
+//! (`HostEgress`); the operator's `egress.allow`/`egress.deny` list is enforced per hop for the
+//! tools that use it (`web_fetch`, MCP over HTTP); `bash` can still reach anything.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![deny(unsafe_code)] // one audited exception: `proc::signal_group` (kill(2) on a process group)
 
@@ -47,7 +47,7 @@ pub struct HostConfig {
     pub root: PathBuf,
     pub layout: Layout,
     pub worktree: Option<String>,
-    /// Directory holding shadow repos (11).
+    /// Directory holding shadow repos.
     pub shadow_dir: PathBuf,
     /// Operator login shell for `aho shell`.
     pub shell: String,
@@ -83,7 +83,7 @@ impl Config for HostConfig {
                 "workspace.layout",
                 Ty::String,
                 Some(json!("in-place")),
-                "`in-place` works in workspace.root; `worktree` works in `.aho/worktrees/<workspace.worktree>` on branch `aho/<name>` (07).",
+                "`in-place` works in workspace.root; `worktree` works in `.aho/worktrees/<workspace.worktree>` on branch `aho/<name>`.",
             ),
             ConfigKey::new(
                 "workspace.worktree",
@@ -91,7 +91,7 @@ impl Config for HostConfig {
                 None,
                 "Worktree name for `workspace.layout = worktree` (letters, digits, `.`, `_`, `-`).",
             ),
-            ConfigKey::new("workspace.shadow_dir", Ty::String, None, "Where checkpoint trees are stored (11); default: `~/.aho/shadow`."),
+            ConfigKey::new("workspace.shadow_dir", Ty::String, None, "Directory for checkpoint trees; default: `~/.aho/shadow`."),
         ]
     }
 

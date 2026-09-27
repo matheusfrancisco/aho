@@ -11,7 +11,7 @@ pub const REDACTED: &str = "[redacted]";
 /// Replaces a value the config resolver already stored as `{"digest": <hex>}`.
 pub const SECRET: &str = "[secret]";
 
-/// What must never be rendered: the plaintext of every loadout secret and its blake3 digest.
+/// The values that must never be rendered: the plaintext of every loadout secret and its blake3 digest.
 #[derive(Clone, Debug, Default)]
 pub struct Redactor {
     needles: Vec<String>,
@@ -73,7 +73,7 @@ impl Redactor {
     }
 }
 
-/// `{"digest": "<64 hex>"}` — how `aho-config` and `aho-compose` store a secret's value.
+/// `{"digest": "<64 hex>"}`: the form `aho-config` and `aho-compose` store a secret's value in.
 fn is_digest(m: &serde_json::Map<String, Value>) -> bool {
     m.len() == 1 && m.get("digest").and_then(Value::as_str).is_some_and(|h| h.len() == 64 && h.bytes().all(|b| b.is_ascii_hexdigit()))
 }
@@ -137,7 +137,7 @@ const GROUPS: &[(&str, &[&str])] = &[
     ("checkpoint", &["WorkspaceCheckpoint", "WorkspaceRestored"]),
 ];
 
-/// What `session_search` looks at when no `kinds` are given.
+/// Kinds `session_search` looks at when no `kinds` are given.
 pub const DEFAULT_SEARCH: &[&str] = &["UserMessage", "AssistantMessage", "ToolCall", "ToolResult", "Note"];
 
 fn norm(s: &str) -> String {

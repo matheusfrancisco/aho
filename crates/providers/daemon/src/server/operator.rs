@@ -1,15 +1,15 @@
-//! What a driving client does to a live session beyond prompting (12, 05, 03): stream it from an
+//! Operations a driving client runs on a live session beyond prompting: stream it from an
 //! entry (`session.subscribe`), append an operator entry (`session.command`), call a method the
-//! host serves over it (`session.call`), boot it again so it runs under what the operator just
+//! host serves over it (`session.call`), boot it again so it runs under what the operator
 //! recorded (`session.reopen`), and answer its approval cards. Everything that changes a session
 //! needs the connection to drive it ([`Daemon::owner_check`]); watching does not.
 
 use super::*;
 
-/// Kinds an operator command may append: configuration and plan records (03), operator commands
-/// and notes (05), invariant records (13), and capability-owned records (`Custom`, e.g.
-/// `schedule/Cancelled`). The turn machinery — turns, steps, messages, calls, results,
-/// operations, approvals, attachments, recovery, compaction — is written by the session only.
+/// Kinds an operator command may append: configuration and plan records, operator commands
+/// and notes, invariant records, and capability-owned records (`Custom`, e.g.
+/// `schedule/Cancelled`). Only the session writes the turn machinery (turns, steps, messages,
+/// calls, results, operations, approvals, attachments, recovery, compaction).
 fn operator_kind(k: &EntryKind) -> bool {
     matches!(
         k,
@@ -391,7 +391,7 @@ impl Daemon {
     }
 
     /// `approval.answer{id, allow | outcome, scope?}`: `outcome` is `allow`, `reject` or `cancel`
-    /// (a cancel reads to the model unlike a rejection, 04); `allow: bool` is the short form.
+    /// (the model reads a cancel differently from a rejection); `allow: bool` is the short form.
     pub(super) async fn answer(&self, conn: ConnId, p: AnswerParams) -> Result<Value, String> {
         if p.outcome.as_deref() == Some("preset") {
             return self.answer_preset(conn, p.id).await;

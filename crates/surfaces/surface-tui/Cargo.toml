@@ -3,7 +3,7 @@ name = "surface-tui"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ratatui TUI; same tree/inventory JSON as web; frame ring buffer for visual debug (08, 12)"
+description = "ratatui TUI; same tree/inventory JSON as web; frame ring buffer for visual debug"
 
 [dependencies]
 aho-types.workspace = true

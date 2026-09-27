@@ -1,18 +1,19 @@
-//! `07` — the ssh world: `Fs + Subprocess + Sandbox + Snapshot + Egress` on another machine,
-//! reached with the system `ssh` client. Worlds table row: `ssh | fs-ssh proc-ssh sandbox-ssh |
-//! remote dir | the remote host | any`. The workspace lives on the remote (sandbox worlds keep it
-//! inside); processes, files and the network are the remote's own, so `aho plan` prints
-//! `enforced by: remote host` — including for `NetworkEgress` (07 "Sandbox worlds").
+//! The ssh world: `Fs + Subprocess + Sandbox + Snapshot + Egress` on another machine, reached
+//! with the system `ssh` client. Providers `fs-ssh`, `proc-ssh`, `sandbox-ssh`; the workspace is
+//! a remote directory; any local platform works. The workspace lives on the remote (sandbox
+//! worlds keep it inside); processes, files and the network are the remote's own, so `aho plan`
+//! prints `enforced by: remote host`, `NetworkEgress` included.
 //!
-//! A third-party-style world in one crate (15): selected with `[seams] world = "ssh"`, configured
+//! A third-party-style world in one crate: selected with `[seams] world = "ssh"`, configured
 //! under `[world.ssh]`, exclusive (fs, subprocess, sandbox, snapshot and egress bind together).
 //!
-//! * transport — one ControlMaster per world (socket under `world.ssh.control_dir`, by default
+//! * transport: one ControlMaster per world (socket under `world.ssh.control_dir`, by default
 //!   `<session.dir>/ssh`), `BatchMode=yes`, host keys checked by ssh itself ([`ssh`]);
-//! * fs — POSIX sh on the remote with every argument single-quoted, bytes raw over the channel ([`fs`]);
-//! * processes — a perl launcher per command: own process group, exact exit status, group kill ([`proc`]);
-//! * snapshots — a shadow SHA-256 git store on the remote, same semantics as the host's (11, [`snapshot`]);
-//! * egress — `web_fetch` & co. leave from the remote: one remote `curl` per hop, redirects and the
+//! * fs: POSIX sh on the remote with every argument single-quoted, bytes raw over the channel ([`fs`]);
+//! * processes: one perl launcher per command, with its own process group, exact exit status and
+//!   group kill ([`proc`]);
+//! * snapshots: a shadow SHA-256 git store on the remote, same semantics as the host's ([`snapshot`]);
+//! * egress: `web_fetch` & co. leave from the remote, one remote `curl` per hop, redirects and the
 //!   operator's host list handled here ([`egress`]).
 //!
 //! Remote requirements (checked when the world starts): a POSIX `/bin/sh`, `perl`, `git ≥ 2.29`,
@@ -46,7 +47,7 @@ pub use crate::sandbox::SshSandbox;
 pub use crate::snapshot::RemoteShadowGit;
 pub use crate::ssh::{Ssh, SshError, Target};
 
-/// What `aho plan` prints for this world (07).
+/// The `enforced by:` text `aho plan` prints for this world.
 pub const ENFORCED_BY: &str = "remote host";
 
 /// Default remote directory for shadow repositories, relative to the remote `$HOME`.
@@ -57,7 +58,7 @@ pub struct SshConfig {
     pub target: Target,
     /// Remote workspace directory; relative paths are under the remote `$HOME`. Created if missing.
     pub workspace: String,
-    /// Remote directory holding shadow repos (11); relative paths are under the remote `$HOME`.
+    /// Remote directory holding shadow repos; relative paths are under the remote `$HOME`.
     pub shadow_dir: String,
     /// Local directory for the ControlMaster socket.
     pub control_dir: PathBuf,
@@ -96,7 +97,7 @@ impl Config for SshConfig {
                 "world.ssh.host",
                 Ty::String,
                 None,
-                "Remote host of the ssh world: a host name, address, or alias from your ssh config (07).",
+                "Remote host of the ssh world: a host name, address, or alias from your ssh config.",
             ),
             ConfigKey::new(
                 "world.ssh.user",
@@ -121,7 +122,7 @@ impl Config for SshConfig {
                 "world.ssh.shadow_dir",
                 Ty::String,
                 Some(json!(DEFAULT_SHADOW_DIR)),
-                "Remote directory for checkpoint trees (11); relative paths are under the remote $HOME.",
+                "Remote directory for checkpoint trees; relative paths are under the remote $HOME.",
             ),
             ConfigKey::new(
                 "world.ssh.control_dir",

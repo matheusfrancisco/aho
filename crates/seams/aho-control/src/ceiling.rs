@@ -1,8 +1,8 @@
-//! `04` — the live session ceiling as a mode sees it. The lattice is meet-only: [`SessionCeiling::narrow`]
+//! The live session ceiling as a mode sees it. The lattice is meet-only: [`SessionCeiling::narrow`]
 //! needs no approval; growth exists only as an operator decision the implementation obtains itself
 //! ([`SessionCeiling::request_widen`]) and logs as `Policy/Epoch{by: Operator, approval_ref}`.
 //! Children inherit the narrowed policy because it *is* the session policy (a guard would not
-//! reach them: a subagent's policy is derived from the parent's, `04` "Children").
+//! reach them: a subagent's policy is derived from the parent's).
 
 use std::sync::Arc;
 
@@ -16,7 +16,7 @@ pub const CEILING_SERVICE: &str = "aho.ceiling";
 #[derive(Clone)]
 pub struct CeilingHandle(pub Arc<dyn SessionCeiling>);
 
-/// What a widening asks the operator.
+/// A widening request to the operator.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Widen {
     /// The tool (or command) asking; the card and `Approval/Requested.for_cap` name it.

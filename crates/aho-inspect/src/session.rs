@@ -1,5 +1,5 @@
 //! Folds over a session's `State`: `aho status`, the resume catch-up brief, `aho gc --dry-run`
-//! orphans, and `aho invariants` (05, 12, 13).
+//! orphans, and `aho invariants`.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
@@ -110,7 +110,7 @@ pub fn status(plan: &Plan, state: &State, now: Timestamp) -> Status {
 pub fn render_status(s: &Status) -> String {
     let sealed = match s.sealed_plan {
         Some(h) if s.plan_matches_log => format!(" (sealed {})", h.short()),
-        Some(h) => format!(" (log sealed {} — config changed since)", h.short()),
+        Some(h) => format!(" (log sealed {}; config changed since)", h.short()),
         None => " (no session sealed)".into(),
     };
     let mut out = format!(
@@ -156,7 +156,7 @@ pub fn render_status(s: &Status) -> String {
 
 // ───────────────────────────── catch-up ─────────────────────────────
 
-/// Closed (12): derived from `StepEnd{transition}`, the open turn, and whether the owner lives.
+/// Closed: derived from `StepEnd{transition}`, the open turn, and whether the owner lives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum SessionStatus {
     Active,
@@ -292,7 +292,7 @@ pub fn catch_up(state: &State) -> CatchUp {
 
 /// Markdown, identical in every surface.
 pub fn render_catch_up(c: &CatchUp) -> String {
-    let mut out = format!("## Catch-up — {:?}\n\n_{}_\n\n", c.status, c.reason);
+    let mut out = format!("## Catch-up: {:?}\n\n_{}_\n\n", c.status, c.reason);
     if let Some(p) = &c.last_prompt {
         out.push_str(&format!("**Last prompt:** {p}\n\n"));
     }
@@ -422,14 +422,14 @@ pub fn render_orphans(scan: &OrphanScan) -> String {
     out
 }
 
-// ───────────────────────────── invariants (13) ─────────────────────────────
+// ───────────────────────────── invariants ─────────────────────────────
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct InvariantRow {
     pub id: String,
-    /// What the operator should believe now: `Stale` whenever the check predates the code.
+    /// The verdict the operator should believe now: `Stale` whenever the check predates the code.
     pub verdict: Verdict,
-    /// What the checker last said.
+    /// The checker's last verdict.
     pub recorded: Verdict,
     pub code_hash: Hash,
     pub stale: bool,
@@ -453,11 +453,11 @@ pub fn invariants(state: &State, current_code_hash: Hash) -> Vec<InvariantRow> {
         .collect()
 }
 
-/// 13: "`aho invariants` folds the latest `Checked` per id against the current checkpoint's
-/// `code_hash`". The current code is the tree of the latest `Workspace/Checkpoint` (tool-formal
+/// `aho invariants` folds the latest `Checked` per id against the current checkpoint's
+/// `code_hash`. The current code is the tree of the latest `Workspace/Checkpoint` (tool-formal
 /// binds every verdict to the workspace tree it checked); before the first checkpoint there is
-/// nothing to be older than, so the recorded verdicts stand. What `aho invariants`, the TUI, the
-/// web view and a swarm's verify gate all show.
+/// nothing to be older than, so the recorded verdicts stand. `aho invariants`, the TUI, the
+/// web view and a swarm's verify gate all show this.
 pub fn current_invariants(state: &State) -> Vec<InvariantRow> {
     match state.checkpoints.last() {
         Some((_, tree, _)) => invariants(state, *tree),

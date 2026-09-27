@@ -1,4 +1,4 @@
-//! `05` — the verb set as clap types. Every verb here is also a `caps.*` / `session.*` rpc method
+//! The verb set as clap types. Every verb here is also a `caps.*` / `session.*` rpc method
 //! or a projection over a log; none exists in this client only.
 
 use std::path::PathBuf;
@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "aho", version, about = "aho — a modular coding harness. What exists, what is on, why, and how to change it.")]
+#[command(name = "aho", version, about = "aho: a modular coding harness. It shows what exists, what is on, why, and how to change it.")]
 pub struct Cli {
     #[command(flatten)]
     pub global: Global,
@@ -73,11 +73,11 @@ pub enum Verb {
         #[arg(long)]
         json: bool,
     },
-    /// Where a setting's value came from, or why a capability is in its state.
+    /// Explain where a setting's value came from, or why a capability is in its state.
     Explain {
         /// A config key (`policy.preset`) or a capability id (`tool-bash`).
         subject: String,
-        /// What the agent saw at entry N of a session log.
+        /// Show what the agent saw at entry N of a session log.
         #[arg(long, value_name = "N")]
         at: Option<u64>,
         #[arg(long, value_name = "ID")]
@@ -85,7 +85,7 @@ pub enum Verb {
         #[arg(long)]
         json: bool,
     },
-    /// Why a capability is Active, Locked, Broken, Unlocked, or Disabled.
+    /// Explain why a capability is Active, Locked, Broken, Unlocked, or Disabled.
     Why {
         id: String,
         #[arg(long)]
@@ -120,7 +120,7 @@ pub enum Verb {
         #[command(subcommand)]
         sub: SessionVerb,
     },
-    /// A session's sandbox network (07): `status`, `allow <dest>`, `map HOST:GUEST`.
+    /// A session's sandbox network: `status`, `allow <dest>`, `map HOST:GUEST`.
     Net {
         #[command(subcommand)]
         sub: NetVerb,
@@ -130,7 +130,7 @@ pub enum Verb {
         #[arg(long, global = true)]
         json: bool,
     },
-    /// A session's sandbox (07): `status`, or `destroy` it (the next turn creates a fresh one).
+    /// A session's sandbox: `status`, or `destroy` it (the next turn creates a fresh one).
     Sandbox {
         #[command(subcommand)]
         sub: SandboxVerb,
@@ -144,12 +144,12 @@ pub enum Verb {
     Export {
         /// A path in the sandbox workspace, e.g. `./src`.
         src: String,
-        /// Where on the host: a new path, or an existing directory to copy into.
+        /// The host destination: a new path, or an existing directory to copy into.
         dst: PathBuf,
         #[arg(long, value_name = "ID")]
         session: Option<String>,
     },
-    /// VM leases (04): what a session's machines may use — granted, and revoked, by the operator.
+    /// VM leases: what a session's machines may use, granted and revoked by the operator.
     Lease {
         #[command(subcommand)]
         sub: LeaseVerb,
@@ -158,7 +158,7 @@ pub enum Verb {
         #[arg(long, global = true)]
         json: bool,
     },
-    /// The operator's VM media library (07): immutable, hashed images recipes are built from.
+    /// The operator's VM media library: immutable, hashed images recipes are built from.
     Media {
         #[command(subcommand)]
         sub: MediaVerb,
@@ -205,7 +205,7 @@ pub enum Verb {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
     },
-    /// Spec mode (14): the agent works with you on spec/ only.
+    /// Spec mode: the agent works with you on spec/ only.
     Spec {
         #[command(subcommand)]
         sub: Option<SpecVerb>,
@@ -232,12 +232,12 @@ pub enum Verb {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
     },
-    /// The daemon (12): one process owns every session of this project; clients attach over a
+    /// The daemon: one process owns every session of this project; clients attach over a
     /// unix socket. `aho run` goes through it while it serves.
     Serve(ServeArgs),
     /// A thin client of `aho serve`: open or resume a session in the daemon and drive it.
     Attach(AttachArgs),
-    /// The terminal UI over a session (08); `--headless` prints the normalized screen as JSON.
+    /// The terminal UI over a session; `--headless` prints the normalized screen as JSON.
     Tui {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
@@ -248,7 +248,7 @@ pub enum Verb {
         #[arg(long, default_value_t = 32)]
         height: u16,
     },
-    /// The web UI over a session (08): HTTPS with `--cert/--key` or the pair `aho cert` wrote;
+    /// The web UI over a session: HTTPS with `--cert/--key` or the pair `aho cert` wrote;
     /// plain HTTP only on loopback with `--insecure-loopback` (development).
     Web {
         #[arg(long, value_name = "ID")]
@@ -263,7 +263,7 @@ pub enum Verb {
         #[arg(long, conflicts_with_all = ["cert", "key"])]
         insecure_loopback: bool,
     },
-    /// Generate the local TLS pair `aho web` and `aho webhook` serve with (08), under ~/.aho/tls/.
+    /// Generate the local TLS pair `aho web` and `aho webhook` serve with, under ~/.aho/tls/.
     Cert {
         /// Another name or IP the certificate should cover (localhost, 127.0.0.1, ::1 always are). Repeatable.
         #[arg(long = "host", value_name = "NAME")]
@@ -272,7 +272,7 @@ pub enum Verb {
         #[arg(long)]
         force: bool,
     },
-    /// The GitHub webhook listener (08): signed deliveries become prompts to one session.
+    /// The GitHub webhook listener: signed deliveries become prompts to one session.
     Webhook {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
@@ -280,26 +280,26 @@ pub enum Verb {
         #[arg(long)]
         insecure_loopback: bool,
     },
-    /// Agent Client Protocol over stdio (08): editors (Zed, …) drive aho sessions.
+    /// Agent Client Protocol over stdio: editors (Zed, …) drive aho sessions.
     Acp,
-    /// Self-dev reload (12): publish this build, smoke it, flip the channels, hand the daemon over.
+    /// Self-dev reload: publish this build, smoke it, flip the channels, hand the daemon over.
     Selfdev {
         #[command(subcommand)]
         sub: SelfdevVerb,
     },
-    /// Branch a session at entry N (11); with `--loadout X` the new branch runs under that loadout.
+    /// Branch a session at entry N; with `--loadout X` the new branch runs under that loadout.
     Fork {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
         #[arg(long, value_name = "N")]
         at: u64,
     },
-    /// Checkpoint trees outside the session (11).
+    /// Checkpoint trees outside the session.
     Checkpoint {
         #[command(subcommand)]
         sub: CheckpointVerb,
     },
-    /// Latest verdict per invariant against the current code (13); a verdict older than the code is Stale.
+    /// Latest verdict per invariant against the current code; a verdict older than the code is Stale.
     /// `show`, `check` and `mutate` run the checkers from here, as the operator.
     Invariants {
         #[command(subcommand)]
@@ -310,12 +310,12 @@ pub enum Verb {
         #[arg(long, global = true)]
         json: bool,
     },
-    /// Ordered readiness checks (12).
+    /// Ordered readiness checks.
     Doctor {
         #[command(subcommand)]
         what: DoctorWhat,
     },
-    /// Capability manifests as the binary declares them (15).
+    /// Capability manifests as the binary declares them.
     Caps {
         #[command(subcommand)]
         sub: CapsVerb,
@@ -330,12 +330,12 @@ pub enum Verb {
         #[command(subcommand)]
         sub: RalphVerb,
     },
-    /// Session modes (04).
+    /// Session modes.
     PlanMode {
         #[command(subcommand)]
         sub: PlanModeVerb,
     },
-    /// Reclaim what dead sessions left behind: worktrees, spill, checkpoint trees, child logs (04, 11, 12).
+    /// Reclaim what dead sessions left behind: worktrees, spill, checkpoint trees, child logs.
     Gc {
         /// List what would be reclaimed, by owning session and age; delete nothing.
         #[arg(long)]
@@ -358,7 +358,7 @@ pub enum LeaseVerb {
         /// Total CPU time (vCPUs × running time), e.g. 6h.
         #[arg(long, default_value = "6h")]
         cpu: String,
-        /// How long the lease lasts, e.g. 6h or 2d.
+        /// Lease duration, e.g. 6h or 2d.
         #[arg(long, default_value = "6h")]
         expires: String,
     },
@@ -441,7 +441,7 @@ pub enum NetVerb {
     /// Subnets, isolation, egress lists, port maps, NICs; live flows when it runs.
     Status,
     /// Let a blocked destination through: a domain, `*.domain`, IP or CIDR, or an isolation
-    /// class (`internet`, `host-lan`, `other-sessions`) — the unlock a blocked flow names.
+    /// class (`internet`, `host-lan`, `other-sessions`): the unlock a blocked flow names.
     Allow { dest: String },
     /// Forward a host port into the sandbox: `aho net map 8080:3000` (or `8080` for the same port).
     Map {
@@ -518,7 +518,7 @@ pub enum SessionVerb {
     /// The transcript and the catch-up brief.
     Show { id: String },
     /// Hash chain, fold invariants, replay equality, and open calls; `--formal` also validates the
-    /// log against aho's own TLA+ specs (13: every session log is a behavior).
+    /// log against aho's own TLA+ specs (every session log is a behavior).
     Verify {
         /// Session id or unique prefix (default: the most recent).
         id: Option<String>,
@@ -535,14 +535,14 @@ pub enum SessionVerb {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
     },
-    /// Bring a worktree session's branch `aho/<name>` back into the checked-out branch (07).
+    /// Bring a worktree session's branch `aho/<name>` back into the checked-out branch.
     Merge {
         id: Option<String>,
         /// Merge even though the spec's open questions grew; the reason is logged.
         #[arg(long)]
         reason: Option<String>,
     },
-    /// Remove a worktree session's worktree (07); its branch and log stay.
+    /// Remove a worktree session's worktree; its branch and log stay.
     Destroy { id: Option<String> },
     /// Search every session's log in this project (the rebuildable index next to the logs).
     /// `terms "a phrase" kind:tool_call tool:bash session:<hex> after:<ms> before:<ms> branch:all limit:N`
@@ -627,7 +627,7 @@ pub enum SelfdevVerb {
 
 #[derive(Subcommand, Debug)]
 pub enum CheckpointVerb {
-    /// Turn a checkpoint into a real commit on a branch of your repository (11).
+    /// Turn a checkpoint into a real commit on a branch of your repository.
     Export {
         /// `c2` or `2`.
         checkpoint: String,
@@ -656,7 +656,7 @@ pub enum InvariantsVerb {
         #[arg(long, value_name = "N")]
         bound: Option<u32>,
     },
-    /// The mutation gate (13 step 3): mutants of the spec's actions must be caught, or the invariant is Vacuous.
+    /// The mutation gate: mutants of the spec's actions must be caught, or the invariant is Vacuous.
     Mutate { id: String },
 }
 
@@ -672,13 +672,13 @@ pub enum DoctorWhat {
         #[arg(long)]
         json: bool,
     },
-    /// Local embeddings (12): which model is selected, whether its artifacts verify, and
+    /// Local embeddings: which model is selected, whether its artifacts verify, and
     /// `--install` to download the pinned MiniLM once into `embed.local.model_dir`.
     Embed {
         #[arg(long)]
         install: bool,
     },
-    /// The formal checkers behind spec mode (13): what is installed, and install TLC or Lean.
+    /// The formal checkers behind spec mode: what is installed, and install TLC or Lean.
     Formal {
         /// `tla` (downloads tla2tools.jar) or `lean` (installs elan, the Lean toolchain manager).
         #[arg(long, value_name = "WHICH")]
@@ -792,6 +792,6 @@ pub enum AddWhat {
         #[arg(long)]
         class: Option<String>,
     },
-    /// A VM recipe over catalog media (07): what `vm_create` and `vm.recipe` build machines from.
+    /// A VM recipe over catalog media: what `vm_create` and `vm.recipe` build machines from.
     Recipe(RecipeArgs),
 }

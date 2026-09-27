@@ -1,6 +1,6 @@
-//! End to end over the NIC socket (07): a real userspace guest stack (smoltcp) attaches to the
-//! network exactly as QEMU or the namespace NIC would — u32 big-endian length, then an Ethernet
-//! frame — and leases, resolves, connects out through the NAT, gets refused, and is reached
+//! End to end over the NIC socket: a real userspace guest stack (smoltcp) attaches to the
+//! network exactly as QEMU or the namespace NIC would (u32 big-endian length, then an Ethernet
+//! frame) and leases, resolves, connects out through the NAT, gets refused, and is reached
 //! through a port map. No hypervisor, TAP device or root is involved.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design

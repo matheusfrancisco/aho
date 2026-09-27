@@ -1,8 +1,8 @@
-//! `12` "Self-dev reload" from the operator's side: `aho selfdev reload` publishes a build,
+//! Self-dev reload from the operator's side: `aho selfdev reload` publishes a build,
 //! smoke-boots it, flips `current`/`canary`, and hands the running daemon over to it; `status`
 //! folds the ledger; `rollback` reloads into the build that ran before. Every phase is an entry in
 //! the builds' ledger (`<builds>/ledger.jsonl`, a log only this command writes: the sessions'
-//! own logs belong to the daemon while it runs), so what happened is a fold, not a guess.
+//! own logs belong to the daemon while it runs), so a fold of the ledger says what happened.
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

@@ -1,5 +1,5 @@
-//! Textual mutants of a TLA+ module (13: "must fail on a mutant"). Only the *model* is mutated
-//! — the actions reachable from `Next` — never the invariants, so a caught mutant means the
+//! Textual mutants of a TLA+ module: an invariant must fail on a mutant. Only the *model* is
+//! mutated (the actions reachable from `Next`), never the invariants, so a caught mutant means the
 //! invariants constrain the behavior the actions allow.
 //!
 //! Operators: drop a guard (`/\ P` → `/\ TRUE`), negate a guard (`/\ ~(P)`), swap a comparison

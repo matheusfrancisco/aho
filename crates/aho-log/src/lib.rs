@@ -1,4 +1,4 @@
-//! `06` — the session log. Config, activation, transcript, tool I/O, approvals, compaction,
+//! The session log. Config, activation, transcript, tool I/O, approvals, compaction,
 //! checkpoints, operations all live here. Everything else is a fold over a branch.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![forbid(unsafe_code)]
@@ -52,7 +52,7 @@ impl Entry {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EntryKind {
-    // ── bootstrap (03) ──
+    // ── bootstrap ──
     ConfigResolved {
         key: String,
         sourced: Sourced<Value>,
@@ -80,7 +80,7 @@ pub enum EntryKind {
         detail: String,
     },
 
-    // ── authority (04) ──
+    // ── authority ──
     PolicyEpoch {
         epoch: Epoch,
         allowed: ConsequenceSet,
@@ -108,7 +108,7 @@ pub enum EntryKind {
         proof_next_attempt: Option<EntryId>,
     },
 
-    // ── turn (01, 16) ──
+    // ── turn ──
     TurnStart {
         turn: TurnId,
     },
@@ -175,7 +175,7 @@ pub enum EntryKind {
         status: OpStatus,
     },
 
-    // ── compaction (10) ──
+    // ── compaction ──
     SurfaceReplace {
         start: EntryId,
         end: EntryId,
@@ -194,7 +194,7 @@ pub enum EntryKind {
         consecutive: u32,
     },
 
-    // ── hooks, commands, surfaces (10, 12) ──
+    // ── hooks, commands, surfaces ──
     HookInvoked {
         point: String,
         cap: String,
@@ -225,7 +225,7 @@ pub enum EntryKind {
         directive: String,
     },
     SessionSeen,
-    /// `pid` alone is not identity — pids recycle. `(pid, start_time)` lets `aho gc` reap orphans across a crash.
+    /// `pid` alone is not identity: pids recycle. `(pid, start_time)` lets `aho gc` reap orphans across a crash.
     SessionMeta {
         title: Option<String>,
         tags: Vec<String>,
@@ -233,7 +233,7 @@ pub enum EntryKind {
         process: Option<ProcessIdentity>,
     },
 
-    // ── subagents (10, 12) ──
+    // ── subagents ──
     SubagentStarted {
         child: SessionId,
         provider: String,
@@ -252,7 +252,7 @@ pub enum EntryKind {
         depth: u32,
     },
 
-    // ── time travel (11) ──
+    // ── time travel ──
     WorkspaceCheckpoint {
         id: CheckpointId,
         tree: Hash,
@@ -267,7 +267,7 @@ pub enum EntryKind {
         deleted: Vec<String>,
     },
 
-    // ── formal (13) ──
+    // ── formal ──
     InvariantRegistered {
         id: String,
         kind: FormalKind,
@@ -378,7 +378,7 @@ pub enum GrantScope {
     UntilRevoked,
 }
 
-/// `10`: closed step transitions.
+/// Closed step transitions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "transition", content = "reason", rename_all = "snake_case")]
 pub enum Transition {
@@ -544,7 +544,7 @@ pub enum Item {
         content: Vec<ContentBlock>,
         is_error: bool,
     },
-    /// A request was made here (`RequestHeader`) or a turn began; results after it are late (16).
+    /// A request was made here (`RequestHeader`) or a turn began; results after it are late.
     Boundary,
 }
 
@@ -581,7 +581,7 @@ impl State {
     }
 }
 
-/// A capability-owned fold step for its own `Custom` kinds (02: `Registrar::entry_kind`).
+/// A capability-owned fold step for its own `Custom` kinds (`Registrar::entry_kind`).
 pub type CustomFold = fn(prev: Option<&Value>, name: &str, body: &Value) -> Result<Value, String>;
 pub type CustomFolds = BTreeMap<String, CustomFold>;
 
@@ -725,11 +725,11 @@ pub fn step(mut s: State, e: &Entry, custom: &CustomFolds) -> Result<State, LogE
     Ok(s)
 }
 
-/// Fixed placeholder rendered for a `ToolCall` with no `ToolResult` at request time (16).
+/// Fixed placeholder rendered for a `ToolCall` with no `ToolResult` at request time.
 pub const TOOL_CALL_RUNNING: &str =
     "Tool call is still running. Its result arrives in a later turn: continue with independent work, or end your turn to wait for it.";
 
-/// `06`/`16`: fixed pipeline → frozen request.
+/// Fixed pipeline → frozen request.
 /// 1. apply every `SurfaceReplace` in log order
 /// 2. placeholders for calls still open; late results at their log position
 /// 3. empty-output marker

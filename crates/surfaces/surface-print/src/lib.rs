@@ -1,13 +1,13 @@
-//! `08` — the print surface: a live transcript on a terminal, or `--json` NDJSON for wrappers.
+//! The print surface: a live transcript on a terminal, or `--json` NDJSON for wrappers.
 //!
 //! Text mode renders assistant text as it streams, thinking dimmed, one card per tool call and
 //! result (from the tool's own `present` functions and the `Card` a result carries), approvals,
-//! checkpoints, and anything that stopped a turn. `--hud` (05) prefixes each durable entry with
-//! its id, principal, and — for tool calls — the capability that owns the tool.
+//! checkpoints, and anything that stopped a turn. `--hud` prefixes each durable entry with
+//! its id, principal, and (for tool calls) the capability that owns the tool.
 //!
-//! JSON mode is the wrapper contract (12): every durable log entry is one line of JSON on stdout,
+//! JSON mode is the wrapper contract: every durable log entry is one line of JSON on stdout,
 //! nothing else is written there, and the error stream stays empty unless something failed.
-//! Stream chunks are not durable (08) and never appear in JSON mode.
+//! Stream chunks are not durable and never appear in JSON mode.
 
 #![forbid(unsafe_code)]
 
@@ -43,7 +43,7 @@ aho_cap::declare_capability!(
     provides = [],
     requires = [],
     tools = &[],
-    doc = "One-shot print surface: live text transcript, or `--json` log entries as NDJSON on stdout (08)."
+    doc = "One-shot print surface: live text transcript, or `--json` log entries as NDJSON on stdout."
 );
 
 // ───────────────────────────── styling ─────────────────────────────
@@ -58,7 +58,7 @@ pub enum Mode {
 pub struct Style {
     /// ANSI colour; the caller decides (TTY and `NO_COLOR`).
     pub color: bool,
-    /// Debug HUD (05): id, principal, and owning capability on every durable entry.
+    /// Debug HUD: id, principal, and owning capability on every durable entry.
     pub hud: bool,
     /// Print operator prompts too (replaying a transcript, not typing it).
     pub echo_user: bool,
@@ -218,8 +218,8 @@ pub fn reason_label(r: &aho_policy::DecisionReason) -> String {
     d.split(['(', ' ', '{']).next().unwrap_or(&d).to_string()
 }
 
-/// The preset an approval's `[p]` answer switches to: the card's own `preset <X>` cut, or — for
-/// a preset refusal without one — the smallest preset whose cut in this world contains the class.
+/// The preset an approval's `[p]` answer switches to: the card's own `preset <X>` cut or, for
+/// a preset refusal without one, the smallest preset whose cut in this world contains the class.
 pub fn preset_cut(card: &ApprovalCard) -> Option<String> {
     if let Some(p) = card.suggested_cut.as_deref().and_then(|c| c.strip_prefix("preset ")) {
         return Some(p.to_string());
@@ -265,7 +265,7 @@ fn boxed(title: &str, rows: &[String]) -> String {
     out
 }
 
-/// The approval card of 05, built from the card data only (never a live tool object).
+/// The approval card, built from the card data only (never a live tool object).
 pub fn render_approval(card: &ApprovalCard, cap: Option<&str>) -> String {
     let inner = CARD_W - 4;
     let name = match cap {
@@ -282,7 +282,7 @@ pub fn render_approval(card: &ApprovalCard, cap: Option<&str>) -> String {
     rows.push(format!("reason: {}", reason_label(&card.reason)));
     rows.push(format!("world: {}  ·  enforced by: {}", card.world.name, card.world.enforced_by));
     if let Some(cut) = card.suggested_cut.as_deref().filter(|c| !c.starts_with("preset ")) {
-        let text = format!("{cut} — a lasting change; this answer covers one call");
+        let text = format!("{cut} (a lasting change; this answer covers one call)");
         for (i, l) in wrap(&text, inner - 6).into_iter().enumerate() {
             rows.push(if i == 0 { format!("fix:  {l}") } else { format!("      {l}") });
         }

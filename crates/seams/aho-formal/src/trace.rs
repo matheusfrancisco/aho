@@ -1,14 +1,14 @@
-//! Log entries → TLA+ action records (13: "every session log is a behavior").
+//! Log entries → TLA+ action records (every session log is a behavior).
 //!
 //! One record per entry, in branch order. Common fields: `action`, `id`, `parent` (0 = none),
 //! `by` (`operator|engineer|agent|system`), `at` (ms since the first entry of the slice, so it
 //! fits TLC's 32-bit integers). The per-action fields are the ones `aho/formal/*.tla`
 //! `TraceStep(e)` reads; every other kind becomes `Other{kind}` so a spec can stutter on it.
 //!
-//! `Task/*` entries (12) are the records of `aho_tasks::tla_record`; a body that does not decode
+//! `Task/*` entries are the records of `aho_tasks::tla_record`; a body that does not decode
 //! is `TaskUnreadable{name}`, which `Tasks.tla` takes no step for, so it is a finding rather than
 //! a stutter. `Invariant/Checked` (`inv`, `verdict`, `code`) and `Workspace/Checkpoint` (`tree`)
-//! carry what a verify gate is judged against (docs 09, 13).
+//! carry what a verify gate is judged against.
 
 use aho_log::{ApprovalOutcome, Entry, EntryKind, OpStatus, ToolOutcome, Verdict};
 use aho_tasks::{Actor, Event, Settings};

@@ -18,7 +18,7 @@ fn covers(ids: &[TaskId]) -> HandoffArtifact {
     HandoffArtifact::parse(&json!({"findings": "reviewed", "confidence": "high", "what_i_did_not_check": ["perf"], "covers": ids})).unwrap()
 }
 
-/// One script for every worker: the behaviour is a function of the node, not of who runs it.
+/// One script for every worker: the behaviour depends only on the node.
 fn script(inputs: Rc<RefCell<Vec<(TaskId, String)>>>) -> Script {
     Box::new(move |t: &Turn<'_>| {
         inputs.borrow_mut().push((t.node.id.clone(), t.input.clone()));
@@ -35,7 +35,7 @@ fn script(inputs: Rc<RefCell<Vec<(TaskId, String)>>>) -> Script {
                 if t.graph.node(&id("survey.b2")).is_some() {
                     Action::Complete(covers(&t.node.depends_on))
                 } else if t.node.no_artifact_requeues == 0 {
-                    // first try: rubber-stamp over the LOW sibling — refused by structure
+                    // first try: rubber-stamp over the LOW sibling, which the structure refuses
                     Action::Complete(covers(&t.node.depends_on))
                 } else {
                     Action::Inject(vec![Injection {

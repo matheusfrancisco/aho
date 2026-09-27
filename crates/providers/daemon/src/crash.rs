@@ -1,8 +1,7 @@
-//! `12` "Session resume": crash detection by `(pid, start_time)` in `SessionMeta.process` — pids
+//! Session resume: crash detection by `(pid, start_time)` in `SessionMeta.process`. Pids
 //! recycle, the pair does not. Liveness flaps are ignored: an identity must be missing on two
 //! consecutive scans before a session is marked `Daemon/Crashed`. Recovery is `fork(at)` at the
-//! last completed turn, plus a notice naming the tools that may or may not have run (`16`:
-//! crash-honest operations).
+//! last completed turn, plus a notice naming the tools that may or may not have run.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::process::{Command, Stdio};
@@ -26,8 +25,8 @@ const START_SLACK_MS: u64 = 2_000;
 
 /// Whether the process named by `id` still runs: `ps -o etime= -p <pid>` gives its elapsed time,
 /// so its start is about now − etime; a pid whose process started after `id.start_time` (plus
-/// slack) was recycled, and the original is gone. When `ps` itself cannot run we cannot prove
-/// anything, and answer alive.
+/// slack) was recycled, and the original is gone. If `ps` cannot run, nothing is provable, and
+/// the answer is alive.
 #[allow(clippy::disallowed_methods, reason = "authority: daemon-crash-probe")]
 pub fn identity_alive(id: &ProcessIdentity) -> bool {
     let out = Command::new("ps")
@@ -193,7 +192,7 @@ pub fn mark_crashed(log: &dyn LogStore, identity: ProcessIdentity) -> Result<Ent
         .map_err(|e| format!("could not record the crash in the session log ({e}); the session stays as it was"))
 }
 
-/// Recovers a session marked crashed. When the head is inside an open turn, forks at the last
+/// Recovers a session marked crashed. If the head is inside an open turn, forks at the last
 /// `TurnEnd` whose fold has no open calls or ops (the turn in flight is lost; nothing is copied or
 /// rewritten). Then appends a `Notice` saying so and listing the tools that may or may not have
 /// run. Returns the fork point (`None` when the head was not inside a turn and no fork was

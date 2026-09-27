@@ -1,12 +1,12 @@
-//! `daemon.reload` (12, "Reload = exec-in-place with a readiness fd"), split out of server.rs for
-//! the file-size ratchet.
+//! `daemon.reload` (exec-in-place with a readiness fd), split out of server.rs for the
+//! file-size ratchet.
 
 use super::*;
 
 impl Daemon {
-    /// `daemon.reload` (12): (1) intents, (2) abort + grace, (3) abort the rest, (4) close open
+    /// `daemon.reload`: (1) intents, (2) abort + grace, (3) abort the rest, (4) close open
     /// turns, (5) the host's `before_exec`, `reload.started` + unlink the socket, (6) exec with this
-    /// connection as the readiness descriptor. When exec fails: rebind, the host's `exec_failed`,
+    /// connection as the readiness descriptor. If exec fails: rebind, the host's `exec_failed`,
     /// continue the interrupted sessions here, reply `reload.failed`.
     #[allow(clippy::disallowed_methods, reason = "authority: daemon-reload-exec")]
     pub(super) async fn reload(self: &Arc<Self>, conn: ConnId, id: u64, tx: &Tx, params: Value, fd: BorrowedFd<'_>) {

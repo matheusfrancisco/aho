@@ -1,4 +1,4 @@
-//! `12`/`16` — every running tool call is an operation; these tools are views on them.
+//! Every running tool call is an operation; these tools are views on them.
 //! `job_wait` is how the model blocks on purpose when it has nothing else to do; it returns on
 //! an `AHO_PROGRESS` / `AHO_CHECKPOINT` marker, on the terminal status, or on its timeout.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only

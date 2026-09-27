@@ -18,7 +18,7 @@ use tokio::sync::{oneshot, watch};
 
 use crate::framing::{Decoder, FrameError, encode};
 
-/// How often a waiting call re-checks cancellation.
+/// The interval at which a waiting call re-checks cancellation.
 const TICK: Duration = Duration::from_millis(50);
 /// Without `experimental/serverStatus`, the server counts as idle once no progress is running
 /// and nothing arrived for this long.
@@ -152,7 +152,7 @@ impl Client {
         &self.child
     }
 
-    /// Why the server is unusable, once it is.
+    /// The reason the server is unusable, once it is.
     pub fn dead(&self) -> Option<String> {
         self.shared.lock().dead.clone()
     }
@@ -273,7 +273,7 @@ async fn read_loop(name: String, child: Arc<dyn Child>, shared: Arc<Shared>) {
                 match decoder.next() {
                     Ok(Some(msg)) => handle(&child, &shared, msg).await,
                     Ok(None) => break,
-                    // Framed correctly, just not JSON: skip it, the stream is still in sync.
+                    // Framed correctly but not JSON: skip it, the stream is still in sync.
                     Err(FrameError::BadJson(_)) => continue,
                     Err(e) => {
                         shared.die(format!("{name} broke the protocol: {e}; it was stopped, and the next lsp call starts it again."));

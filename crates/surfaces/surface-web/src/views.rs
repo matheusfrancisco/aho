@@ -61,7 +61,7 @@ pub fn tool_cap(reg: &Registry, tool: &str) -> Option<String> {
         .or_else(|| reg.dynamic_tools.iter().find(|(_, s, _)| s.name == tool).map(|(c, _, _)| c.name.to_string()))
 }
 
-/// The doc-05 approval card as data: the same fields the TUI modal shows.
+/// The approval card as data: the same fields the TUI modal shows.
 pub fn approval_json(id: u64, card: &ApprovalCard, cap: Option<String>, state: &State) -> Value {
     let now = Timestamp::now();
     let leases: Vec<&String> = state.leases.values().filter(|(_, exp)| *exp > now).map(|(s, _)| s).collect();
@@ -92,7 +92,7 @@ fn cause_text(c: &CheckpointCause, calls: &std::collections::BTreeMap<CallId, St
     }
 }
 
-/// Checkpoint markers of the current branch with the turn and prompt they belong to (11).
+/// Checkpoint markers of the current branch with the turn and prompt they belong to.
 pub fn checkpoints_json(branch: &[Entry]) -> Vec<Value> {
     let mut out = Vec::new();
     let mut turn = 0u64;
@@ -119,7 +119,7 @@ pub fn checkpoints_json(branch: &[Entry]) -> Vec<Value> {
     out
 }
 
-/// `POST /api/session/fold`: a snapshot of the folded head (08 `fold(at)`).
+/// `POST /api/session/fold`: a snapshot of the folded head (`fold(at)`).
 pub fn fold_json(session: &Session, state: &State, branch: &[Entry]) -> Value {
     let caps: serde_json::Map<String, Value> = state.caps.iter().map(|(k, v)| (k.clone(), json!(v))).collect();
     let code = state.checkpoints.last().map(|c| c.1);
@@ -182,7 +182,7 @@ pub fn jobs_json(ops: &OpTable) -> Vec<Value> {
         .collect()
 }
 
-/// Panels whose capability is Active in the fold (08: a disabled capability ships no panel).
+/// Panels whose capability is Active in the fold (a disabled capability ships no panel).
 pub fn active_slots(panels: &[(CapabilityId, &'static str, &'static [&'static str])], state: &State) -> Vec<Value> {
     let mut seen = std::collections::BTreeSet::new();
     panels
@@ -202,7 +202,7 @@ pub fn parse_mode(s: &str) -> Option<RewindMode> {
     }
 }
 
-/// What a rewind would do; nothing is applied (plan-then-apply, 05/11).
+/// The effect of a rewind; nothing is applied (plan-then-apply).
 pub async fn rewind_plan(session: &Session, checkpoint: CheckpointId, mode: RewindMode) -> Result<Value, String> {
     let state = session.fold().map_err(|e| e.to_string())?;
     let (_, tree, at) = state

@@ -103,7 +103,7 @@ async fn late_result_becomes_a_user_block_and_results_follow_their_tool_use() {
     let tool_use = |id: &str| ContentBlock::ToolUse { id: CallId(id.into()), name: "bash".into(), args: json!({"command": id}) };
     let result =
         |id: &str, text: &str| ContentBlock::ToolResult { id: CallId(id.into()), content: vec![ContentBlock::text(text)], is_error: false };
-    // what derive_messages yields: placeholder for `b`, a deferred notice, later the late result
+    // derive_messages yields: placeholder for `b`, a deferred notice, later the late result
     let history = vec![
         Message::user("run both"),
         Message::assistant(vec![

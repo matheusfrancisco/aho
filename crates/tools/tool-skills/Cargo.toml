@@ -3,7 +3,7 @@ name = "tool-skills"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "`skill` tool, <available_skills> catalog context, `/name` invocation render (10)"
+description = "`skill` tool, <available_skills> catalog context, `/name` invocation render"
 
 [dependencies]
 aho-types.workspace = true

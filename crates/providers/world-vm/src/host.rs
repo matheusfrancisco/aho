@@ -1,4 +1,4 @@
-//! What the operator (`aho lease`, `aho sandbox`, `aho export`) and `aho gc` do to a session's
+//! Operator verbs (`aho lease`, `aho sandbox`, `aho export`) and `aho gc` on a session's
 //! VM state without opening a manager: a manager binds its machines' NIC sockets, which the
 //! session that runs them holds. Everything here works on the persisted records under
 //! `<state>/<owner>/`, under the same lock, and controls QEMU only over its owned QMP socket.

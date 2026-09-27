@@ -1,5 +1,5 @@
-//! Salvage is a fold over the dead worker's log, not a fork (12): its last tool-call summaries and
-//! its latest `Task/Checkpoint`.
+//! Salvage folds the dead worker's log without forking it: its last tool-call summaries and its
+//! latest `Task/Checkpoint`.
 
 use std::collections::BTreeMap;
 

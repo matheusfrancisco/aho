@@ -1,4 +1,4 @@
-//! Shell lexer for the blast-radius classifier (split out for the file-size ratchet, doc 12).
+//! Shell lexer for the blast-radius classifier (split out for the file-size ratchet).
 
 // ───────────────────────────── lexer ─────────────────────────────
 
@@ -46,7 +46,7 @@ pub(super) struct Lexed {
 }
 
 pub(super) fn capture_balanced(cs: &[char], mut i: usize, open: char, close: char) -> (String, usize) {
-    // `i` points just past the opening delimiter.
+    // `i` points one past the opening delimiter.
     let mut depth = 1;
     let mut out = String::new();
     let mut quote: Option<char> = None;

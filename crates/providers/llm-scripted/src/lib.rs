@@ -1,4 +1,4 @@
-//! Deterministic fake model (01): the route `scripted` consumes a script one step per
+//! Deterministic fake model: the route `scripted` consumes a script one step per
 //! `stream` call, emitting exactly the scripted events. Expectations turn a drifted conversation
 //! into a precise `LlmError::Fatal` instead of a confusing downstream assertion.
 //!
@@ -11,8 +11,8 @@
 //!   {"error": "rate_limited"}
 //! ]}
 //! ```
-//! * `expect_last_user_contains` — text of the most recent user message that has text blocks.
-//! * `expect_tool_result_contains` — text of the most recent `ToolResult` block in the request
+//! * `expect_last_user_contains`: text of the most recent user message that has text blocks.
+//! * `expect_tool_result_contains`: text of the most recent `ToolResult` block in the request
 //!   (a still-running call shows `aho_log::TOOL_CALL_RUNNING`).
 //! * `stop` defaults to `tool_use` when the step has tool calls, else `end_turn`.
 //! * `error`: `context_window` | `rate_limited` | `transient`; the step emits nothing else.
@@ -178,7 +178,7 @@ impl ScriptedLlm {
         match c.steps.pop_front() {
             Some(step) => Ok((n, step)),
             None => Err(LlmError::Fatal(format!(
-                "scripted model: request {n} has no step — the script ({}) has {} step(s) and all were consumed; last user message: {:?}. Add a step or end the conversation sooner",
+                "scripted model: request {n} has no step; the script ({}) has {} step(s) and all were consumed. Last user message: {:?}. Add a step or end the conversation sooner",
                 self.source,
                 self.total,
                 last_user_text(&req.messages).unwrap_or_default()
@@ -368,5 +368,5 @@ declare_capability!(
     provides = [SeamId(aho_llm::SEAM)],
     requires = [Requirement::Setting { key: "provider.scripted.script", pred: Pred::Set }],
     tools = &[],
-    doc = "Deterministic scripted model route `scripted` for system tests: one scripted step per request, expectations fail loudly (01)."
+    doc = "Deterministic scripted model route `scripted` for system tests: one scripted step per request, expectations fail loudly."
 );

@@ -1,5 +1,5 @@
-//! The VM lab and the sandbox VM world end to end against a stub QEMU (07: nothing here needs a
-//! hypervisor): the real supervisor owns the stub, the manager speaks real QMP to it, the real
+//! The VM lab and the sandbox VM world end to end against a stub QEMU, so nothing here needs a
+//! hypervisor: the real supervisor owns the stub, the manager speaks real QMP to it, the real
 //! guest agent answers on the agent socket, and the machine's NIC plugs into a real aho-net
 //! network. Covers lifecycle, console round trip, lease enforcement, naming, quotas, the
 //! sandbox VM as a world (files and processes through the agent), and orphan disks for gc.
@@ -109,7 +109,7 @@ fn stub_root() -> PathBuf {
     root.join(format!("aho-vm-guests-{}", std::process::id()))
 }
 
-/// Where the stub guest keeps `machine`'s workspace (what its recipe must name).
+/// The stub guest's workspace for `machine` (the path its recipe must name).
 fn guest_workspace(machine: &str) -> PathBuf {
     stub_root().join(format!("aho-5e55-{machine}"))
 }

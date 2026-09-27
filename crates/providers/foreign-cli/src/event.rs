@@ -1,6 +1,6 @@
-//! What a foreign CLI's transcript says, in aho's vocabulary. Each CLI crate owns its own
-//! normalizer (12: "a fork of an adapter is a copy, not an abstraction"); this is only the
-//! output type they share with the engine.
+//! A foreign CLI's transcript in aho's vocabulary. Each CLI crate owns its own normalizer (a
+//! forked adapter is a copy, never a shared abstraction); this is only the output type they
+//! share with the engine.
 
 use aho_types::{StopReason, Value};
 
@@ -44,7 +44,7 @@ pub enum Event {
     },
 }
 
-/// How one transcript record was handled.
+/// The outcome for one transcript record.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Normalized {
     /// Mapped into these events (possibly none, e.g. an assistant record holding only a

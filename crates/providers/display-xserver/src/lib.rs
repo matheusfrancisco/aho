@@ -261,5 +261,5 @@ declare_capability!(
     tools = &[],
     provides_handles = [HandleKind::Desktop],
     enforced_by = "bound world's Subprocess and session lifecycle guard; no host fallback",
-    doc = "A session-private Xvfb server plus x11vnc over a private Unix socketpair, relayed through the bound world's protocol process streams. Requires python3, Xvfb and x11vnc inside a POSIX world, checked at launch rather than incorrectly probing host binaries. Host means policy only; namespace and VM preserve their own process boundary. X clients must use this desktop's DISPLAY and XAUTHORITY. Windows worlds are unsupported."
+    doc = "A session-private Xvfb server plus x11vnc over a private Unix socketpair, relayed through the bound world's protocol process streams. Requires python3, Xvfb and x11vnc inside a POSIX world, checked at launch, never by probing host binaries. Host means policy only; namespace and VM preserve their own process boundary. X clients must use this desktop's DISPLAY and XAUTHORITY. Windows worlds are unsupported."
 );

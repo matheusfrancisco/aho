@@ -3,7 +3,7 @@ name = "tool-lsp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "lsp_definition/references/hover/diagnostics/symbols/rename_preview over language servers spawned in the bound world (00, 01)"
+description = "lsp_definition/references/hover/diagnostics/symbols/rename_preview over language servers spawned in the bound world"
 
 [dependencies]
 aho-types.workspace = true

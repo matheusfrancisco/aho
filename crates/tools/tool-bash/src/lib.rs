@@ -1,11 +1,11 @@
-//! `12`/`16` — `bash` and `bash_persistent`. Class `SpawnsProcess`; the content refinement is
+//! `bash` and `bash_persistent`. Class `SpawnsProcess`; the content refinement is
 //! the blast-radius classifier (`aho_policy::shell::assess`) wired as `ToolDecl.check`.
 //!
 //! Output is streamed line by line to `ExecRequest.progress` and into the call's operation
 //! (so `job_output` / `job_wait` and `AHO_PROGRESS` markers work while it runs); the child is
 //! attached to the operation, so `job_kill` and cancellation kill its whole process group.
 //!
-//! `00` pwsh parity: `caps.tool-bash.shell = pwsh` runs both tools in PowerShell 7 (`pwsh`
+//! Pwsh parity: `caps.tool-bash.shell = pwsh` runs both tools in PowerShell 7 (`pwsh`
 //! module). The classifier reads only POSIX shells, so under pwsh every command asks.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![forbid(unsafe_code)]
@@ -29,14 +29,14 @@ pub const MAX_TIMEOUT_MS: u64 = 3_600_000;
 pub const KEEP_HALF: usize = 512 * 1024;
 /// A line longer than this is streamed in pieces.
 const MAX_LINE: usize = 64 * 1024;
-/// How often a running command re-checks cancellation and its deadline.
+/// Interval at which a running command re-checks cancellation and its deadline.
 const TICK: Duration = Duration::from_millis(50);
 
 pub use pwsh::{BashConfig, PWSH_TOOLS, SHELL_KEY, ShellKind, check_pwsh};
 
 pub struct BashDeps {
     pub proc: SubprocessHandle,
-    /// Seeded by the session (16); without it output still streams to `progress`.
+    /// Seeded by the session; without it output still streams to `progress`.
     pub ops: Option<OperationsHandle>,
 }
 
@@ -94,7 +94,7 @@ declare_capability!(
         Requirement::AnyOf(&[Requirement::Setting { key: SHELL_KEY, pred: Pred::Eq("bash") }, Requirement::Binary("pwsh")]),
     ],
     tools = TOOLS,
-    doc = "Shell commands in the bound world, with the blast-radius classifier as the tool's own check. `caps.tool-bash.shell` selects the shell: `bash` (POSIX /bin/sh, the default) or `pwsh` (PowerShell 7; Locked until `pwsh` is on PATH). The classifier understands POSIX shells only: under pwsh every command is held at the most conservative level — Catastrophic matches are denied and every other command asks the operator (a justification does not skip the ask)."
+    doc = "Shell commands in the bound world, with the blast-radius classifier as the tool's own check. `caps.tool-bash.shell` selects the shell: `bash` (POSIX /bin/sh, the default) or `pwsh` (PowerShell 7; Locked until `pwsh` is on PATH). The classifier understands POSIX shells only, so under pwsh every command is held at the most conservative level: Catastrophic matches are denied and every other command asks the operator (a justification does not skip the ask)."
 );
 
 pub static TOOLS: &[ToolDecl] = &[
@@ -126,7 +126,7 @@ fn schema_bash(w: &BoundWorld) -> RootSchema {
         "justification": {"type": "string",
                           "description": "Why an irreversible command is what the user asked for (≥ 25 chars, not a bare affirmation)."}
     });
-    // `04`/`10`: escalation-at-denial exists only where the bound world actually confines.
+    // Escalation-at-denial exists only where the bound world confines.
     if w.confines {
         props["escalate"] = json!({
             "type": "array",
@@ -137,7 +137,7 @@ fn schema_bash(w: &BoundWorld) -> RootSchema {
     RootSchema(json!({"type": "object", "properties": props, "required": ["command"], "additionalProperties": false}))
 }
 
-/// `04` step 3 for shell: `Catastrophic` → Deny (never lifted), `Confirm` → Ask with the
+/// Decision-chain step 3 for shell: `Catastrophic` → Deny (never lifted), `Confirm` → Ask with the
 /// reflection prompt unless the call carries an acceptable `justification`.
 pub fn check_command(args: &Value, view: &PolicyView) -> Option<Decision> {
     let command = args.get("command").and_then(Value::as_str)?;

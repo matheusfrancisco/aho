@@ -405,7 +405,7 @@ impl Query<'_> {
         let turn = view::rows(branch).last().map(|r| r.turn).unwrap_or(0);
         let heads = tree.heads_containing(id);
         let children = tree.children.get(&id).cloned().unwrap_or_default();
-        let mut header = format!("#{} {} turn {} by {} — {}", id.0, view::label(&e.kind), turn, view::principal(&e.by), tree.where_(id));
+        let mut header = format!("#{} {} turn {} by {} ({})", id.0, view::label(&e.kind), turn, view::principal(&e.by), tree.where_(id));
         if children.len() > 1 {
             header.push_str(&format!("; fork point: branches continue at {}", ids(&children)));
         }

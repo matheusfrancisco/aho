@@ -1,5 +1,5 @@
-//! `sandbox-ssh`: the world is another machine. What confines the agent is that its files,
-//! processes and network are the remote host's, not yours: `enforced by: remote host` (07).
+//! `sandbox-ssh`: the world is another machine. The agent's files, processes and network are the
+//! remote host's, and that is what confines it: `enforced by: remote host`.
 
 use std::sync::Arc;
 

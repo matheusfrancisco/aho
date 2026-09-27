@@ -1,4 +1,4 @@
-//! `aho/formal/Tasks.tla` (docs 09, 12, 13) with the real TLC: the model passes; a copy whose gates
+//! `aho/formal/Tasks.tla` with the real TLC: the model passes; a copy whose gates
 //! may pass over an unaddressed LOW sibling is caught with a counterexample; with invariant
 //! evidence (`TasksVerify.cfg`) it passes, and a copy whose verify gate may pass over a failing or
 //! stale invariant is caught; generic mutants of its actions are caught; and a session log holding
@@ -296,7 +296,7 @@ fn child(i: &str, kind: Kind) -> ChildSpec {
     ChildSpec { id: id(i), content: format!("do {i}"), kind, depends_on: vec![] }
 }
 
-/// What the scripted workers and the operator have done so far.
+/// Moves the scripted workers and the operator have made so far.
 #[derive(Default)]
 struct Plot {
     reopened: bool,

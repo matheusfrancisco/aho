@@ -3,7 +3,7 @@ name = "aho-fs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Fs seam: read/write/edit/glob/grep with versions; FsRead/FsWrite handles; Snapshot (02, 07, 11)"
+description = "Fs seam: read/write/edit/glob/grep with versions; FsRead/FsWrite handles; Snapshot"
 
 [dependencies]
 aho-types.workspace = true

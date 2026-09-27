@@ -1,4 +1,4 @@
-//! `12` — long-term memory. Hybrid dense+BM25 → RRF → listwise rerank with consensus →
+//! Long-term memory. Hybrid dense+BM25 → RRF → listwise rerank with consensus →
 //! carry-verified degradation. Injection is a source-labelled Snapshot entry with TTL/overlap
 //! suppression ([`Suppressor`]). Extraction runs through an [`Extractor`] with no tools (policy
 //! `Nothing`) under `System("memory")`.
@@ -115,7 +115,7 @@ pub struct Hit {
     pub score: f32,
 }
 
-/// What a write did: a new row, or a merge into a near-duplicate.
+/// The outcome of a write: a new row, or a merge into a near-duplicate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Upserted {
     pub id: u64,
@@ -230,7 +230,7 @@ pub trait Extractor: Send + Sync {
 }
 
 pub trait Memory: Send + Sync {
-    /// Gated retrieval for injection: judge-verified, carry-verified, or dynamic-gated — never
+    /// Gated retrieval for injection: judge-verified, carry-verified, or dynamic-gated, never
     /// unvetted fused output. Once per fresh user turn, one turn of lag, never blocks a model call.
     fn retrieve<'a>(&'a self, focused_query: &'a str, k: usize) -> BoxFuture<'a, Result<Vec<Entry>, MemoryError>>;
     /// Model-issued search: the fused hybrid ranking, top `k`, no gate (the caller judges).
@@ -301,7 +301,7 @@ pub fn dynamic_gate(scored: &[(u64, f32)]) -> Vec<u64> {
 
 // ───────────────────────────── suppression ─────────────────────────────
 
-/// Producer-side suppression rules (12).
+/// Producer-side suppression rules.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Suppression {
     pub pending_stale_s: u64,
@@ -317,7 +317,7 @@ impl Default for Suppression {
     }
 }
 
-/// Why a pending injection was dropped.
+/// The reason a pending injection was dropped.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Suppressed {
     Empty,
@@ -356,7 +356,7 @@ impl Suppressor {
     }
 
     /// `ids` in rank order; `render` turns an id list into the payload text. On success returns
-    /// the ids actually injected (those outside their TTL) and their rendered payload.
+    /// the injected ids (those outside their TTL) and their rendered payload.
     pub fn admit(
         &mut self,
         computed_at: Timestamp,
@@ -440,7 +440,7 @@ fn custom(name: &str, body: Value) -> EntryKind {
     EntryKind::Custom { ns: NS.to_string(), name: name.to_string(), body }
 }
 
-/// `Memory/Pruned` — one per removed entry, with enough to audit why.
+/// `Memory/Pruned`: one per removed entry, with enough to audit why.
 pub fn pruned_event(e: &Entry, now: Timestamp) -> EntryKind {
     custom(
         "Pruned",
@@ -467,14 +467,14 @@ pub fn extract_failed_event(trigger: Trigger, error: &str) -> EntryKind {
     custom("ExtractFailed", json!({ "trigger": trigger, "error": error }))
 }
 
-/// `Memory/Error` — background work (maintenance, retrieval, injection bookkeeping) failed.
+/// `Memory/Error`: background work (maintenance, retrieval, injection bookkeeping) failed.
 pub fn error_event(during: &str, error: &str) -> EntryKind {
     custom("Error", json!({ "during": during, "error": error }))
 }
 
 /// The `Memory` projection: pruned ids, maintenance totals, extraction counters. A `Pruned`
 /// that breaks the prune rule (confidence ≥ [`PRUNE_BELOW`], younger than 24 h, pruned twice)
-/// fails the fold — `aho session verify` audits prunes through this.
+/// fails the fold; `aho session verify` audits prunes through this.
 pub fn fold(prev: Option<&Value>, name: &str, body: &Value) -> Result<Value, String> {
     let mut s = prev.cloned().unwrap_or_else(
         || json!({ "pruned": [], "maintained": MaintainStats::default(), "extracted": 0, "extract_failures": 0, "errors": 0 }),

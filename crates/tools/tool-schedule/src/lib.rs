@@ -1,20 +1,20 @@
-//! `00`/`10` — schedules: prompts this session receives later.
+//! Schedules: prompts this session receives later.
 //!
-//! * `schedule_create {prompt, at | every | cron, label?}` — `at` is one RFC 3339 instant, `every`
+//! * `schedule_create {prompt, at | every | cron, label?}`: `at` is one RFC 3339 instant, `every`
 //!   an interval from now (`30m`, `1h30m`, `1d`), `cron` a 5-field expression evaluated in UTC
 //!   ([`spec::Cron`]). Exactly one of the three.
-//! * `schedule_list {}` — active schedules with their next fire time, recent finished ones, and
+//! * `schedule_list {}`: active schedules with their next fire time, recent finished ones, and
 //!   the current UTC time (so the model can compute an `at`).
-//! * `schedule_cancel {id}` — agents cancel what agents created; the operator anything.
+//! * `schedule_cancel {id}`: agents cancel what agents created; the operator anything.
 //!
 //! **Class `ReadOnly`**, like `create_goal` and `todo_write`: creating a schedule appends a
 //! `schedule/Created` entry and nothing else. The consequence arrives later as an ordinary turn
 //! whose every call goes through the decision chain under the policy in force *then*; a schedule
 //! carries no authority of its own, reaches no human (`TalksToHuman` is for tools that ask the
 //! operator something now) and has no external effect. It is agent self-direction over time,
-//! exactly as bounded as the agent's next turn. The fired prompt says who scheduled it.
+//! as bounded as the agent's next turn. The fired prompt says who scheduled it.
 //!
-//! Firing is not a tool's job: the [`driver::Scheduler`] runs next to the session (daemon, CLI)
+//! Firing is the [`driver::Scheduler`]'s job: it runs next to the session (daemon, CLI)
 //! and fires through an `aho_control::PromptSink`. The host seeds [`driver::SERVICE`]; without it
 //! this capability does not build, so a session that nothing will ever wake does not accept
 //! schedules. Entries are `Custom{ns: "schedule"}` ([`fold`]); `register` installs
@@ -46,7 +46,7 @@ pub fn schema_create(_: &BoundWorld) -> RootSchema {
     RootSchema(json!({
         "type": "object",
         "properties": {
-            "prompt": {"type": "string", "description": "What this session is asked when the schedule fires; write it as a complete instruction."},
+            "prompt": {"type": "string", "description": "The prompt this session receives when the schedule fires; write it as a complete instruction."},
             "at": {"type": "string", "description": "Fire once at this RFC 3339 time, e.g. 2026-09-27T09:00:00Z."},
             "every": {"type": "string", "description": "Fire repeatedly at this interval from now, e.g. 30m, 2h, 1h30m, 1d."},
             "cron": {"type": "string", "description": "Fire on a 5-field cron schedule in UTC: minute hour day-of-month month day-of-week, e.g. \"0 9 * * 1-5\"."},
@@ -72,7 +72,7 @@ pub static TOOLS: &[ToolDecl] = &[
     ToolDecl::new(
         "schedule_create",
         "Schedule a prompt for this session later: once (`at`, RFC 3339), repeatedly (`every`, an interval), or on a UTC cron \
-         expression (`cron`). Pass exactly one. When it fires, the session gets the prompt as a new turn. Times are UTC.",
+         expression (`cron`). Pass exactly one. The session gets the prompt as a new turn when it fires. Times are UTC.",
         Consequence::ReadOnly,
     )
     .schema(schema_create),
@@ -177,7 +177,7 @@ declare_capability!(
     requires = [],
     tools = TOOLS,
     entry_kinds = ["schedule/Created", "schedule/Fired", "schedule/Cancelled"],
-    doc = "schedule_create / schedule_list / schedule_cancel: prompts this session receives later (at | every | UTC cron), fired by a hosted Scheduler (00, 10)."
+    doc = "schedule_create / schedule_list / schedule_cancel: prompts this session receives later (at | every | UTC cron), fired by a hosted Scheduler."
 );
 
 fn lock(m: &Mutex<Schedules>) -> MutexGuard<'_, Schedules> {
@@ -282,7 +282,7 @@ pub fn create(m: &Mutex<Schedules>, limits: Limits, view: &ExecView, now: Timest
     let first = s.next_due.map(format_utc).unwrap_or_default();
     let label = if s.label.is_empty() { String::new() } else { format!(" \"{}\"", s.label) };
     let text = format!(
-        "Scheduled {}{label}: {}; first fire {first} (UTC). When it fires, this session receives the prompt as a new turn. schedule_cancel with id {} stops it.",
+        "Scheduled {}{label}: {}; first fire {first} (UTC). This session receives the prompt as a new turn when it fires. schedule_cancel with id {} stops it.",
         s.id,
         s.spec.describe(),
         s.id

@@ -1,6 +1,6 @@
-//! `07` — the policy hinge. A *world* is `Fs + Subprocess + Sandbox` bound as one exclusive
+//! The policy hinge. A *world* is `Fs + Subprocess + Sandbox` bound as one exclusive
 //! bundle. The `enforced_by` string a world reports is printed by `aho plan`; `policy only` is
-//! an honest value. `run_conformance` is the suite every world must pass (15).
+//! an honest value. `run_conformance` is the suite every world must pass.
 
 #![forbid(unsafe_code)]
 
@@ -15,12 +15,12 @@ use aho_types::*;
 pub const SEAM: SeamId = SeamId("sandbox");
 
 pub trait Sandbox: Send + Sync {
-    /// Name, whether it confines, and what enforces it — exactly what `aho plan` prints.
+    /// Name, whether it confines, and what enforces it: exactly what `aho plan` prints.
     fn bound(&self) -> BoundWorld;
     /// Canonical writable roots shared by the kernel profile and the in-process fs fence, so
-    /// "bash can write /tmp but `write` cannot" cannot happen (10). The workspace root is first.
+    /// "bash can write /tmp but `write` cannot" cannot happen. The workspace root is first.
     fn writable_roots(&self) -> Vec<String>;
-    /// Functional probe: run `true` in the world. Fail closed (10).
+    /// Functional probe: run `true` in the world. Fail closed.
     fn probe(&self) -> BoxFuture<'_, Result<(), String>>;
     /// argv for an interactive operator shell in the world (`aho shell`); run it with the
     /// workspace root (`writable_roots()[0]`) as cwd.
@@ -33,7 +33,7 @@ impl Handle for SandboxHandle {
     const KIND: HandleKind = HandleKind::Custom("sandbox");
 }
 
-// ───────────────────────────── conformance (15) ─────────────────────────────
+// ───────────────────────────── conformance ─────────────────────────────
 
 /// Cases every world passes. Confining worlds add their isolation cases in their own crate.
 pub const CONFORMANCE: &[&str] = &[
@@ -52,7 +52,7 @@ pub const CONFORMANCE: &[&str] = &[
     "glob_and_grep_honor_gitignore",
 ];
 
-/// Cases for worlds that provide `Snapshot` (11).
+/// Cases for worlds that provide `Snapshot`.
 pub const SNAPSHOT_CONFORMANCE: &[&str] = &["snapshot_restore_round_trips_the_tree"];
 
 /// Per-case deadline; a hang is a failure, not a stuck suite.

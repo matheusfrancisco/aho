@@ -1,9 +1,9 @@
-//! What every session log under the session directory references, on every branch.
+//! References from every session log under the session directory, on every branch.
 //!
 //! A log is `<session.dir>/<id>.jsonl` (the CLI names ids in hex, the daemon in decimal) or a
 //! child log `<session.dir>/<parent>/<child>.jsonl`; its label is the path below the directory
 //! without `.jsonl`. `read_from(None)` is every entry of every branch (a fork only moves the head),
-//! so a tree or spill named on an abandoned branch is still referenced (11).
+//! so a tree or spill named on an abandoned branch is still referenced.
 
 use std::path::{Path, PathBuf};
 

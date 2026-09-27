@@ -1,4 +1,4 @@
-//! The operator's side of the VM lab (04, 05, 07): `aho lease grant|revoke|status` (what a
+//! The operator's side of the VM lab: `aho lease grant|revoke|status` (what a
 //! session's machines may use; the agent can only request), `aho media import|list` and
 //! `aho add recipe` (the library machines are built from; no agent tool writes it), and the
 //! `vm` world under `aho sandbox` and `aho export`. None of them opens the session's network.

@@ -1,5 +1,5 @@
 //! The provider on its own: fork points, tool filters, delegated policy, depth, interrupt,
-//! one-shot children — real child Sessions with a scripted model, no parent Session needed.
+//! one-shot children. Real child Sessions with a scripted model, no parent Session needed.
 #![allow(clippy::unwrap_used, clippy::expect_used)] // integration-test helpers may panic on setup failure
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
 

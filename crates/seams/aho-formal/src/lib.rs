@@ -1,4 +1,4 @@
-//! `13`/`14` — TLA+ and Lean as capabilities. Verdicts are closed (`aho_log::Verdict`); a
+//! TLA+ and Lean as capabilities. Verdicts are closed (`aho_log::Verdict`); a
 //! verdict older than the code is `Stale`; an invariant that catches no mutant is `Vacuous` and
 //! does not count.
 //!
@@ -9,7 +9,7 @@
 //!
 //! Beside the seam this crate holds what every provider and tool shares: the trace mapping from
 //! log entries to TLA+ action records ([`trace_of`], and [`trace_for`] per spec module), TLA+
-//! value rendering/parsing ([`tla`]), and the literate System Spec of doc 14 ([`spec_doc`]).
+//! value rendering/parsing ([`tla`]), and the literate System Spec ([`spec_doc`]).
 
 #![forbid(unsafe_code)]
 
@@ -83,7 +83,7 @@ impl SpecRef {
 
 /// What to check and how hard. For TLC, `Bounded(n)` explores every behavior of at most `n`
 /// steps of the finite instance fixed by `constants`; `Bounded(0)` explores the whole instance
-/// (the outcome then reports the depth actually reached).
+/// (the outcome then reports the depth reached).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CheckConfig {
     pub mode: CheckMode,
@@ -92,7 +92,7 @@ pub struct CheckConfig {
     pub invariants: Vec<String>,
     /// Temporal / action properties (`PROPERTY`).
     pub properties: Vec<String>,
-    /// `(name, TLA+ value)` — `("N", "3")`, `("Procs", "{p1, p2}")` (model values allowed).
+    /// `(name, TLA+ value)`, e.g. `("N", "3")`, `("Procs", "{p1, p2}")` (model values allowed).
     pub constants: Vec<(String, String)>,
     /// State constraints (`CONSTRAINT`), by operator name.
     pub constraints: Vec<String>,
@@ -169,7 +169,7 @@ pub struct Diagnostic {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Outcome {
     pub verdict: Verdict,
-    /// The mode actually established (e.g. `Bounded(depth reached)` for an exhaustive TLC run).
+    /// The mode the run established (e.g. `Bounded(depth reached)` for an exhaustive TLC run).
     pub mode: CheckMode,
     pub counterexample: Option<Counterexample>,
     pub goals: Vec<Goal>,
@@ -196,7 +196,7 @@ impl Outcome {
     }
 }
 
-/// Aeneas output: the Lean module generated from a crate, bound to the translation hash (13).
+/// Aeneas output: the Lean module generated from a crate, bound to the translation hash.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Translation {
     pub module: String,
@@ -213,7 +213,7 @@ pub struct MutantOutcome {
     /// The checker rejected the mutant (a `Fail` verdict).
     pub caught: bool,
     pub verdict: Verdict,
-    /// Which property rejected it, when caught.
+    /// The property that rejected it, if caught.
     pub violated: Option<String>,
 }
 
@@ -227,7 +227,7 @@ impl MutationReport {
     pub fn caught(&self) -> usize {
         self.mutants.iter().filter(|m| m.caught).count()
     }
-    /// `Vacuous` when no mutant was caught (13: it does not count), else `Pass`.
+    /// `Vacuous` when no mutant was caught (it does not count), else `Pass`.
     pub fn verdict(&self) -> Verdict {
         if self.caught() == 0 { Verdict::Vacuous } else { Verdict::Pass }
     }
@@ -252,8 +252,8 @@ pub enum FormalError {
 }
 
 impl FormalError {
-    /// The closed verdict this error stands for, when it stands for one (13:
-    /// `Unknown{Timeout|Unsupported|ToolMissing}`); `None` for request/tool failures.
+    /// The closed verdict this error stands for, if it stands for one
+    /// (`Unknown{Timeout|Unsupported|ToolMissing}`); `None` for request/tool failures.
     pub fn verdict(&self) -> Option<Verdict> {
         let reason = match self {
             FormalError::ToolMissing { tool, .. } => format!("tool_missing: {tool}"),

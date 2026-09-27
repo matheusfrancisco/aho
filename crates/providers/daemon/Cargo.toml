@@ -3,7 +3,7 @@ name = "daemon"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "`aho serve`: one process owns every session, thin clients attach over a unix socket (NDJSON); takeover, crash detection, reload by exec-in-place with a readiness fd (12)"
+description = "`aho serve`: one process owns every session, thin clients attach over a unix socket (NDJSON); takeover, crash detection, reload by exec-in-place with a readiness fd"
 
 [[bin]]
 name = "daemon-ready-probe"

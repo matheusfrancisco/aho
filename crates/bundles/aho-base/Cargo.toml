@@ -3,7 +3,7 @@ name = "aho-base"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "the spine every product includes (01, 03)"
+description = "the spine every product includes"
 
 [dependencies]
 aho-cap.workspace = true

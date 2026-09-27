@@ -194,7 +194,7 @@ async fn interrupting_mid_turn_cancels_the_childs_turn_and_the_child_carries_on(
     let child = ChildAho::new(vec![
         Step::tool_call("slow", json!({})),
         Step::text("resumed"),
-        // the cancelled call's late result may land inside the next turn and earn one more request (16)
+        // the cancelled call's late result may land inside the next turn and earn one more request
         Step::text("resumed"),
     ]);
     let p = parent(&child);

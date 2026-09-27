@@ -1,4 +1,4 @@
-//! `12` visual debug: every drawn frame becomes a [`Frame`] (layout rects, text per area, render
+//! Visual debug: every drawn frame becomes a [`Frame`] (layout rects, text per area, render
 //! order, timing, anomalies). The [`FrameCapture`] ring buffer drops a frame identical to the
 //! previous one unless it is anomalous, and flags `layout_oscillation` when consecutive frames
 //! alternate between two screens of different layout (flicker). Frames stay in memory; they never
@@ -45,7 +45,7 @@ pub struct Frame {
     pub text: Vec<(String, String)>,
     /// Render time.
     pub ms: u64,
-    /// When the frame was drawn (ms since the epoch).
+    /// Wall-clock time of the draw (ms since the epoch).
     pub at: u64,
     pub anomalies: Vec<String>,
     /// Digest of every cell symbol and the rects; equal digests mean an identical frame.

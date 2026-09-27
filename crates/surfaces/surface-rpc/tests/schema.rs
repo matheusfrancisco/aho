@@ -1,4 +1,4 @@
-//! Wire schema snapshot (12): every frame type, serialized by the functions the server uses,
+//! Wire schema snapshot: every frame type, serialized by the functions the server uses,
 //! compared to the committed `tests/fixtures/frames.json`. A diff is a protocol change: additive
 //! fields are a minor bump, anything else needs a new major and a handshake decision.
 //! Regenerate deliberately with `UPDATE_SNAPSHOTS=1 cargo test -p surface-rpc --test schema`.

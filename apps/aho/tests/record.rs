@@ -1,4 +1,4 @@
-//! A changed plan reaches the session log exactly once (03, 05): an operator verb (`aho set`)
+//! A changed plan reaches the session log exactly once: an operator verb (`aho set`)
 //! records it as its own command, and a resume under a plan the log did not seal records it as
 //! `resume`; a resume under the sealed plan records nothing.
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design

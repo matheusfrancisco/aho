@@ -3,7 +3,7 @@ name = "tool-vm"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The 13 vm_* tools over the session's VM lab (aho-vm): machines from operator recipes, console, screen, under a lease (00, 07)"
+description = "The 13 vm_* tools over the session's VM lab (aho-vm): machines from operator recipes, console, screen, under a lease"
 
 [dependencies]
 aho-types.workspace = true

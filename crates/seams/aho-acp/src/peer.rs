@@ -27,7 +27,7 @@ use tokio::task::{AbortHandle, JoinSet};
 use crate::jsonrpc::{FrameReader, Message, RequestId, RpcError, write_frame};
 use crate::methods;
 
-/// What a request handler returns: owned, so it can outlive the call that produced it.
+/// The future a request handler returns: owned, so it can outlive the call that produced it.
 pub type HandlerFuture = Pin<Box<dyn Future<Output = Result<Value, RpcError>> + Send + 'static>>;
 
 /// The local side's methods.

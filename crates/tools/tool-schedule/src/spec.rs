@@ -1,4 +1,4 @@
-//! When a schedule fires: `at` (one RFC 3339 instant), `every` (a fixed interval from the moment
+//! Schedule timing: `at` (one RFC 3339 instant), `every` (a fixed interval from the moment
 //! it was created), `cron` (5 fields, evaluated in UTC). All arithmetic is UTC civil time in the
 //! proleptic Gregorian calendar, so there are no daylight-saving gaps or repeated hours: a daily
 //! `30 2 * * *` is exactly 24 h apart on every date.
@@ -352,7 +352,7 @@ impl Cron {
 
 // ───────────────────────────────── spec ─────────────────────────────────
 
-/// How a schedule fires. Serialized in `schedule/Created` bodies.
+/// A schedule's firing rule. Serialized in `schedule/Created` bodies.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Spec {

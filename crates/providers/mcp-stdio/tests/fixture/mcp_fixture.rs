@@ -2,12 +2,12 @@
 //! integration tests in `tests/mcp.rs` start it through `mcp.servers.<name>.cmd`.
 //!
 //! `FIXTURE_PROFILE` selects the behavior:
-//! * `full` (default) — tools over two pages, resources over two pages, one template; pings the
+//! * `full` (default): tools over two pages, resources over two pages, one template; pings the
 //!   client before answering the first `tools/list`; checks `initialize` then `initialized`.
-//! * `dup` — lists the tool `a` twice.
-//! * `badversion` — answers `initialize` with protocol `1999-01-01`.
-//! * `crash` — writes to stderr and exits on `initialize`.
-//! * `notools` — advertises resources only.
+//! * `dup`: lists the tool `a` twice.
+//! * `badversion`: answers `initialize` with protocol `1999-01-01`.
+//! * `crash`: writes to stderr and exits on `initialize`.
+//! * `notools`: advertises resources only.
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
 
 use std::io::{BufRead, Write};

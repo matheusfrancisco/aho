@@ -1,5 +1,5 @@
-//! `08` — the spine plus the headless surfaces: one-shot print/`--json`, the NDJSON rpc protocol the
-//! SDKs and the daemon topology speak, the GitHub webhook listener (Locked until its credential
+//! The spine plus the headless surfaces: one-shot print/`--json`, the NDJSON rpc protocol the SDKs
+//! and the daemon topology speak, the GitHub webhook listener (Locked until its credential
 //! exists), and the Agent Client Protocol server editors drive over stdio (`aho acp`).
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![forbid(unsafe_code)]

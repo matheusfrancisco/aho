@@ -1,7 +1,7 @@
-//! `12` "Reload = exec-in-place": before exec, each affected session gets a
+//! Reload recovery: before exec, each affected session gets a
 //! `SessionRecoveryIntent{role, directive}`; the new process closes the turn that was cut short
-//! and appends one continuation prompt per intent. An intent is *consumed* by the entry that
-//! references it — a `UserMessage` whose `client_key` is `recovery:<intent entry id>` — so there
+//! and appends one continuation prompt per intent. The entry that references an intent
+//! *consumes* it (a `UserMessage` whose `client_key` is `recovery:<intent entry id>`), so there
 //! are no side files, and `Session::prompt`'s `client_key` dedup keeps it exactly-once even when
 //! the process dies between the two.
 

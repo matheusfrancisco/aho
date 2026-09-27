@@ -3,7 +3,7 @@ name = "aho-log"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The only store: append-only, hash-chained, tree-shaped session log and its fold (06)."
+description = "The only store: append-only, hash-chained, tree-shaped session log and its fold."
 
 [dependencies]
 aho-types.workspace = true

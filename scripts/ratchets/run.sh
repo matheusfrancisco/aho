@@ -1,12 +1,12 @@
 #!/bin/sh
-# Ratchets, not thresholds (doc 12). Per-file counts may not grow, files absent from the baseline
+# Ratchets: per-file counts may not grow, files absent from the baseline
 # may not introduce any, and totals may not grow. `#[cfg(test)]` items, `tests/` dirs, `tests.rs`
 # files, and comments are excluded from the pattern counts.
 #
 #   panic      .unwrap( .expect( panic!( todo!(
 #   swallowed  `let _ = `  `.ok();`
 #   long       files over 1200 lines (value = line count)
-#   wildcard   `pub use …::*;` — baseline pinned at 0
+#   wildcard   `pub use …::*;` (baseline pinned at 0)
 #
 # Usage: scripts/ratchets/run.sh [--update]    (--update rewrites the JSON baselines)
 set -u
@@ -70,7 +70,7 @@ for name in panic swallowed long wildcard; do
     baseline="$DIR/$name.json"
     if [ "$UPDATE" = 1 ]; then
         if [ "$name" = wildcard ] && [ "$total" != 0 ]; then
-            echo "  $name: $total wildcard re-export(s); the baseline stays 0 — name what you re-export"
+            echo "  $name: $total wildcard re-export(s); the baseline stays 0; name what you re-export"
             grep -v '^__total__' "$WORK/$name.tsv" | sed 's/^/    /'
             failed="$failed $name"
             continue

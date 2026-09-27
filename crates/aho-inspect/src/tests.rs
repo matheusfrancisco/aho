@@ -387,7 +387,7 @@ fn catch_up_after_a_crash_names_what_the_operator_must_do() {
     assert_eq!(c.tool_counts, vec![("write".to_string(), 1)]);
     assert!(c.needs_from_user.iter().any(|n| n == "1 tool call(s) had no result when the session stopped"), "{:?}", c.needs_from_user);
     let md = render_catch_up(&c);
-    assert!(md.starts_with("## Catch-up — Crashed") && md.contains("**Files touched:** `src/parse.rs`"), "{md}");
+    assert!(md.starts_with("## Catch-up: Crashed") && md.contains("**Files touched:** `src/parse.rs`"), "{md}");
     let (live, _) = session_status(&crashed_session(42), true);
     assert_eq!(live, SessionStatus::Active);
 }

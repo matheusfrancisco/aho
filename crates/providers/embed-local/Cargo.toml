@@ -3,7 +3,7 @@ name = "embed-local"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Local lexical or optional ONNX MiniLM embeddings, bounded cache and idle unloading (12)"
+description = "Local lexical or optional ONNX MiniLM embeddings, bounded cache and idle unloading"
 
 [features]
 default = []

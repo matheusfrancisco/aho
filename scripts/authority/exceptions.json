@@ -885,13 +885,13 @@
     "path": "crates/providers/daemon/src/crash.rs",
     "item": "fn identity_alive",
     "authority": "process: `ps -o etime= -p <pid>` on the host",
-    "reason": "Crash detection compares a recorded (pid, start_time) with the live process table; the daemon itself always runs on the host (07), so this probe is host lifecycle, not a tool effect."
+    "reason": "Crash detection compares a recorded (pid, start_time) with the live process table; the daemon itself always runs on the host, so this probe is host lifecycle, not a tool effect."
   },
   "daemon-ready-env": {
     "path": "crates/providers/daemon/src/ready.rs",
     "item": "fn take_ready_fd",
     "authority": "env: AHO_READY_FD of this process",
-    "reason": "The exec-in-place reload handshake (12) passes the readiness descriptor through the environment; it is read once at startup before anything can spawn and inherit it."
+    "reason": "The exec-in-place reload handshake passes the readiness descriptor through the environment; it is read once at startup before anything can spawn and inherit it."
   },
   "daemon-ready-spawn": {
     "path": "crates/providers/daemon/src/ready.rs",
@@ -903,7 +903,7 @@
     "path": "crates/providers/daemon/src/ready.rs",
     "item": "fn exec_with_ready",
     "authority": "process: execve of the new daemon image in place",
-    "reason": "Self-dev reload (12) replaces the daemon image with the same pid; only the daemon may do this, and only after quiescing sessions and stopping drivers."
+    "reason": "Self-dev reload replaces the daemon image with the same pid; only the daemon may do this, and only after quiescing sessions and stopping drivers."
   },
   "daemon-serve-lifecycle": {
     "path": "crates/providers/daemon/src/server.rs",
@@ -945,7 +945,7 @@
     "path": "crates/providers/daemon/src/server/client.rs",
     "item": "fn connect",
     "authority": "net: connect to the daemon's operator unix socket",
-    "reason": "The CLI and bridges are clients of the local daemon (12); the socket is 0600, so connecting is operator authority, not agent egress."
+    "reason": "The CLI and bridges are clients of the local daemon; the socket is 0600, so connecting is operator authority, not agent egress."
   },
   "daemon-reload-exec": {
     "path": "crates/providers/daemon/src/server/reload.rs",
@@ -987,7 +987,7 @@
     "path": "crates/providers/world-host/src/proc.rs",
     "item": "fn start",
     "authority": "process: spawn a host child with separate protocol pipes",
-    "reason": "The host world's Subprocess provider (07) is the process authority for world=host; this adds the lossless stdin/stdout/stderr transport MCP servers use, in the same process group model."
+    "reason": "The host world's Subprocess provider is the process authority for world=host; this adds the lossless stdin/stdout/stderr transport MCP servers use, in the same process group model."
   },
   "world-ssh-transport": {
     "path": "crates/providers/world-ssh/src/proc.rs",
@@ -1029,7 +1029,7 @@
     "path": "crates/bundles/aho-sdk/src/client.rs",
     "item": "fn spawn",
     "authority": "process: spawn `aho rpc` as the SDK's session server",
-    "reason": "An embedder's SDK client drives aho through the rpc surface on stdio (08); starting that process is the embedder's own operator authority."
+    "reason": "An embedder's SDK client drives aho through the rpc surface on stdio; starting that process is the embedder's own operator authority."
   },
   "sdk-client-connect": {
     "path": "crates/bundles/aho-sdk/src/client.rs",
@@ -1077,7 +1077,7 @@
     "path": "crates/providers/daemon/src/bin/ready_probe.rs",
     "item": "fn main",
     "authority": "process: exec in place for the readiness-handshake tests",
-    "reason": "Test helper binary for exec-in-place reload (12); it exists to exercise take_ready_fd/exec_with_ready exactly as a real reload does."
+    "reason": "Test helper binary for exec-in-place reload; it exists to exercise take_ready_fd/exec_with_ready exactly as a real reload does."
   },
   "net-userspace-control": {
     "path": "crates/providers/net-userspace/src/lib.rs",

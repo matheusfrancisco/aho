@@ -6,7 +6,7 @@ license.workspace = true
 description = "web + formal verification (TLA+/TLC, Lean) + long-term memory (local embeddings)"
 
 [features]
-# Semantic local embeddings (12): ONNX MiniLM behind embed-local; the default build stays lexical.
+# Semantic local embeddings: ONNX MiniLM behind embed-local; the default build stays lexical.
 minilm = ["embed-local/minilm"]
 
 [dependencies]

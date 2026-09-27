@@ -9,7 +9,7 @@
 //! * the answer is one stdin line: `{"id", "ok": true, "value"}` or `{"id", "ok": false, "code", "reason"}`.
 //!
 //! Python moves the channel off fd 0 (stdin reads see EOF); Node cannot `dup2`, so a Node
-//! program must not read stdin — the tool description says so.
+//! program must not read stdin (the tool description says so).
 
 /// Marker at the start of every piece; the per-run nonce follows.
 pub const MARKER: &str = "\u{1e}AHO_PTC:";

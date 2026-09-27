@@ -14,7 +14,7 @@ use crate::settings::HookCommand;
 
 /// Output kept per stream; the rest is read and discarded so the hook never blocks on a full pipe.
 pub const MAX_OUTPUT: usize = 1 << 20;
-/// How long to wait for output pipes after the hook exited (a backgrounded child may hold them).
+/// Wait for output pipes this long after the hook exited (a backgrounded child may hold them).
 const DRAIN: Duration = Duration::from_millis(500);
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -60,7 +60,7 @@ pub fn run_command(cmd: &HookCommand, project: &Path, payload: &Value) -> RunRes
         .current_dir(project)
         .env("CLAUDE_PROJECT_DIR", project)
         .env("AHO_HOOKS_DISABLED", "1")
-        .env_remove("AHO_READY_FD") // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write (12)
+        .env_remove("AHO_READY_FD") // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

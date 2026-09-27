@@ -3,7 +3,7 @@ name = "llm-openai-completions"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "OpenAI chat-completions protocol adapter (01, 16)"
+description = "OpenAI chat-completions protocol adapter"
 
 [dependencies]
 aho-types.workspace = true

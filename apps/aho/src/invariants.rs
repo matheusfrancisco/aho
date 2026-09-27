@@ -1,11 +1,11 @@
-//! `13` — the operator's formal verbs: `aho invariants` (the table), `aho invariants show | check |
+//! The operator's formal verbs: `aho invariants` (the table), `aho invariants show | check |
 //! mutate`, and the `--formal` half of `aho session verify`.
 //!
 //! They drive the checkers as a library, never through a model turn: TLC through formal-tlc on
 //! this host, with specs and models resolved exactly as tool-formal's `spec_check` /
 //! `invariant_mutate` resolve them (`tool_formal::resolve_target` / `check_config`), and verdicts
-//! bound to the workspace tree when the check starts — the quantity `Workspace/Checkpoint`
-//! records, so `aho_inspect::current_invariants` judges them like the model's own.
+//! bound to the workspace tree when the check starts (the quantity `Workspace/Checkpoint`
+//! records), so `aho_inspect::current_invariants` judges them like the model's own.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -118,7 +118,7 @@ fn here(ctx: &Ctx, session: Option<&str>, required: bool) -> Result<Here, Fail> 
 
 /// TLC as formal-tlc runs it, on this host, or why it cannot run. The jar is `formal.tla.jar`
 /// (what `aho doctor formal --install tla` sets), else `~/.aho/tools/tla2tools.jar`, the path
-/// formal-tlc names; the Java runtime must actually start.
+/// formal-tlc names; the Java runtime must start.
 async fn tlc(ctx: &Ctx, inputs: &Inputs, p: &Planned) -> Result<Tlc, String> {
     let cfg = match TlcConfig::from_loadout(&p.loadout) {
         Ok(c) => c,
@@ -155,9 +155,9 @@ async fn tlc(ctx: &Ctx, inputs: &Inputs, p: &Planned) -> Result<Tlc, String> {
     Ok(Tlc::new(proc, aho_fs::FsWrite(fs), cfg))
 }
 
-/// The code a verdict is bound to (13): the session world's workspace tree now, as its
+/// The code a verdict is bound to: the session world's workspace tree now, as its
 /// `Workspace/Checkpoint` entries record it. `Hash::ZERO` (as tool-formal does) when it cannot
-/// be read — the verdict then shows Stale at the next checkpoint.
+/// be read; the verdict then shows Stale at the next checkpoint.
 async fn code_tree(ctx: &Ctx, h: &Here, s: &Sess) -> (Hash, Option<String>) {
     let tree = match crate::history::session_shadow(ctx, &h.inputs.home, &s.state) {
         Ok((_, shadow)) => shadow.tree().await.map_err(|e| e.to_string()),
@@ -169,7 +169,7 @@ async fn code_tree(ctx: &Ctx, h: &Here, s: &Sess) -> (Hash, Option<String>) {
     }
 }
 
-/// What happened to the entries a verb wanted to record.
+/// The outcome for the entries a verb wanted to record.
 enum Recorded {
     Appended(usize),
     Refused(String),
@@ -379,7 +379,7 @@ async fn show(ctx: &Ctx, id: &str, session: Option<&str>, json: bool) -> Result<
         println!("  mutants     none tried since the latest check (`aho invariants mutate {id}`)");
     } else {
         let caught = mutants.iter().filter(|(_, c)| *c).count();
-        println!("  mutants     {caught} of {} caught{}", mutants.len(), if caught == 0 { " — Vacuous ⚠" } else { "" });
+        println!("  mutants     {caught} of {} caught{}", mutants.len(), if caught == 0 { " (Vacuous ⚠)" } else { "" });
     }
     match cx {
         Some((hash, Some(c))) => {
@@ -595,7 +595,7 @@ async fn mutate(ctx: &Ctx, id: &str, session: Option<&str>, json: bool) -> Resul
         )
     } else if caught == 0 {
         format!(
-            "Vacuous ⚠: `{id}` caught none of {} mutants — it does not constrain what the actions allow, and does not count. Strengthen the statement.",
+            "Vacuous ⚠: `{id}` caught none of {} mutants; it does not constrain what the actions allow, and does not count. Strengthen the statement.",
             r.mutants.len()
         )
     } else {
@@ -618,8 +618,8 @@ async fn mutate(ctx: &Ctx, id: &str, session: Option<&str>, json: bool) -> Resul
                 "not caught"
             };
             let why = match (&m.violated, &m.verdict) {
-                (Some(v), _) => format!(" — {v}"),
-                (None, Verdict::Unknown { reason }) => format!(" — {reason}"),
+                (Some(v), _) => format!(" ({v})"),
+                (None, Verdict::Unknown { reason }) => format!(" ({reason})"),
                 _ => String::new(),
             };
             println!("  {mark:<11}{}: {}{why}", m.name, m.description);
@@ -661,7 +661,7 @@ fn models(module: &str, entries: &[Entry], trace: &[Value]) -> bool {
     trace.iter().any(|r| r.get("action").and_then(Value::as_str).is_some_and(|a| actions.contains(&a)))
 }
 
-/// `aho session verify --formal` (13: every session log is a behavior): the log's trace against
+/// `aho session verify --formal` (every session log is a behavior): the log's trace against
 /// each of aho's own TLA+ modules it has entries for, by TLC. Prints `✓`/`✕` lines in verify's
 /// style and returns how many failed; without TLC it says why and fails nothing.
 pub async fn verify_formal(ctx: &Ctx, entries: &[Entry]) -> Result<usize, Fail> {
@@ -670,7 +670,7 @@ pub async fn verify_formal(ctx: &Ctx, entries: &[Entry]) -> Result<usize, Fail> 
     let tlc = match tlc(ctx, &inputs, &p).await {
         Ok(t) => t,
         Err(why) => {
-            println!("  · formal: skipped — {why}");
+            println!("  · formal: skipped; {why}");
             return Ok(0);
         }
     };
@@ -699,7 +699,7 @@ pub async fn verify_formal(ctx: &Ctx, entries: &[Entry]) -> Result<usize, Fail> 
                 (v, _) => (false, format!("formal {module}.tla: {}", verdict_text(v))),
             },
             Err(e @ FormalError::ToolMissing { .. }) => {
-                println!("  · formal: skipped — {e}");
+                println!("  · formal: skipped; {e}");
                 return Ok(failures);
             }
             Err(e) => (false, format!("formal {module}.tla could not validate the log: {e}")),

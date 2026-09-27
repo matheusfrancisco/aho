@@ -1,4 +1,4 @@
-//! `14` — spec mode from the CLI. Entering and leaving is a preset switch (plan → diff → apply);
+//! Spec mode from the CLI. Entering and leaving is a preset switch (plan → diff → apply);
 //! `status` and `render` read `spec/SPEC.md` against the session log's formal entries.
 
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ const DEFAULT_DOC: &str = "spec/SPEC.md";
 pub async fn run(ctx: &Ctx, sub: Option<&SpecVerb>) -> Result<(), Fail> {
     match sub {
         None => {
-            println!("spec mode (14): the agent reads the code, writes only under spec/, and runs the checkers;");
+            println!("spec mode: the agent reads the code, writes only under spec/, and runs the checkers;");
             println!("every invariant it proposes needs your approval. Leave with `aho spec exit`.");
             crate::config::preset(ctx, SPEC_PRESET).await
         }

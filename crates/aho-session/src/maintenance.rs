@@ -1,13 +1,13 @@
 //! Compaction, hooks, checkpoints & rewind, operator commands, resume.
-//! Split out of the session driver (file-size ratchet, doc 12); child modules share the root's
-//! private state and items crossing modules are `pub(crate)`.
+//! Split out of the session driver for the file-size ratchet; child modules share the root's
+//! private state, and items crossing modules are `pub(crate)`.
 
 use super::*;
 
 impl Session {
     // ───────────────────────────── compaction ─────────────────────────────
 
-    /// Pre-step pressure or provider overflow → summarize the oldest range under policy Nothing (10).
+    /// Pre-step pressure or provider overflow → summarize the oldest range under policy Nothing.
     pub(crate) async fn maybe_compact(&self, forced: bool) {
         if *lk(&self.compaction_failures) >= 3 {
             return;
@@ -84,7 +84,7 @@ impl Session {
     // ───────────────────────────── hooks ─────────────────────────────
 
     /// Runs every hook registered for `event`. A timed-out hook yields its `on_error` decision
-    /// (default Deny, 12). Returns the combined outcome; hooks only narrow (`⊓`).
+    /// (default Deny). Returns the combined outcome; hooks only narrow (`⊓`).
     pub(crate) async fn run_hooks(&self, event: HookEvent, payload: Value) -> HookVerdict {
         let mut verdict = HookVerdict::default();
         for (cap, h) in &self.reg.hooks {
@@ -125,7 +125,7 @@ impl Session {
         verdict
     }
 
-    // ───────────────────────────── checkpoints & rewind (11) ─────────────────────────────
+    // ───────────────────────────── checkpoints & rewind ─────────────────────────────
 
     pub(crate) async fn checkpoint(&self, cause: CheckpointCause) -> Option<CheckpointId> {
         let snap = self.reg.handle::<SnapshotHandle>()?;
@@ -185,9 +185,9 @@ impl Session {
         Ok(e.id)
     }
 
-    /// After a fork into the middle of a turn: nothing may stay open on the new branch (06, 11).
+    /// After a fork into the middle of a turn: nothing may stay open on the new branch.
     /// Pending approvals are cancelled, open calls get a synthetic cancelled result, open ops are
-    /// closed, and the open turn is ended — so the next turn folds and never waits on ghosts.
+    /// closed, and the open turn ends, so the next turn folds and never waits on ghosts.
     pub(crate) fn close_branch(&self, reason: CancelReason) -> Result<(), SessionError> {
         let state = self.fold()?;
         for req in state.pending_approvals.keys().copied() {
@@ -270,7 +270,7 @@ impl Session {
         Ok(text)
     }
 
-    /// Ops that were open at load: re-runnable → re-dispatch; external effect → Uncertain; else Failed (16).
+    /// Ops that were open at load: re-runnable → re-dispatch; external effect → Uncertain; else Failed.
     pub(crate) async fn recover_open_ops(self: &Arc<Self>, state: &State) -> Result<(), SessionError> {
         for (op, (call, rerunnable, external)) in &state.open_ops {
             if *rerunnable

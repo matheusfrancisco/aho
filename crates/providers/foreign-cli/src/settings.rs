@@ -17,7 +17,7 @@ pub struct Settings {
     pub tmux: String,
     /// aho's own tmux server: a socket name (`-L`) or, when it contains `/`, a socket path (`-S`).
     pub socket: String,
-    /// How often the transcript is read.
+    /// Interval between transcript reads.
     pub poll_ms: u64,
     /// A run whose transcript is silent this long while the screen does not change is reported
     /// as blocked on the CLI's own dialog.
@@ -67,7 +67,7 @@ impl Settings {
                 &format!("{prefix}.poll_ms"),
                 Ty::Int,
                 Some(json!(DEFAULT_POLL_MS)),
-                &format!("How often {product}'s transcript is read (ms)."),
+                &format!("Interval between reads of {product}'s transcript (ms)."),
             ),
             ConfigKey::new(
                 &format!("{prefix}.blocked_after_ms"),
@@ -87,7 +87,7 @@ impl Settings {
                 &format!("{prefix}.max_depth"),
                 Ty::Int,
                 Some(json!(DEFAULT_MAX_DEPTH)),
-                "Deepest delegation allowed for these children (the root session is 0); a spawn past it is refused (10).",
+                "Deepest delegation allowed for these children (the root session is 0); a spawn past it is refused.",
             ),
         ]
     }

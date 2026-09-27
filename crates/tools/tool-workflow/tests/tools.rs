@@ -94,7 +94,7 @@ fn start_status_stop_through_the_log() {
 
     let out = call(&reg, "ralph_start", json!({"prompt": "port the parser", "completion_promise": "PARSER PORTED"}), agent());
     assert!(
-        text(&out).starts_with("Started ralph-1. When this turn ends the session is given the prompt again, up to 4 times"),
+        text(&out).starts_with("Started ralph-1. After this turn ends, the session gets the prompt again, up to 4 times"),
         "{}",
         text(&out)
     );

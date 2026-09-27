@@ -1,4 +1,4 @@
-//! `10` — SKILL.md discovery from directories.
+//! SKILL.md discovery from directories.
 //!
 //! Roots, lowest rank first (a lower rank wins a duplicate name; the loser is `Shadowed`):
 //! 0. `<project>/.aho/skills` (workspace)
@@ -231,7 +231,7 @@ pub fn discovered(scan: &Scan) -> Vec<Discovered> {
         if !f.dropped.is_empty() {
             doc.push_str(&format!(" (policy keys dropped from its frontmatter: {})", f.dropped.join(", ")));
         }
-        doc.push_str(&format!(" — enable: `{}`", enable_fix(&t.name)));
+        doc.push_str(&format!("; enable: `{}`", enable_fix(&t.name)));
         rows.push(Discovered {
             id: skill_id(&t.name),
             kind: Kind::Template,
@@ -437,7 +437,7 @@ declare_capability!(
     provides = [aho_skills::SEAM],
     requires = [],
     tools = &[],
-    doc = "SKILL.md skills from `.aho/skills`, `.agents/skills`, `~/.aho/skills` and `skills.dirs`; each skill is enabled with `skills.<name>.enabled` (10)."
+    doc = "SKILL.md skills from `.aho/skills`, `.agents/skills`, `~/.aho/skills` and `skills.dirs`; each skill is enabled with `skills.<name>.enabled`."
 );
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
-//! The namespace world end to end on a real kernel (07): a busybox recipe, the session's real
-//! userspace network, and every property the sandbox promises — PID 2, a private seeded
+//! The namespace world end to end on a real kernel: a busybox recipe, the session's real
+//! userspace network, and the properties the sandbox promises (PID 2, a private seeded
 //! workspace, stray jobs that die with their command, exit status passthrough, egress through
-//! aho-net only, persistence across re-entry without a network, recipe drift refused, destroy.
+//! aho-net only, persistence across re-entry without a network, recipe drift refused, destroy).
 //!
 //! Needs Linux with user namespaces, overlayfs, /dev/net/tun, `ip`, and a static busybox at
 //! /bin/busybox (Debian `busybox-static`); anything missing skips with the reason. The Linux CI

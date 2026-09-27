@@ -1,4 +1,4 @@
-//! `aho invariants check|show` and `aho session verify --formal` through the built binary (13):
+//! `aho invariants check|show` and `aho session verify --formal` through the built binary:
 //! without TLC the check refuses with the install fix and records nothing; with java and
 //! tla2tools.jar a failing spec exits 2, its verdict lands in the session log by Operator and
 //! `show` renders the counterexample state by state; a session with `Task/*` entries is a
@@ -18,7 +18,7 @@ struct Project {
     home: PathBuf,
 }
 
-const SPEC: &str = r#"# Counter — System Spec
+const SPEC: &str = r#"# Counter: System Spec
 
 ## 1 Purpose
 

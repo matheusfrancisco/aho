@@ -56,7 +56,7 @@ pub struct TreeNode {
     /// The one command that changes this node's state (Locked: its first fix). `None` when Active.
     pub action: Option<String>,
     /// Classes this capability's tools declare that the preset does not allow: calls needing them
-    /// ask or are denied by the decision chain (04). A note, never a lock.
+    /// ask or are denied by the decision chain. A note, never a lock.
     pub over_preset: Option<Missing>,
     pub doc: String,
     pub children: Vec<TreeNode>,
@@ -335,7 +335,7 @@ fn render_node(out: &mut String, n: &TreeNode, child: bool) {
     }
 }
 
-/// The `aho tree` screen (05): header, then one line per node, one line per missing prerequisite.
+/// The `aho tree` screen: header, then one line per node, one line per missing prerequisite.
 pub fn render_tree(composition: &str, nodes: &[TreeNode], plan: &Plan) -> String {
     let fp = plan.fingerprint.to_hex();
     let mut out = format!(
@@ -360,7 +360,7 @@ fn flatten(nodes: &[TreeNode]) -> Vec<&TreeNode> {
     out
 }
 
-/// One uniform card per capability, whatever its kind (05 "The inventory").
+/// One uniform card per capability, whatever its kind.
 #[derive(Clone, Debug, Serialize)]
 pub struct Card {
     pub id: String,
@@ -392,7 +392,7 @@ pub fn inventory_in(nodes: &[TreeNode], plan: &Plan, kind: Option<&str>) -> Vec<
                 CapState::Unlocked | CapState::Disabled { .. } => {
                     let mut e = n.action.clone().unwrap_or_default();
                     if over.0 != 0 {
-                        e.push_str(&format!("       (will unlock: {} — exceeds preset '{}')", render_classes(over), plan.preset));
+                        e.push_str(&format!("       (will unlock: {}; exceeds preset '{}')", render_classes(over), plan.preset));
                     } else if n.classes.0 != 0 {
                         e.push_str(&format!("       (will unlock: {})", render_classes(n.classes)));
                     }
@@ -442,7 +442,7 @@ pub fn render_inventory(cards: &[Card]) -> String {
     out
 }
 
-/// What `aho_why <capability>` returns and `aho explain <capability>` prints (04, 05).
+/// The result `aho_why <capability>` returns and `aho explain <capability>` prints.
 #[derive(Clone, Debug, Serialize)]
 pub struct Why {
     pub id: String,

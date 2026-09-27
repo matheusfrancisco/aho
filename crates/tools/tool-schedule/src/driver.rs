@@ -17,7 +17,7 @@ use crate::fold::{Event, NS, Schedules, load};
 /// Principal of the driver's records: `System("schedule")`.
 pub const DRIVER: &str = "schedule";
 /// Service a host seeds when it runs a [`Scheduler`] for the session; without it the schedule
-/// tools refuse to build (a schedule nothing fires would be a lie).
+/// tools refuse to build (no schedule could ever fire).
 pub const SERVICE: &str = "aho.driver.schedule";
 
 /// The host's handle on a running scheduler: seeded as [`SERVICE`] before boot, then handed to

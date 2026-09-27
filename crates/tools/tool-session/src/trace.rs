@@ -1,6 +1,6 @@
-//! `session_trace`: the causal chain of a call or an entry across every branch of the log (06 tree,
-//! 11 rewinds). Links are found by the ids entries carry — `call`, `op`, `req`, checkpoint ids —
-//! never by position, so a chain that crosses a fork is still one chain.
+//! `session_trace`: the causal chain of a call or an entry across every branch of the log.
+//! Links follow the ids entries carry (`call`, `op`, `req`, checkpoint ids), never their
+//! position, so a chain that crosses a fork is still one chain.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -64,7 +64,7 @@ pub fn trace(q: &Query<'_>, args: &Value) -> Out {
     Ok(render(q, &tree, &title, chain))
 }
 
-/// Which call an entry belongs to, following `op` and `req` references.
+/// The calls an entry belongs to, following `op` and `req` references.
 fn owning_calls(tree: &Tree, e: &Entry) -> Vec<CallId> {
     if let Some(c) = call_of(&e.kind) {
         return vec![c.clone()];
@@ -103,7 +103,7 @@ fn checkpoint_on_branch(tree: &Tree, cp: CheckpointId, at: EntryId) -> Option<En
     ancestors(tree, at).find(|e| matches!(e.kind, EntryKind::WorkspaceCheckpoint { id, .. } if id == cp)).map(|e| e.id)
 }
 
-/// The `PreRewind` checkpoint a `Workspace/Restored` names as `from`: taken on the old branch just
+/// The `PreRewind` checkpoint a `Workspace/Restored` names as `from`: taken on the old branch immediately
 /// before the fork, so it is the nearest earlier `PreRewind` with that id anywhere in the file.
 fn pre_rewind(tree: &Tree, cp: CheckpointId, restored: EntryId) -> Option<EntryId> {
     checkpoint_on_branch(tree, cp, restored).filter(|id| is_pre_rewind(tree, *id)).or_else(|| {
@@ -258,7 +258,7 @@ fn render(q: &Query<'_>, tree: &Tree, title: &str, chain: Chain) -> aho_cap::Exe
         let place = tree.where_(*id);
         let mut line = format!("#{} {} t{turn} [{place}] {summary}", id.0, view::label(&e.kind));
         if !notes.is_empty() {
-            line.push_str(&format!(" — {}", notes.join("; ")));
+            line.push_str(&format!(" ({})", notes.join("; ")));
         }
         let children = tree.children.get(id).cloned().unwrap_or_default();
         if children.len() > 1 {

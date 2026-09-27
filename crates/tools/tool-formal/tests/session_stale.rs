@@ -1,4 +1,4 @@
-//! Doc 13 end to end in a live session: "anything older than the code is `Stale`, not `Pass`", and
+//! Stale verdicts end to end in a live session: a verdict older than the code is `Stale`, and
 //! a verify gate cannot pass while a covering invariant is `Stale`. The session checkpoints a
 //! write, `spec_check` runs real TLC and binds its verdict to that workspace tree, and
 //! `aho_inspect::current_invariants` shows Pass. A further edit is checkpointed: the same verdict

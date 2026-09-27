@@ -230,8 +230,8 @@ impl Policy {
         })
     }
 
-    /// What the operator runs to let a blocked flow to `address` through: the isolation class
-    /// when isolation blocked it, else the destination itself. `None` when nothing can.
+    /// The command the operator runs to let a blocked flow to `address` through: the isolation
+    /// class when isolation blocked it, else the destination itself. `None` when nothing can.
     pub(crate) fn unlock(&self, address: IpAddr) -> Option<String> {
         match self.isolation_of(address, false)? {
             (Access::Deny, class) => Some(format!("aho net allow {class}")),

@@ -1,4 +1,4 @@
-//! Docs 09, 13: "a Verify gate cannot pass while a covering invariant is `Fail` or `Stale`".
+//! A Verify gate cannot pass while a covering invariant is `Fail` or `Stale`.
 //!
 //! The graph does not read invariants. Whoever completes a verify gate (tool-tasks) decides which
 //! registered invariants cover the files the gate's scope handed over ([`Graph::gate_files`]) and

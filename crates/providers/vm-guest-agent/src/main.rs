@@ -132,8 +132,8 @@ where
         });
         while requests.try_join_next().is_some() {}
     };
-    // An interrupted effect is never replayed by the host. Keep accepted effects alive through
-    // reconnect; their handles remain in the server's session, rather than killing live jobs.
+    // The host never replays an interrupted effect. Keep accepted effects alive through reconnect
+    // instead of killing live jobs; their handles remain in the server's session.
     requests.detach_all();
     write_task.abort();
     result

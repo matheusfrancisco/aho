@@ -343,7 +343,7 @@ async fn slash_commands_run_behind_auth_list_on_help_and_refuse_unknown_names_wi
 
     let (status, help) = post(&web, "session/command", json!({"line": "/help"})).await;
     assert_eq!(status, 200, "{help}");
-    assert_eq!(help["output"], "/help — list these commands\n/echo <text> — repeat the text");
+    assert_eq!(help["output"], "/help: list these commands\n/echo <text>: repeat the text");
 
     let (status, unknown) = post(&web, "session/command", json!({"line": "/nope x"})).await;
     assert_eq!(status, 404, "{unknown}");

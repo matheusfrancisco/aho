@@ -1,19 +1,19 @@
-//! `08`/`01` — ACP, the Agent Client Protocol (agentclientprotocol.com), protocol version 1.
+//! ACP, the Agent Client Protocol (agentclientprotocol.com), protocol version 1.
 //!
 //! Types follow the published JSON Schema `schema/v1/schema.json`, schema release **1.23.0**
 //! (github.com/agentclientprotocol/agent-client-protocol, 2026-09-18); field names are the
 //! schema's. Transport is stdio framing: newline-delimited JSON-RPC 2.0 messages that never
 //! contain an embedded newline.
 //!
-//! Both aho sides share this crate (08: "aho as an ACP server; `subagent-acp` is the client
-//! side"): `surface-acp` answers `initialize` / `session/*` and sends `session/update` +
-//! `session/request_permission`; `subagent-acp` drives an external agent the other way round.
+//! Both aho sides share this crate: `surface-acp` is aho as an ACP server (answers `initialize` /
+//! `session/*`, sends `session/update` + `session/request_permission`); `subagent-acp` is the
+//! client side and drives an external agent the other way round.
 //!
-//! * [`schema`] — `initialize`, `session/new`, `session/load`, `session/prompt`,
+//! * [`schema`]: `initialize`, `session/new`, `session/load`, `session/prompt`,
 //!   `session/update` (`agent_message_chunk`, `tool_call`, `tool_call_update`, `plan`, …),
 //!   `session/request_permission`, `session/cancel`.
-//! * [`jsonrpc`] — the message model, error codes, decode rules, and the line framing.
-//! * [`peer`] — a bidirectional connection over a caller-supplied reader/writer. This crate opens
+//! * [`jsonrpc`]: the message model, error codes, decode rules, and the line framing.
+//! * [`peer`]: a bidirectional connection over a caller-supplied reader/writer. This crate opens
 //!   no process, socket, or file.
 
 #![forbid(unsafe_code)]

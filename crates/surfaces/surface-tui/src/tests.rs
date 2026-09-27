@@ -584,10 +584,10 @@ async fn unknown_command_is_refused_with_the_list_and_help_lists_every_command()
     assert!(seen.try_recv().is_err(), "the handler was not called");
 
     crate::runtime::run_command(&mut ui, &commands, &s, "help", "");
-    assert_eq!(ui.notice.as_deref(), Some("/help — list these commands\n/echo <text> — repeat the text\n/fail — always refuses"));
+    assert_eq!(ui.notice.as_deref(), Some("/help: list these commands\n/echo <text>: repeat the text\n/fail: always refuses"));
     let text = screen(&ui, 100, 16);
     let tail: Vec<&str> = text.lines().rev().take(3).collect();
-    assert!(tail[2].contains("/help — list") && tail[1].contains("/echo <text>") && tail[0].contains("/fail"), "{text}");
+    assert!(tail[2].contains("/help: list") && tail[1].contains("/echo <text>") && tail[0].contains("/fail"), "{text}");
     assert_eq!(branch_len(&s), before, "/help writes nothing");
     assert_eq!(s.fold().unwrap().turns, 0);
 }

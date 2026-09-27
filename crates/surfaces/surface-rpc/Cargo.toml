@@ -3,7 +3,7 @@ name = "surface-rpc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "NDJSON over stdio or unix socket; versioned envelope; the SDK protocol; default daemon topology (08, 12)"
+description = "NDJSON over stdio or unix socket; versioned envelope; the SDK protocol; default daemon topology"
 
 [dependencies]
 aho-types.workspace = true

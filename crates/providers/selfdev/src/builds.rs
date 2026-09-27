@@ -1,8 +1,8 @@
-//! Immutable build store + channel symlinks (12 "Releases").
+//! Immutable build store + channel symlinks.
 //!
 //! Layout under `root`:
-//! * `versions/<hash>/aho` — one published binary per content hash, file and directory `0o555`;
-//! * `current`, `stable`, `canary` — relative symlinks to `versions/<hash>`.
+//! * `versions/<hash>/aho`: one published binary per content hash, file and directory `0o555`;
+//! * `current`, `stable`, `canary`: relative symlinks to `versions/<hash>`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -66,7 +66,7 @@ pub struct Smoke {
     pub detail: String,
 }
 
-/// What `activate` changed, enough to undo it.
+/// The changes `activate` made, enough to undo them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Activation {
     pub hash: String,

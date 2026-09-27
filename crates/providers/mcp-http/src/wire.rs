@@ -1,12 +1,12 @@
 //! MCP JSON → `aho_mcp` types, and JSON-RPC message classes. Pure and transport-agnostic: the
-//! same shapes `mcp-stdio` reads (the report asks for this module to move into `aho-mcp` so both
-//! transports share it).
+//! same shapes `mcp-stdio` reads (this module should move into `aho-mcp` so both transports
+//! share it).
 
 use aho_mcp::{CallResult, McpError, RemoteTool, Resource, ResourceContents, ResourceTemplate, SUPPORTED_VERSIONS};
 use aho_types::{RootSchema, Value};
 use serde_json::json;
 
-/// What `initialize` told us.
+/// The `initialize` answer.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ServerInfo {
     pub protocol_version: String,

@@ -1,10 +1,10 @@
-//! `05` — the agent reads the same projection the operator sees, and may only *request* changes.
+//! The agent reads the same projection the operator sees, and may only *request* changes.
 //!
-//! * `aho_why{id}` — `aho_inspect::why` for a capability id or a tool name (resolved to the
+//! * `aho_why{id}`: `aho_inspect::why` for a capability id or a tool name (resolved to the
 //!   capability that declares it, active or not): state, missing prerequisites with fixes,
 //!   governing settings, classes, and the one command that would change it.
-//! * `aho_inspect{view}` — `tree` (the `aho tree` screen) or `status` (preset, world, active caps).
-//! * `unlock_request{id, reason}` — raises an approval card carrying the fix; never applies it.
+//! * `aho_inspect{view}`: `tree` (the `aho tree` screen) or `status` (preset, world, active caps).
+//! * `unlock_request{id, reason}`: raises an approval card carrying the fix; never applies it.
 //!
 //! The session seeds two services this capability reads: `aho.plan` (`Arc<Plan>`) and
 //! `aho.manifests` (`Arc<Vec<&'static Manifest>>`).

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "native provider account login: OAuth flows, private credential store, request-time refresh (12)"
+description = "native provider account login: OAuth flows, private credential store, request-time refresh"
 
 [dependencies]
 serde.workspace = true

@@ -17,7 +17,7 @@ pub const CHILD_OUTPUT_CAP: usize = 8 << 20;
 /// SIGTERM → SIGKILL grace for a group kill.
 pub const KILL_GRACE: Duration = Duration::from_secs(2);
 /// After the leader exits, how long its pipes may keep draining before descendants holding
-/// them are cut off ("a waited read ends when the process ends, not its last descendant").
+/// them are cut off: a waited read ends when the process ends, not when its last descendant does.
 pub const DRAIN_GRACE: Duration = Duration::from_millis(250);
 
 /// Send `sig` to every process in group `pgid`.
@@ -72,7 +72,7 @@ impl HostSubprocess {
         cmd.args(&spec.argv[1..])
             .current_dir(&cwd)
             .envs(spec.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-            // `12` reload: the daemon's readiness fd is close-on-exec; never tell a tool about it (daemon::ready::READY_FD_ENV).
+            // Daemon reload: the readiness fd is close-on-exec; never tell a tool about it (daemon::ready::READY_FD_ENV).
             .env_remove("AHO_READY_FD")
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())

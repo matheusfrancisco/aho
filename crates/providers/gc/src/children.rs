@@ -1,12 +1,12 @@
-//! Children a session started (jobs, viewers, sandboxes) and the owner that started them (12:
-//! "`aho gc` reaps children orphaned by a dead identity"; crash-honest receipts).
+//! Children a session started (jobs, viewers, sandboxes) and the owner that started them:
+//! `aho gc` reaps children orphaned by a dead identity, found through crash-honest receipts.
 //!
 //! A child is known from its receipt, `Custom{ns: "Child", name: "Spawned", body: {pid,
 //! start_time, kind, label}}`, appended by the owner's operations table as `system:ops` when the
 //! child starts (`aho_proc::spawned`, read back with `aho_proc::child_receipt`); receipts by any
 //! other principal (a tool's `value.events`, say) are ignored. The owner is the identity of the
-//! `Session/Meta` in force at that point of the log. Identities are `(pid, start_time)` — pids
-//! recycle, the pair does not — probed with `ps`. An owner is alive when its pid runs and started
+//! `Session/Meta` in force at that point of the log. Identities are `(pid, start_time)` (pids
+//! recycle, the pair does not), probed with `ps`. An owner is alive when its pid runs and started
 //! no later than recorded (the meta is written after boot); a child only when its pid started
 //! within a few seconds of the recorded time, since the receipt is written as it starts.
 

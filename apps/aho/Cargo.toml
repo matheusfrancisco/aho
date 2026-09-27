@@ -3,14 +3,14 @@ name = "aho"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "the operator CLI (05): plan tree inventory explain why catalog enable disable allow set preset loadout lock apply run attach serve session fork checkpoints checkpoint rewind shell status rpc tui web cert webhook acp selfdev invariants doctor caps schedule ralph plan-mode spec credential login logout add"
+description = "the operator CLI: plan tree inventory explain why catalog enable disable allow set preset loadout lock apply run attach serve session fork checkpoints checkpoint rewind shell status rpc tui web cert webhook acp selfdev invariants doctor caps schedule ralph plan-mode spec credential login logout add"
 
 [[bin]]
 name = "aho"
 path = "src/main.rs"
 
 [features]
-# `aho doctor embed --install` and `embed.local.model = all-MiniLM-L6-v2` (12).
+# `aho doctor embed --install` and `embed.local.model = all-MiniLM-L6-v2`.
 minilm = ["aho-lab/minilm", "embed-local/minilm"]
 
 [dependencies]

@@ -10,7 +10,7 @@
 //! | `user`, text `[Request interrupted by user…` | `TurnEnd{Aborted}` |
 //! | `user`, other text/image blocks | `UserPrompt`; `isMeta: true` (skill expansions) ignored |
 //! | `assistant` | `text` → `AssistantText`, `tool_use` → `ToolUse{id, name, input}`; `thinking` (redacted: signature only) and `fallback` (model switch) produce nothing; `isApiErrorMessage` → `Error{error, text}` |
-//! | `system/turn_duration` | `TurnEnd{EndTurn}` — the interactive CLI's turn boundary |
+//! | `system/turn_duration` | `TurnEnd{EndTurn}`: the interactive CLI's turn boundary |
 //! | `system/api_error` | `Error{retrying}` (Claude Code retries by itself: `retryAttempt`/`maxRetries`) |
 //! | `system/model_refusal_fallback` | `Error{retrying: true}` (it retried on `fallbackModel`) |
 //! | `attachment/queued_command` | `UserPrompt` (text typed while it worked, taken up now) |

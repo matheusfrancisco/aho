@@ -1,5 +1,5 @@
-//! The remote host's network as the world's `Egress` (07: "`ssh` uses the remote's own network
-//! and marks `NetworkEgress` as `enforced by: remote host`").
+//! The remote host's network as the world's `Egress`: `ssh` uses the remote's own network and
+//! marks `NetworkEgress` as `enforced by: remote host`.
 //!
 //! Each hop is one `curl` run on the remote over the ControlMaster. Redirects are followed here,
 //! never by curl, so the operator's host list is checked on every hop before anything is sent
@@ -7,7 +7,7 @@
 //! host. Headers and the URL travel as a curl config on stdin (never on a command line another
 //! remote user could read with `ps`), the body right after it; both land in a private
 //! `mktemp -d` directory that is removed when curl ends. The body is read here only up to
-//! `max_body_bytes`; the rest is cut off by closing the channel.
+//! `max_body_bytes`; closing the channel cuts off the rest.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};

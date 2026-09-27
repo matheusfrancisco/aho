@@ -1,4 +1,4 @@
-//! `12` "Takeover is a decision with logged inputs": one interactive owner per session. A second
+//! Takeover is a decision with logged inputs: one interactive owner per session. A second
 //! client may take over iff it is the same client instance, or it has local history of the
 //! session and is not provably a different instance. The server logs every decision as
 //! `SurfaceAttached{client_instance, has_local_history, takeover}`; a refused client stays

@@ -2,7 +2,7 @@
 //! the latest user prompt and hands the session a Snapshot text that passed suppression.
 //!
 //! Never blocks a model call: the retrieval future is polled once inline. With a local
-//! embedder and no rerank due it finishes on that poll and the snapshot answers this very
+//! embedder and no rerank due it finishes on that poll and the snapshot answers the current
 //! prompt; otherwise it continues on the runtime and is injected at the next step (one turn of
 //! lag), unless it went stale first. The same job then checks the extraction triggers and runs
 //! maintenance, queueing their log entries on the memory's outbox.

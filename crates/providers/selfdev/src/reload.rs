@@ -1,4 +1,4 @@
-//! `aho selfdev reload` (12 "Self-dev reload"): publish → smoke → Activated{pending} → flip
+//! `aho selfdev reload`: publish → smoke → Activated{pending} → flip
 //! `current` + `canary` → handoff → Handoff{ok} or rollback + Handoff{rolled_back}.
 
 use std::collections::BTreeMap;
@@ -23,7 +23,7 @@ fn append(log: &dyn LogStore, by: &Principal, name: &str, body: Value) -> Result
 }
 
 /// Runs the whole reload; every phase is appended to `log` by the operator. `handoff` receives
-/// `<root>/current/aho` and performs the actual process handoff (e.g. `daemon::client::reload_and_wait`).
+/// `<root>/current/aho` and performs the process handoff (e.g. `daemon::client::reload_and_wait`).
 /// Returns the activated hash.
 pub async fn reload<F>(
     op: &Operator,

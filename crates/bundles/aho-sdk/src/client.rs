@@ -1,4 +1,4 @@
-//! The Rust rpc client (08): the same protocol the TS and Python SDKs speak, over any duplex —
+//! The Rust rpc client: the same protocol the TS and Python SDKs speak, over any duplex, such as
 //! an in-process server ([`crate::Sdk::open_session`]), a child `aho rpc` ([`Client::spawn`]),
 //! or a unix socket (`aho rpc --socket`, [`Client::connect_unix`]).
 //!
@@ -39,7 +39,7 @@ pub fn hello(client_instance: &str) -> Hello {
     }
 }
 
-/// How to start a server process: `[program, globals…, args…, "rpc", --session <id>]`, the
+/// Server launch options: `[program, globals…, args…, "rpc", --session <id>]`, the
 /// argv `aho rpc` takes (and the TS/Python `spawn` options build).
 #[derive(Clone, Debug, Default)]
 pub struct Spawn {
@@ -273,7 +273,7 @@ impl Client {
         self.prompt_keyed(text, None).await
     }
 
-    /// [`Client::prompt`] with a dedup key: a prompt whose key the log has seen is not run again (16).
+    /// [`Client::prompt`] with a dedup key: a prompt whose key the log has seen is not run again.
     pub async fn prompt_keyed(&self, text: impl Into<String>, client_key: Option<String>) -> Result<Transition, SdkError> {
         let params = Self::encode("session.prompt", &PromptParams { text: text.into(), client_key })?;
         self.call::<PromptReply>("session.prompt", params).await.map(|r| r.transition)
@@ -300,7 +300,7 @@ impl Client {
         self.call("session.fold", json!({})).await
     }
 
-    /// Rewinds chat and/or code to a checkpoint (11); returns the entry the branch continues from.
+    /// Rewinds chat and/or code to a checkpoint; returns the entry the branch continues from.
     pub async fn rewind(&self, checkpoint: CheckpointId, mode: RewindMode) -> Result<EntryId, SdkError> {
         let mode = match mode {
             RewindMode::Both => "both",

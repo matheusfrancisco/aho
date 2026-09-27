@@ -1,4 +1,4 @@
-# Orders — System Spec
+# Orders: System Spec
 
 ## 1 Purpose
 

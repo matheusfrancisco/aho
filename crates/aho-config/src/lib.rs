@@ -1,4 +1,4 @@
-//! `03` — there are no bare config values. Every resolved setting is `Sourced<T>`; the complete
+//! There are no bare config values. Every resolved setting is `Sourced<T>`; the complete
 //! resolved set becomes the session log's first entries. `resolve` is pure: the caller captures
 //! argv/env/file text into `ResolveInputs` first.
 
@@ -43,7 +43,7 @@ impl Layer {
             Layer::Default | Layer::Bundle(_) | Layer::Profile(_) => Scope::Machine,
             Layer::FileHome => Scope::User,
             Layer::FileProject => Scope::Project,
-            // Env vars usually come from a shell rc: user-wide, not this invocation (03 classic case).
+            // Env vars usually come from a shell rc: user-wide, not this invocation.
             Layer::Env => Scope::User,
             Layer::Arg => Scope::Invocation,
             Layer::Runtime(_) => Scope::Session,
@@ -488,7 +488,7 @@ pub fn resolve(inputs: &ResolveInputs, schema: &Schema, strict: bool) -> Result<
     Ok(Loadout { hash, config, secrets, disabled, inputs: input_digests, schema_hash, diagnostics })
 }
 
-/// Flatten TOML into dotted keys; stops at schema keys declared as `Table`/`Array` so they stay whole.
+/// Flattens TOML into dotted leaf keys.
 fn flatten(prefix: &str, v: &toml::Value, schema: &Schema, out: &mut Vec<(String, Value)>) {
     let _ = schema;
     match v {

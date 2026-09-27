@@ -403,7 +403,7 @@ async fn cancel_mid_turn_stops_the_tool_and_answers_cancelled() {
     let f = Factory::new(vec![
         Step::tool_call("slow", json!({})),
         Step::text("back again"),
-        // the cancelled call's late result may land inside the next turn and earn one more request (16)
+        // the cancelled call's late result may land inside the next turn and earn one more request
         Step::text("back again"),
     ]);
     let (mut c, _server) = Client::connect(&f);

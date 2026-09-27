@@ -10,7 +10,7 @@ _LINE_LIMIT = 64 * 1024 * 1024
 
 
 class SpawnOptions(TypedDict, total=False):
-    """How to start the server: `[command, *globals, *args, "rpc", *session]`, the argv of `aho rpc`."""
+    """Server launch options: `[command, *globals, *args, "rpc", *session]`, the argv of `aho rpc`."""
 
     command: str
     """Program to run; default `aho` (looked up on PATH)."""
@@ -32,7 +32,7 @@ class SpawnOptions(TypedDict, total=False):
     has_local_history: bool
     allow_takeover: bool
     stderr: int
-    """Where the server's stderr goes (e.g. `asyncio.subprocess.DEVNULL`); default: inherited."""
+    """Destination of the server's stderr (e.g. `asyncio.subprocess.DEVNULL`); default: inherited."""
 
 
 class RpcError(Exception):

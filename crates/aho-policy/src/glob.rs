@@ -1,8 +1,8 @@
 //! Tiny glob for content rules (`bash(git *)`, `write(src/**)`, `mcp__github__*`).
 //!
 //! Two modes:
-//! * command mode — `*` matches any run of characters (spaces and `/` included), `?` one character;
-//! * path mode — `*` and `?` stop at `/`, `**` crosses directories, `**/` also matches nothing.
+//! * command mode: `*` matches any run of characters (spaces and `/` included), `?` one character;
+//! * path mode: `*` and `?` stop at `/`, `**` crosses directories, `**/` also matches nothing.
 //!
 //! `\x` matches `x` literally. Matching is a row-by-row DP, linear in pattern × text.
 

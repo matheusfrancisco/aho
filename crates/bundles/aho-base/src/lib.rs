@@ -1,15 +1,15 @@
-//! `03` — `spine()`: the composition every product includes. A product is a Rust value.
+//! `spine()`: the composition every product includes. A product is a Rust value.
 //!
 //! Model adapters (OpenAI chat-completions, Anthropic messages, the deterministic `scripted`
-//! route), the host, namespace (Linux) and ssh worlds (07; `seams.world` picks one, host by
+//! route), the host, namespace (Linux) and ssh worlds (`seams.world` picks one, host by
 //! default), the userspace sandbox network (`net`, started only when a sandbox world attaches),
-//! the host terminals behind `tool-terminal` (opt-in) and `run_code` (10, programmatic tool calls),
+//! the host terminals behind `tool-terminal` (opt-in) and `run_code` (programmatic tool calls),
 //! the fs / bash / jobs tools, in-process subagents and their tools (`seams.subagent =
 //! subagent-inproc` by default), skills (SKILL.md directories, discovered into the tree), MCP
 //! servers over stdio and HTTP with their resource tools, the task-graph, goal, todo, schedule,
 //! workflow and plan-mode tools, web fetch/search, LSP, Claude Code hooks compatibility (opt-in),
 //! and the self-inspection tools (`aho_why`, `aho_inspect`, `unlock_request`) the session points
-//! the model at when a tool is missing — plus the engineer defaults that sit at `Layer::Bundle`:
+//! the model at when a tool is missing, plus the engineer defaults that sit at `Layer::Bundle`:
 //! every operator layer (profile, files, env, flags) still shadows them.
 //! Products built on the spine `include` it; `Composition::include` carries these defaults along.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
@@ -22,9 +22,9 @@ use serde_json::json;
 
 pub const NAME: &str = "aho-base";
 
-/// Engineer defaults (`Layer::Bundle`). Doc 04/05: the product ships under `workspace`; doc 16:
-/// a 1 s grace window for async tool calls and a 10 min heartbeat while only calls are pending.
-/// Doc 05 shows `tool-terminal` Unlocked until `aho enable tool-terminal`; Claude Code hooks run
+/// Engineer defaults (`Layer::Bundle`). The product ships under `workspace`, with a 1 s grace
+/// window for async tool calls and a 10 min heartbeat while only calls are pending.
+/// `tool-terminal` stays Unlocked until `aho enable tool-terminal`; Claude Code hooks run
 /// commands a repository ships, so they also wait for the operator's `aho enable hooks-claude-code`.
 pub fn defaults() -> [(&'static str, serde_json::Value); 7] {
     [

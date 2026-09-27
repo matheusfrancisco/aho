@@ -1,4 +1,4 @@
-//! HTTPS termination (08: the web surface is HTTPS only). The operator supplies the PEM pair
+//! HTTPS termination (the web surface is HTTPS only). The operator supplies the PEM pair
 //! (`aho cert` generates a local CA + leaf); handshakes run off the accept loop so one slow or
 //! plain-HTTP client cannot stall the listener.
 

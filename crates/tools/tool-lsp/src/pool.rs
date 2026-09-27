@@ -37,12 +37,12 @@ pub struct Server {
     docs: tokio::sync::Mutex<HashMap<String, Doc>>,
 }
 
-/// What `Server::sync` did for one file.
+/// The outcome of `Server::sync` for one file.
 pub struct Synced {
     pub uri: String,
     pub text: String,
     pub version: i64,
-    /// When the server was told about new content; `None` = it already had this text.
+    /// The instant the server was told about new content; `None` = it already had this text.
     pub changed_at: Option<Instant>,
 }
 

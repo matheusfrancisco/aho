@@ -1,8 +1,8 @@
-//! Parent-log entries (08: a subagent's entries are mirrored into the parent under
-//! `Subagent/*`). All are `EntryKind::Custom { ns: "Subagent", name, body }` appended by
+//! Parent-log entries: a subagent's entries are mirrored into the parent under `Subagent/*`.
+//! All are `EntryKind::Custom { ns: "Subagent", name, body }` appended by
 //! `Principal::System(<provider>)`; every body carries `child` (decimal string) and `provider`.
-//! Entries derived from the transcript also carry `offset`, the byte just past the record they
-//! came from, which is where a resumed tail continues (12: crash-honest receipts).
+//! Entries derived from the transcript also carry `offset`, the byte right after the record they
+//! came from, which is where a resumed tail continues (crash-honest receipts).
 //!
 //! | name | when | body (besides child, provider) |
 //! |---|---|---|

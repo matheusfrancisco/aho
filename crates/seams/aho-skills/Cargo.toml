@@ -3,7 +3,7 @@ name = "aho-skills"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Skills seam: SKILL.md parsing (Untrusted), catalog snapshot, shared invocation render (10)"
+description = "Skills seam: SKILL.md parsing (Untrusted), catalog snapshot, shared invocation render"
 
 [dependencies]
 aho-types.workspace = true

@@ -3,7 +3,7 @@ name = "surface-acp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ACP v1 over stdio: aho as an Agent Client Protocol agent, one ACP session per aho Session (08, 01)"
+description = "ACP v1 over stdio: aho as an Agent Client Protocol agent, one ACP session per aho Session"
 
 [dependencies]
 aho-types.workspace = true

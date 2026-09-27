@@ -1,7 +1,7 @@
 //! The protocol as JSON Schema (draft 2020-12). `$defs` holds every table type; the root
 //! validates any frame (`ClientMessage` per method, `ServerMessage` per event); `x-aho-methods`
 //! pairs each method with its params and result (a reply's type depends on the request it
-//! answers, which JSON Schema cannot say). Objects are open: readers ignore unknown fields (12).
+//! answers, which JSON Schema cannot say). Objects are open: readers ignore unknown fields.
 //! Keys are emitted sorted so the file is byte-stable whatever map order serde_json was built with.
 
 use serde_json::{Map, Value, json};
@@ -152,7 +152,7 @@ pub fn render(p: &Protocol) -> String {
         "$id": "urn:aho:rpc",
         "$comment": HEADER,
         "title": "aho rpc protocol",
-        "description": "NDJSON frames over stdio or a unix socket (08, 12). The first client frame is `hello`; every request carries `id` and is answered by a `result` or `error` frame with `reply_to = id`; events carry `reply_to: null`. Unknown fields are ignored.",
+        "description": "NDJSON frames over stdio or a unix socket. The first client frame is `hello`; every request carries `id` and the server answers it with a `result` or `error` frame with `reply_to = id`; events carry `reply_to: null`. Readers ignore unknown fields.",
         "x-aho-version": {"min": p.version_min, "max": p.version_max},
         "x-aho-methods": methods,
         "x-aho-events": events,

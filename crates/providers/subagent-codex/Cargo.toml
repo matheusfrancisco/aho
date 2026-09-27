@@ -3,7 +3,7 @@ name = "subagent-codex"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Codex as a subagent: the real `codex` in tmux with the user's own credentials, observed through its rollout JSONL (08, 10, 12)"
+description = "Codex as a subagent: the real `codex` in tmux with the user's own credentials, observed through its rollout JSONL"
 
 [dependencies]
 aho-types.workspace = true

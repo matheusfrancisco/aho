@@ -3,7 +3,7 @@ name = "llm-anthropic-messages"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Anthropic Messages protocol adapter; late results render as user blocks (16)"
+description = "Anthropic Messages protocol adapter; late results render as user blocks"
 
 [dependencies]
 aho-types.workspace = true

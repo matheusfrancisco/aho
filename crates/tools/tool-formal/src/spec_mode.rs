@@ -1,10 +1,10 @@
-//! `14` — spec mode: the `spec` preset plus this prompt section plus the tool restriction.
+//! Spec mode: the `spec` preset plus this prompt section plus the tool restriction.
 
 /// Preset spec mode runs under: read-only on code, writes only under `spec/`, `SpawnsProcess`
 /// for the checkers.
 pub const SPEC_PRESET: &str = "spec";
 
-/// The interview protocol of doc 14, as the prompt section spec mode adds.
+/// The interview protocol, as the prompt section spec mode adds.
 pub const SPEC_MODE_SECTION: &str = "\
 # Spec mode
 

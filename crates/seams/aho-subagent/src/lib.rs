@@ -1,5 +1,5 @@
-//! `10`/`12` — subagents. Child policy = parent ⊓ decl; fork excludes the open turn;
-//! lifecycle is recorded in the *parent* log; a subagent is a `Remote` operation (16).
+//! Subagents. Child policy = parent ⊓ decl; fork excludes the open turn; lifecycle is recorded
+//! in the *parent* log; a subagent is a `Remote` operation.
 
 #![forbid(unsafe_code)]
 
@@ -63,7 +63,7 @@ pub enum SubagentError {
     Provider(String),
 }
 
-/// What a provider supports; a request needing an unsupported feature is rejected, never degraded.
+/// Features a provider supports; a request needing an unsupported feature is rejected, never degraded.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Features {
     pub fork: bool,
@@ -76,7 +76,7 @@ pub struct Features {
 pub trait SubagentProvider: Send + Sync {
     fn features(&self) -> Features;
     /// The parent's fork point: its last `Turn/End` on the head branch at which no call or
-    /// operation is open (06: a fork never inherits the in-flight turn). `None` when the parent
+    /// operation is open (a fork never inherits the in-flight turn). `None` when the parent
     /// has not completed a turn yet or the provider cannot fork.
     fn fork_point(&self) -> Option<EntryId> {
         None
@@ -85,7 +85,7 @@ pub trait SubagentProvider: Send + Sync {
     fn send(&self, child: SessionId, text: String) -> BoxFuture<'_, Result<(), SubagentError>>;
     fn interrupt(&self, child: SessionId) -> BoxFuture<'_, Result<(), SubagentError>>;
     fn wait(&self, child: SessionId) -> BoxFuture<'_, Result<Result_, SubagentError>>;
-    /// What the provider knows about one of its children; `None` for an unknown id.
+    /// The provider's view of one of its children; `None` for an unknown id.
     fn child_info(&self, _child: SessionId) -> Option<ChildInfo> {
         None
     }

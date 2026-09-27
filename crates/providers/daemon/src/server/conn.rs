@@ -1,5 +1,5 @@
 //! Daemon connection I/O: socket binding, frame helpers, request params, event and approval forwarding
-//! (split out of server.rs for the file-size ratchet, doc 12).
+//! (split out of server.rs for the file-size ratchet).
 
 use super::*;
 
@@ -320,7 +320,7 @@ pub(super) async fn forward(
 }
 
 /// Cards go to the session's live owner as `approval.request` with the fields every surface
-/// renders (05); with no owner the reply slot is dropped, which the channel answers as
+/// renders; with no owner the reply slot is dropped, which the channel answers as
 /// `Unavailable` (fail closed).
 pub(super) async fn forward_approvals(d: Arc<Daemon>, sid: SessionId, mut requests: mpsc::Receiver<ApprovalRequest>) {
     while let Some((card, reply)) = requests.recv().await {

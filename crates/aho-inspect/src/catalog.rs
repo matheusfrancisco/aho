@@ -1,4 +1,4 @@
-//! `aho catalog config`: every settable key, generated from the schema the capabilities declare (03).
+//! `aho catalog config`: every settable key, generated from the schema the capabilities declare.
 
 use aho_config::{ConfigKey, Schema};
 use aho_types::Value;

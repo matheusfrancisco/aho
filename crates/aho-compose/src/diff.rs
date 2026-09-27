@@ -1,4 +1,4 @@
-//! `aho plan --patch` / every UI toggle: the state diff shown before anything is written (05 rule 1).
+//! `aho plan --patch` / every UI toggle: the state diff shown before anything is written.
 
 use std::collections::BTreeSet;
 
@@ -35,7 +35,7 @@ pub struct CapFlip {
     pub unlocks: ConsequenceSet,
     /// Classes the flip takes away (the capability stops being Active).
     pub revokes: ConsequenceSet,
-    /// What the capability still lacks after the change.
+    /// Requirements the capability still lacks after the change.
     pub missing: Vec<Missing>,
 }
 

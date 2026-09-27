@@ -1,13 +1,12 @@
-//! `aho-sdk-min` (01 line 95): the spine plus the rpc surface, embeddable as a Rust library.
+//! `aho-sdk-min`: the spine plus the rpc surface, embeddable as a Rust library.
 //!
-//! * Rust (00: "SDK (Rust lib; TS/Python via stdio JSON-RPC)"): [`Sdk::builder`] loads the
-//!   composition, [`Sdk::open_session`] boots a [`Session`] and attaches an in-process rpc
-//!   [`Client`] to it — `prompt`, `subscribe`, `approve`, typed [`Event`]s. The same client drives
-//!   a child `aho rpc` ([`Client::spawn`]) or a socket. [`SdkSession::session`] is the `Session`
-//!   API itself (08).
-//! * TS/Python (08 line 35, 09 line 50): thin clients over `aho rpc` stdio, generated from the
-//!   protocol table ([`protocol`]) by `cargo run -p aho-sdk -- gen` into `aho/sdk/`; a test fails
-//!   when the committed sources drift from the table ([`codegen`]).
+//! * Rust: [`Sdk::builder`] loads the composition, [`Sdk::open_session`] boots a [`Session`] and
+//!   attaches an in-process rpc [`Client`] to it (`prompt`, `subscribe`, `approve`, typed
+//!   [`Event`]s). The same client drives a child `aho rpc` ([`Client::spawn`]) or a socket.
+//!   [`SdkSession::session`] is the `Session` API itself.
+//! * TS/Python: thin clients over `aho rpc` stdio, generated from the protocol table
+//!   ([`protocol`]) by `cargo run -p aho-sdk -- gen` into `aho/sdk/`; a test fails when the
+//!   committed sources drift from the table ([`codegen`]).
 //!
 //! Nothing here re-implements the session: approvals, takeover, replay, and every method go
 //! through surface-rpc exactly as for any other client.
@@ -250,7 +249,7 @@ impl SdkBuilder {
 
 /// The CLI enters the project directory so the host world's default root is the project; an
 /// embedder cannot change the process's directory for one session, so the project (and a shadow
-/// dir under the given home) become bundle defaults instead — every operator layer still wins.
+/// dir under the given home) become bundle defaults instead; every operator layer still wins.
 fn embedder_defaults(c: Composition, project: &Path, home: &Path) -> Composition {
     let schema = aho_compose::schema_of(&c);
     let shadow = home.join(".aho").join("shadow");
@@ -264,7 +263,7 @@ fn embedder_defaults(c: Composition, project: &Path, home: &Path) -> Composition
 
 // ───────────────────────────── sdk ─────────────────────────────
 
-/// Which log a session runs on.
+/// The log a session runs on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Open {
     /// A new session under `session.dir` (`<id>.jsonl`), like `aho run`.
@@ -345,7 +344,7 @@ impl Sdk {
     #[allow(clippy::disallowed_methods, reason = "authority: sdk-session-open")]
     async fn boot(&self, open: Open) -> Result<Booted, SdkError> {
         let dir = self.session_dir();
-        // Through the cross-session index, like every other writer of this directory (06). Opened
+        // Through the cross-session index, like every other writer of this directory. Opened
         // only for on-disk sessions: an in-memory one must not create the directory or database.
         let writer = |id: SessionId| -> Result<Arc<dyn LogStore>, SdkError> {
             let index = Arc::new(
@@ -388,7 +387,7 @@ impl Sdk {
             bootstrap: aho_compose::bootstrap_entries(&self.planned),
             log,
             approval,
-            // The embedding process owns the session, as stdio ownership does for `aho rpc` (08).
+            // The embedding process owns the session, as stdio ownership does for `aho rpc`.
             operator: Operator::authenticate(OperatorProof::local_tty()),
             workspace: self.workspace().display().to_string(),
             home: self.inputs.home.display().to_string(),
@@ -450,7 +449,7 @@ impl SdkSession {
     pub fn log_path(&self) -> Option<&Path> {
         self.path.as_deref()
     }
-    /// The `Session` API itself (08): what every surface drives.
+    /// The `Session` API itself: what every surface drives.
     pub fn session(&self) -> &Arc<Session> {
         &self.session
     }

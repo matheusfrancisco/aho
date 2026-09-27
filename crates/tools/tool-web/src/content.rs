@@ -1,6 +1,6 @@
 //! Content-type awareness: what a fetched body is, and how its bytes become text.
 
-/// What a response body is, by `content-type` or (when absent) by sniffing.
+/// The kind of a response body, by `content-type` or (when absent) by sniffing.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
     Html,

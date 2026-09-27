@@ -3,7 +3,7 @@ name = "tool-schedule"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "schedule_create / schedule_list / schedule_cancel (at RFC3339 | every | 5-field UTC cron) and the Scheduler driver that fires them as prompts (00, 10)"
+description = "schedule_create / schedule_list / schedule_cancel (at RFC3339 | every | 5-field UTC cron) and the Scheduler driver that fires them as prompts"
 
 [dependencies]
 aho-types.workspace = true

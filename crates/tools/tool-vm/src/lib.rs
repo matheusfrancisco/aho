@@ -1,8 +1,8 @@
-//! The 13 `vm_*` tools (00, 07) over the session's VM lab (`aho-vm::VmLab`, `vm-qemu`): the
+//! The 13 `vm_*` tools over the session's VM lab (`aho-vm::VmLab`, `vm-qemu`): the
 //! agent creates machines from operator recipes inside its own network, starts and stops them,
 //! talks to their serial console, and drives their screen. Machines are named, never paths;
-//! recipes and media are the operator's (`aho add recipe`, `aho media import`). Every call is
-//! checked against the session's lease by the lab before any effect (`RevocationEffective`).
+//! recipes and media are the operator's (`aho add recipe`, `aho media import`). The lab checks
+//! every call against the session's lease before any effect (`RevocationEffective`).
 //!
 //! Classes: looking (list, status, console read, screenshot, pointer) is `ReadOnly`; everything
 //! that changes a machine is `ControlsVM`, which presets below `lab` ask for or deny.
@@ -174,7 +174,7 @@ pub static TOOLS: &[ToolDecl] = &[
     )
     .schema(schema_screenshot)
     .safe(),
-    ToolDecl::new("vm_pointer", "Where the pointer is on a machine's screen, and the screen size.", Consequence::ReadOnly)
+    ToolDecl::new("vm_pointer", "The pointer's position on a machine's screen, and the screen size.", Consequence::ReadOnly)
         .schema(schema_name)
         .safe(),
     ToolDecl::new("vm_mouse", "Move the pointer on a machine's screen to (x, y), optionally clicking there.", Consequence::ControlsVM)

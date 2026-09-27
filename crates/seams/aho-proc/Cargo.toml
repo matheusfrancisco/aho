@@ -3,7 +3,7 @@ name = "aho-proc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Subprocess seam and the operations table behind every tool call (07, 12, 16)"
+description = "Subprocess seam and the operations table behind every tool call"
 
 [dependencies]
 aho-types.workspace = true

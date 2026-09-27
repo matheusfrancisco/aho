@@ -1,4 +1,4 @@
-//! `12` "Process topology: one daemon, thin surfaces" — `aho serve`. One process owns every
+//! `aho serve`: one daemon, thin surfaces. One process owns every
 //! session under [`SessionHost::sessions_dir`]; clients attach over a unix socket speaking
 //! [`wire`] frames.
 //!
@@ -15,11 +15,11 @@
 //!
 //! Authentication: the socket is `0600`, so every connection is this user; *driving* a session
 //! (prompt, steer, abort, operator commands, host calls, reopen) needs the ownership an attach was
-//! allowed (`12` takeover). A connection whose attach was refused is read-only: it watches.
+//! allowed. A connection whose attach was refused is read-only: it watches.
 //!
 //! Reload is exec-in-place: intents are persisted, turns wound down and closed, the host's
 //! [`SessionHost::before_exec`] runs, and the new image is exec'd with the initiator's connection
-//! as its readiness descriptor — one byte on it tells the client that asked that the new binary
+//! as its readiness descriptor: one byte on it tells the requesting client that the new binary
 //! serves. Every other descriptor is close-on-exec, so other clients see end of file and reconnect.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -54,7 +54,7 @@ use crate::wire::{self, ClientFrame, ServerFrame};
 
 pub mod client;
 
-/// What the app provides: where logs live and how a session boots (composition, plan, loadout),
+/// The app's side: where logs live and how a session boots (composition, plan, loadout),
 /// plus the hooks around what the host runs next to a session (drivers).
 pub trait SessionHost: Send + Sync + 'static {
     /// Session logs live at `<dir>/<id as lowercase hex>.jsonl`, the name every CLI projection reads.
@@ -101,7 +101,7 @@ pub struct ServeOptions {
     pub socket: PathBuf,
     /// Exit after this long with no clients and no running turns.
     pub idle_exit: Option<Duration>,
-    /// How long a reload (or shutdown) lets running turns wind down after `abort()`.
+    /// Time a reload (or shutdown) lets running turns wind down after `abort()`.
     pub reload_grace: Duration,
     /// Interval between crash scans (a crash is confirmed on the second scan).
     pub scan_interval: Duration,
@@ -114,7 +114,7 @@ impl ServeOptions {
     }
 }
 
-/// Why [`serve`] returned. A successful reload never returns: the process image is replaced.
+/// The reason [`serve`] returned. A successful reload never returns: the process image is replaced.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ServeExit {
     Idle,
@@ -303,7 +303,7 @@ pub async fn serve(opts: ServeOptions, host: Arc<dyn SessionHost>, ready: Option
     }
     let hosted: Vec<SessionId> = d.st().sessions.keys().copied().collect();
     for sid in hosted {
-        // Nobody is left to tell: the daemon's stderr is its log.
+        // No client is left to tell: the daemon's stderr is its log.
         for p in d.host.closing(sid).await {
             eprintln!("aho serve: session {}: {p}", sid.0);
         }

@@ -3,7 +3,7 @@
 use aho_types::BoxFuture;
 use tokio::sync::{mpsc, oneshot};
 
-/// How a driven turn ended.
+/// The outcome of a driven turn.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct TurnEnd {
     /// The last non-empty assistant text of the turn ("" when it produced none).

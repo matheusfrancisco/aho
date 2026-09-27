@@ -1,17 +1,17 @@
-//! Docs 09, 13: "a Verify gate cannot pass while a covering invariant is `Fail` or `Stale`" — the
-//! evidence a verify gate's `task_complete` hands the engine.
+//! The evidence a verify gate's `task_complete` hands the engine: a Verify gate cannot pass while
+//! a covering invariant is `Fail` or `Stale`.
 //!
-//! What the running system keeps about invariants, and where this reads it:
-//! * `Invariant/Registered { id, covers }` — appended by tool-formal on the engineer's approval;
+//! The invariant records the running system keeps, and where this reads them:
+//! * `Invariant/Registered { id, covers }`: appended by tool-formal on the engineer's approval;
 //!   `covers` are paths, globs, log kinds or entry ranges. Only entries hold them.
-//! * `Invariant/Checked { id, verdict, code_hash }` — the only way a verdict enters the log; the
+//! * `Invariant/Checked { id, verdict, code_hash }`: the only way a verdict enters the log; the
 //!   fold keeps the latest per id (`State::invariants`), and `aho_inspect::invariants` judges it
 //!   against the current workspace checkpoint: a check of other code is `Stale`, never `Pass`.
 //!   tool-formal binds each verdict to the workspace tree it checked, so the rows are
 //!   `aho_inspect::current_invariants`: Stale once a later checkpoint has other code; before the
 //!   first checkpoint the recorded verdict stands.
 //!
-//! When a verify gate completes, the session log (`aho.log`) is folded as it stands at that
+//! A completing verify gate folds the session log (`aho.log`) as it stands at that
 //! moment, so a file written earlier in the same step already makes a check stale. Without the
 //! log (a composition outside a session) the rows come from the state the context hook last saw
 //! and no registration is known.

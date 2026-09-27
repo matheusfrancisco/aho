@@ -1,11 +1,11 @@
-//! Hosts the `aho-control` drivers next to a live `aho_session::Session` (`01` "a driver, not a
-//! fork"; `00` schedules and workflows). A library the daemon / CLI calls, not a capability.
+//! Hosts the `aho-control` drivers (schedules and workflows) next to a live
+//! `aho_session::Session`. The daemon and CLI call this library; it is not a capability.
 //!
-//! * [`SessionSink`] — `PromptSink` over a session: a running turn is waited out, never
+//! * [`SessionSink`]: `PromptSink` over a session. A running turn is waited out, never
 //!   interrupted; a key the log already holds runs nothing and reports the earlier turn.
-//! * [`DriverSeed`] — the services to seed *before* `Session::boot`: `tool-schedule` and
+//! * [`DriverSeed`]: the services to seed *before* `Session::boot`. `tool-schedule` and
 //!   `tool-workflow` build only when a driver will run for the session.
-//! * [`host`] — after boot: spawns the scheduler, the ralph loop driver, and the forwarder that
+//! * [`host`]: after boot, spawns the scheduler, the ralph loop driver, and the forwarder that
 //!   wakes them (a `schedule/*` entry wakes the scheduler, every turn end wakes the loop driver).
 
 #![forbid(unsafe_code)]
@@ -23,8 +23,8 @@ use tokio::task::JoinHandle;
 use tool_schedule::{Scheduler, SchedulerLink};
 use tool_workflow::{LoopLink, Looper};
 
-/// How long to wait for an `Idle` before trying a busy session again anyway (covers an `Idle`
-/// sent just before we listened, while the finishing turn still held the session).
+/// Wait this long for an `Idle` before trying a busy session again anyway (covers an `Idle`
+/// sent before we started listening, while the finishing turn still held the session).
 const BUSY_RETRY: Duration = Duration::from_millis(500);
 
 pub struct SessionSink {
@@ -43,7 +43,7 @@ impl SessionSink {
 }
 
 impl PromptSink for SessionSink {
-    /// The prompt is recorded as the driver's (`System(by)`), never the operator's (04); the key
+    /// The prompt is recorded as the driver's (`System(by)`), never the operator's; the key
     /// (`schedule:<id>:<n>`) names the occurrence so a redelivery is admitted once.
     fn prompt(&self, by: &'static str, text: String, key: String) -> BoxFuture<'_, Result<TurnEnd, DriveError>> {
         Box::pin(async move {

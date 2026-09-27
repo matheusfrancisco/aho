@@ -3,7 +3,7 @@ name = "aho-control"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "What drivers (schedules, ralph loops) and session modes (plan mode) may ask of a live session: prompt sink, clock, ceiling (01, 04, 10)"
+description = "The requests drivers (schedules, ralph loops) and session modes (plan mode) may make of a live session: prompt sink, clock, ceiling"
 
 [dependencies]
 aho-types.workspace = true

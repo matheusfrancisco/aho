@@ -165,7 +165,7 @@ impl Live {
         (format!("approval-{}", m.synthetic), true)
     }
 
-    /// Puts one approval card to the client. Operator authority is the ACP client's (08: process
+    /// Puts one approval card to the client. Operator authority is the ACP client's (process
     /// ownership); the agent never answers its own card. A card raised after the client cancelled
     /// the turn is answered `cancelled` without asking.
     fn ask(self: &Arc<Self>, m: &mut Mapper, card: aho_policy::ApprovalCard, reply: oneshot::Sender<Decided>) {
@@ -231,7 +231,7 @@ impl Live {
     }
 
     /// `session/cancel`: aborts the turn. The Session stops its running calls and ends the turn at
-    /// the next boundary — between steps, mid model request, or while waiting — without calling
+    /// the next boundary (between steps, mid model request, or while waiting) without calling
     /// the model again; the prompt then answers `cancelled`.
     pub(crate) fn cancel(&self) {
         let mut t = lock(&self.turn);
@@ -288,7 +288,7 @@ impl Live {
         Ok(PromptResponse { stop_reason, meta: None })
     }
 
-    /// A cancelled turn can end with its own calls still open (their results land later, 16):
+    /// A cancelled turn can end with its own calls still open (their results land later):
     /// tell the client they are over before the `cancelled` answer (prompt-turn §Cancellation).
     /// Calls earlier turns left running are not this cancel's to report.
     fn fail_open_calls(&self, turn: u64) {

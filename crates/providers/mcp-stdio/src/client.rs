@@ -21,7 +21,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 
 /// Stderr kept for error messages.
 const STDERR_TAIL: usize = 4096;
-/// How often a blocked request checks its cancellation token.
+/// Interval at which a blocked request checks its cancellation token.
 const POLL: Duration = Duration::from_millis(20);
 /// Upper bound on pages for one paginated list (a looping cursor is a server bug).
 const MAX_PAGES: usize = 1000;
@@ -101,7 +101,7 @@ impl Conn {
     }
 }
 
-/// What `initialize` told us.
+/// The `initialize` answer.
 #[derive(Clone, Debug, Default)]
 pub struct ServerInfo {
     pub protocol_version: String,

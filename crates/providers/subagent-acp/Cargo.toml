@@ -3,7 +3,7 @@ name = "subagent-acp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "External ACP agents as subagents: aho as the ACP client; child updates mirrored into the parent log, permission requests to the parent's operator (08, 10, 12)"
+description = "External ACP agents as subagents: aho as the ACP client; child updates mirrored into the parent log, permission requests to the parent's operator"
 
 [dependencies]
 aho-types.workspace = true

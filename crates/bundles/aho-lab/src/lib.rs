@@ -1,7 +1,7 @@
-//! `12`/`13`/`14` — the web product plus the formal checkers behind spec mode (TLC for TLA+,
-//! Lean), long-term memory over local embeddings, the session query tools, Claude Code and Codex
-//! as subagent providers (12 "observe, don't wrap"; `aho set seams.subagent subagent-claude`), and
-//! self-dev reload (`aho selfdev reload`), and the VM lab (07): `vm-qemu` under an operator lease,
+//! The web product plus the formal checkers behind spec mode (TLC for TLA+, Lean), long-term
+//! memory over local embeddings, the session query tools, Claude Code and Codex as subagent
+//! providers (observed, never wrapped; `aho set seams.subagent subagent-claude`), self-dev reload
+//! (`aho selfdev reload`), and the VM lab: `vm-qemu` under an operator lease,
 //! the 13 `vm_*` tools, `world = vm` (the session's sandbox VM), and the session desktop tools.
 //! Checkers, foreign CLIs and QEMU lock with a named fix when their binaries are missing; nothing
 //! here widens the preset (ControlsVM / ControlsDesktop still need `aho preset lab` or an approval).

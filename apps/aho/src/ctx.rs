@@ -91,7 +91,7 @@ pub struct Ctx {
     /// Canonical project directory; also the process working directory from here on, so the host
     /// world's default `workspace.root` ("the directory aho was started in") is the project.
     pub project: PathBuf,
-    /// Where aho was launched, for resolving relative paths the operator typed.
+    /// The launch directory, for resolving relative paths the operator typed.
     pub launched_in: PathBuf,
     pub comp: Composition,
 }
@@ -143,7 +143,7 @@ impl Ctx {
         workspace_of(&self.project, p)
     }
 
-    /// The daemon's socket (12): `--socket`, else `<project>/.aho/aho.sock`.
+    /// The daemon's socket: `--socket`, else `<project>/.aho/aho.sock`.
     pub fn socket(&self, typed: Option<&Path>) -> PathBuf {
         match typed {
             Some(p) => self.typed_path(p),
@@ -272,7 +272,7 @@ pub fn branch(path: &Path) -> Result<(JsonlLog, Vec<Entry>), Fail> {
     Ok((log, entries))
 }
 
-/// The derived cross-session index next to the logs (06: JSONL stays the truth; this is a
+/// The derived cross-session index next to the logs (JSONL stays the truth; this is a
 /// rebuildable projection). Opening it scans the directory only when the database is new.
 pub fn session_index(dir: &Path) -> Result<std::sync::Arc<SessionIndex>, Fail> {
     let db = dir.join("index.sqlite3");
@@ -286,7 +286,7 @@ pub fn open_writer(dir: &Path, id: SessionId) -> Result<IndexedLog, Fail> {
     session_index(dir)?.open_log(id).map_err(|e| err(format!("the log of session {} could not be opened ({e})", hex(id))))
 }
 
-/// Crash-honest liveness (12): the pid runs *and* started no later than the session recorded.
+/// Crash-honest liveness: the pid runs *and* started no later than the session recorded.
 pub fn owner_alive(p: &ProcessIdentity) -> bool {
     if p.pid == std::process::id() {
         return true;

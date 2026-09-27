@@ -3,7 +3,7 @@ name = "session-drive"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Hosts the schedule and ralph-loop drivers next to a live Session: SessionSink, DriverSeed, host() (00, 01, 10)"
+description = "Hosts the schedule and ralph-loop drivers next to a live Session: SessionSink, DriverSeed, host()"
 
 [dependencies]
 aho-types.workspace = true

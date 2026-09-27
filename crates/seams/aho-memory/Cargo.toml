@@ -3,7 +3,7 @@ name = "aho-memory"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Memory seam: hybrid retrieval, rerank, suppression, extraction hooks (12)"
+description = "Memory seam: hybrid retrieval, rerank, suppression, extraction hooks"
 
 [dependencies]
 aho-types.workspace = true

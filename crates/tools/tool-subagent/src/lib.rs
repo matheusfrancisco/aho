@@ -1,17 +1,17 @@
-//! `04`/`10`/`12`/`16` — model-facing subagent tools over the `subagent` seam.
+//! Model-facing subagent tools over the `subagent` seam.
 //!
 //! * `subagent` / `subagent_fork` start a child and run it to idle *inside this tool call's
-//!   operation* (kind `Remote`, 16): the parent sees the fixed placeholder and keeps working;
+//!   operation* (kind `Remote`): the parent sees the fixed placeholder and keeps working;
 //!   the child's last message arrives as this call's (possibly late) result.
-//! * The child's policy is `aho_policy::child_policy(parent, decl_cut, is_async, bubble)` (04):
+//! * The child's policy is `aho_policy::child_policy(parent, decl_cut, is_async, bubble)`:
 //!   `preset` narrows, nothing widens; an `async` child cannot ask the operator unless `bubble`.
-//! * Lifecycle is recorded in the *parent* log (10, 12): every result that closes a child run
+//! * Lifecycle is recorded in the *parent* log: every result that closes a child run
 //!   carries `value.events = [{"kind": Subagent/Started}, {"kind": Subagent/Ended}]`, which the
 //!   session appends right after the `Tool/Result`. A run is always closed, even when it is
-//!   interrupted or fails, so no child row stays open forever (12).
+//!   interrupted or fails, so no child row stays open forever.
 //!
 //! The classes are `ReadOnly`: a call grants nothing the child's own decision chain does not
-//! re-check — every child call is reviewed under the narrowed child policy.
+//! re-check: every child call is reviewed under the narrowed child policy.
 
 #![forbid(unsafe_code)]
 
@@ -139,7 +139,7 @@ fn schema_subagent(_: &BoundWorld) -> RootSchema {
 fn schema_fork(_: &BoundWorld) -> RootSchema {
     object(
         json!({
-            "prompt": {"type": "string", "description": "What the fork should do; it already knows the conversation up to the previous turn."},
+            "prompt": {"type": "string", "description": "The fork's task; it already knows the conversation up to the previous turn."},
             "label": {"type": "string", "description": "Short name for it; default `fork`."}
         }),
         &["prompt"],

@@ -106,7 +106,7 @@ pub enum Message {
     Response { id: RequestId, result: Result<Value, RpcError> },
 }
 
-/// Why an incoming frame was not a message, and whether (and to which id) to answer it.
+/// The reason an incoming frame was not a message, and whether (and to which id) to answer it.
 /// Something shaped like a response is never answered, so two peers cannot ping-pong errors.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rejected {

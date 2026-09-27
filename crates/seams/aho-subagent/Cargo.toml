@@ -3,7 +3,7 @@ name = "aho-subagent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Subagent seam: spawn/fork providers, child policy, lifecycle in the parent log (10, 12)"
+description = "Subagent seam: spawn/fork providers, child policy, lifecycle in the parent log"
 
 [dependencies]
 aho-types.workspace = true

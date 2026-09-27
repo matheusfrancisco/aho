@@ -3,7 +3,7 @@ name = "pty-host"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Terminals on the host: portable-pty sessions rendered by vt100, process-tree close; world = host only (07)"
+description = "Terminals on the host: portable-pty sessions rendered by vt100, process-tree close; world = host only"
 
 [dependencies]
 aho-types.workspace = true

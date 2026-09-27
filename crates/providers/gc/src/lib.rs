@@ -1,23 +1,23 @@
 //! `aho gc [--dry-run]`: what aho left on disk and in the process table that no session needs.
 //!
-//! * 04: "quotas and an owner-session on every resource-holding capability; `aho gc --dry-run`
-//!   lists orphans by owner and age; `aho gc` reclaims".
-//! * 11: "a tree is reachable while any log branch references it; `aho gc` prunes the rest".
-//! * 12: "`aho gc` reaps children (viewers, jobs, sandboxes) orphaned by a dead identity …
-//!   an identity must be missing on two consecutive scans before anything is marked gone";
-//!   "crash-honest receipts".
+//! * Every resource-holding capability has quotas and an owner session; `aho gc --dry-run`
+//!   lists orphans by owner and age; `aho gc` reclaims.
+//! * A tree is reachable while any log branch references it; `aho gc` prunes the rest.
+//! * `aho gc` reaps children (viewers, jobs, sandboxes) orphaned by a dead identity, found through
+//!   crash-honest receipts. An identity must be missing on two consecutive scans before anything
+//!   is marked gone.
 //!
 //! [`scan`] reads every session log under the session directory, on every branch, and lists:
-//! * [`OrphanKind::Snapshot`] — checkpoint trees in this project's shadow repositories that no
+//! * [`OrphanKind::Snapshot`]: checkpoint trees in this project's shadow repositories that no
 //!   `Workspace/Checkpoint` references ([`snapshots`](crate::snapshots));
-//! * [`OrphanKind::Worktree`] — `.aho/worktrees/<name>` whose sessions' logs are gone or closed
+//! * [`OrphanKind::Worktree`]: `.aho/worktrees/<name>` whose sessions' logs are gone or closed
 //!   longer than the retention;
-//! * [`OrphanKind::Spill`] — spill files no `Tool/Result.spill_ref` names;
-//! * [`OrphanKind::Child`] — children with a `Child/Spawned` receipt (`aho_proc::spawned`, written
+//! * [`OrphanKind::Spill`]: spill files no `Tool/Result.spill_ref` names;
+//! * [`OrphanKind::Child`]: children with a `Child/Spawned` receipt (`aho_proc::spawned`, written
 //!   by the session's operations table) whose owner identity `(pid, start_time)` from
 //!   `Session/Meta` was missing on this scan and the previous one (the state file carries the
 //!   previous scan across runs).
-//! * [`OrphanKind::Sandbox`] / [`OrphanKind::Machine`] — a namespace sandbox or network whose
+//! * [`OrphanKind::Sandbox`] / [`OrphanKind::Machine`]: a namespace sandbox or network whose
 //!   session log is gone, and VM machines whose session is gone or whose lease ended
 //!   ([`sandboxes`](crate::sandboxes)).
 //!
@@ -64,7 +64,7 @@ pub struct ScanInputs {
     pub session_dir: PathBuf,
     /// `workspace.shadow_dir` (default `~/.aho/shadow`); logs may name more.
     pub shadow_dir: PathBuf,
-    /// Where the previous scan's missing owners are kept; `None` makes every scan a first scan.
+    /// File holding the previous scan's missing owners; `None` makes every scan a first scan.
     pub state_file: Option<PathBuf>,
     pub now: Timestamp,
     pub retention_ms: u64,
@@ -113,7 +113,7 @@ impl OrphanKind {
     }
 }
 
-/// What reclaiming an orphan acts on.
+/// The thing reclaiming an orphan acts on.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Target {
     /// An unreferenced root tree; the loose objects only orphans reach go with it.
@@ -158,7 +158,7 @@ pub struct Orphan {
     pub age_ms: Option<u64>,
     /// Bytes on disk it frees; `None` for processes.
     pub size: Option<u64>,
-    /// What the table shows in the PATH column.
+    /// The table's PATH column.
     pub path: String,
     pub target: Target,
 }
@@ -225,7 +225,7 @@ impl GcReport {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ReclaimOpts {
-    /// How long a child gets after SIGTERM before SIGKILL.
+    /// Time a child gets after SIGTERM before SIGKILL.
     pub term_grace_ms: u64,
 }
 

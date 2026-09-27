@@ -3,7 +3,7 @@ name = "tool-run-code"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "run_code (PTC): python/node programs through the world's Subprocess, calling tools back through the session's decision chain (00, 07, 10)"
+description = "run_code (PTC): python/node programs through the world's Subprocess, calling tools back through the session's decision chain"
 
 [dependencies]
 aho-types.workspace = true

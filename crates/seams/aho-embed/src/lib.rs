@@ -1,4 +1,4 @@
-//! `12` — embeddings. Every stored vector carries its model id; dense similarity only compares
+//! Embeddings. Every stored vector carries its model id; dense similarity only compares
 //! same-model vectors (`similarity` returns `None` across models, never a silent 0). Providers
 //! drop resident state on `unload` (idle unload, allocator purge).
 

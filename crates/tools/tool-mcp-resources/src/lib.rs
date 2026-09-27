@@ -1,4 +1,4 @@
-//! `10` — MCP resources as three shared tools: `list_mcp_resources`,
+//! MCP resources as three shared tools: `list_mcp_resources`,
 //! `list_mcp_resource_templates`, `read_mcp_resource`.
 //!
 //! They reach the running, classified servers in the `McpHandle` directory (quarantined servers
@@ -86,7 +86,7 @@ fn unknown_server(dir: &McpDirectory, name: &str) -> ExecOutcome {
     ExecOutcome::err("MCP_UNKNOWN_SERVER", format!("no running MCP server is named `{name}` ({known}); nothing was read."))
 }
 
-/// One line per resource: `- <uri>  <name> (<mime>) — <description>`.
+/// One line per resource: `- <uri>  <name> (<mime>): <description>`.
 pub fn resource_line(r: &Resource) -> String {
     let mut s = format!("- {}", r.uri);
     let label = r.title.as_deref().unwrap_or(&r.name);
@@ -97,7 +97,7 @@ pub fn resource_line(r: &Resource) -> String {
         s.push_str(&format!(" ({m})"));
     }
     if let Some(d) = r.description.as_deref().filter(|d| !d.is_empty()) {
-        s.push_str(&format!(" — {d}"));
+        s.push_str(&format!(": {d}"));
     }
     s
 }
@@ -112,7 +112,7 @@ pub fn template_line(t: &ResourceTemplate) -> String {
         s.push_str(&format!(" ({m})"));
     }
     if let Some(d) = t.description.as_deref().filter(|d| !d.is_empty()) {
-        s.push_str(&format!(" — {d}"));
+        s.push_str(&format!(": {d}"));
     }
     s
 }
@@ -250,7 +250,7 @@ declare_capability!(
     provides = [],
     requires = [Requirement::Seam(aho_mcp::SEAM)],
     tools = TOOLS,
-    doc = "list_mcp_resources, list_mcp_resource_templates, read_mcp_resource over running MCP servers; blobs never enter model text (10)."
+    doc = "list_mcp_resources, list_mcp_resource_templates, read_mcp_resource over running MCP servers; blobs never enter model text."
 );
 
 #[cfg(test)]
@@ -266,7 +266,7 @@ mod tests {
             description: Some("first".into()),
             mime: Some("text/plain".into()),
         };
-        assert_eq!(resource_line(&r), "- mem://a  Alpha (text/plain) — first");
+        assert_eq!(resource_line(&r), "- mem://a  Alpha (text/plain): first");
         let bare = Resource { uri: "mem://b".into(), name: String::new(), title: None, description: None, mime: None };
         assert_eq!(resource_line(&bare), "- mem://b");
         let t = ResourceTemplate {
@@ -276,7 +276,7 @@ mod tests {
             description: Some("by id".into()),
             mime: None,
         };
-        assert_eq!(template_line(&t), "- mem://n/{id}  note — by id");
+        assert_eq!(template_line(&t), "- mem://n/{id}  note: by id");
     }
 
     #[test]

@@ -1,5 +1,5 @@
-//! The one renderer (04): every decision becomes the sentence the model, the approval card,
-//! the HUD and `aho explain` show. Message voice (12): what happened, what we did, how to
+//! The one renderer: every decision becomes the sentence the model, the approval card,
+//! the HUD and `aho explain` show. Message voice: what happened, what we did, how to
 //! change it; no internal nouns.
 
 use aho_cap::{BoundWorld, ToolDecl};
@@ -9,7 +9,7 @@ use aho_types::*;
 use crate::chain::{ChainOutcome, DecisionReason, SafetyKind};
 use crate::{Preset, SandboxPolicy};
 
-/// Why, as a clause that completes "`tool` …".
+/// The reason, as a clause that completes "`tool` …".
 fn clause(r: &DecisionReason) -> String {
     match r {
         DecisionReason::Rule { origin, rule } => format!("rule `{rule}` from {origin}"),
@@ -97,7 +97,7 @@ fn escalate_list(targets: &[Consequence]) -> String {
     targets.iter().map(|t| format!("\"{}\"", t.name())).collect::<Vec<_>>().join(", ")
 }
 
-/// The one renderer. `DenyEscalatable` renders the `[sandbox: …]` marker and hint of 04.
+/// The one renderer. `DenyEscalatable` renders the `[sandbox: …]` marker and escalation hint.
 pub fn render(outcome: &ChainOutcome, tool: &str) -> String {
     match outcome {
         ChainOutcome::Allow(r) => format!("`{tool}` was allowed by {}.", clause(r)),
@@ -110,7 +110,7 @@ pub fn render(outcome: &ChainOutcome, tool: &str) -> String {
             };
             format!(
                 "[sandbox: `{tool}` denied under {under}]\n\
-                 [sandbox: escalation available — retry this exact call once with escalate: [{}] and a justification]",
+                 [sandbox: escalation available; retry this exact call once with escalate: [{}] and a justification]",
                 escalate_list(targets)
             )
         }
@@ -118,7 +118,7 @@ pub fn render(outcome: &ChainOutcome, tool: &str) -> String {
 }
 
 /// The four approval outcomes read differently so the model neither retries a human "no" nor
-/// wastes a turn asking when prompts are off (04).
+/// wastes a turn asking when prompts are off.
 pub fn render_outcome(o: ApprovalOutcome, tool: &str) -> String {
     match o {
         ApprovalOutcome::Rejected => {
@@ -162,7 +162,7 @@ fn class_aware_cut(outcome: &ChainOutcome, class: Consequence, args: &Value, pol
     }
 }
 
-/// Approval card payload: never a live tool object (10). Cites the class, never the vendor.
+/// Approval card payload: never a live tool object. Cites the class, never the vendor.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApprovalCard {
     pub tool: String,

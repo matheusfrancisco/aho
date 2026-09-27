@@ -1,6 +1,6 @@
-//! Verbs over the resolved plan (03, 05). Every write is plan → diff → `apply? [y/N]` →
-//! toml_edit into the most specific layer file; `enable`/`disable`/`allow`/`set`/`preset` then
-//! record the change in the current session (`record::record_change`), as the walkthroughs show.
+//! Verbs over the resolved plan. Every write is plan → diff → `apply? [y/N]` → toml_edit into
+//! the most specific layer file; `enable`/`disable`/`allow`/`set`/`preset` then record the
+//! change in the current session (`record::record_change`).
 
 use std::path::Path;
 
@@ -266,7 +266,7 @@ fn propose(ctx: &Ctx, changes: Vec<(String, Value)>) -> Result<Proposal, Fail> {
     Ok(caps::propose(&ctx.comp, &ctx.inputs(&[], false)?, changes)?)
 }
 
-/// [`apply`], then the change as entries in the current session (05: `appended Cap/Delta{…}`).
+/// [`apply`], then the change as entries in the current session (`appended Cap/Delta{…}`).
 async fn apply_and_record(ctx: &Ctx, prop: Proposal, name: &str, args: Vec<String>) -> Result<(), Fail> {
     if !write(ctx, &prop)? {
         return Ok(());

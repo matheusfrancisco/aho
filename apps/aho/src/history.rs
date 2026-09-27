@@ -1,4 +1,4 @@
-//! Branches and worktrees (07, 11): `aho fork` branches a session's log at an entry (optionally
+//! Branches and worktrees: `aho fork` branches a session's log at an entry (optionally
 //! under another loadout), `aho session diff` compares the folds of two heads, `aho session
 //! merge|destroy` bring a worktree session's branch back or remove its worktree, and `aho
 //! checkpoint export` turns a checkpoint tree into a real commit in the operator's repository.
@@ -22,7 +22,7 @@ fn cfg_str<'a>(st: &'a State, key: &str) -> Option<&'a str> {
     st.config.get(key).and_then(|s| s.value.as_str()).filter(|s| !s.is_empty())
 }
 
-/// The shadow store the session's world wrote (11), keyed by its workspace root: where its
+/// The shadow store the session's world wrote, keyed by its workspace root: where its
 /// checkpoint trees live, and what `Snapshot::tree` hashes the workspace against; with the
 /// canonical workspace root it is keyed by.
 pub(crate) fn session_shadow(ctx: &Ctx, home: &Path, st: &State) -> Result<(PathBuf, world_host::ShadowGit), Fail> {
@@ -247,7 +247,7 @@ struct Worktree {
     st: State,
 }
 
-/// The worktree a session worked in, from its own logged config (07).
+/// The worktree a session worked in, from its own logged config.
 async fn worktree(ctx: &Ctx, id: Option<&str>) -> Result<Worktree, Fail> {
     let p = ctx.load(&ctx.inputs(&[], false)?)?;
     let dir = ctx.session_dir(&p);
@@ -298,7 +298,7 @@ pub async fn merge(ctx: &Ctx, id: Option<&str>, reason: Option<&str>) -> Result<
         && reason.is_none()
     {
         return Err(Fail::Plan(format!(
-            "the spec debt in {doc} §9 grew ({before} → {after} lines) on {br}, so nothing was merged (14). Cover it in spec mode (`aho spec`), or merge anyway with --reason \"…\" (logged)"
+            "the spec debt in {doc} §9 grew ({before} → {after} lines) on {br}, so nothing was merged. Cover it in spec mode (`aho spec`), or merge anyway with --reason \"…\" (logged)"
         )));
     }
 

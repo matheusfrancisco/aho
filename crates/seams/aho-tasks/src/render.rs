@@ -12,7 +12,7 @@ use crate::error::TaskError;
 use crate::graph::{Derived, Graph};
 use crate::model::{Confidence, HandoffArtifact, Node, TaskId, agent_label};
 
-/// How upstream artifacts enter a dependent's input.
+/// Hydration mode: how upstream artifacts enter a dependent's input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Hydrate {
     /// Findings (excerpted), negative space, open questions and the contract; the rest by reference
@@ -50,7 +50,7 @@ fn render_artifact(out: &mut String, n: &Node, a: &HandoffArtifact, mode: Hydrat
         Hydrate::Reference => {
             ln!(
                 out,
-                "\n## {} ({}) — confidence {} — by {by}; full artifact: task_status {{\"id\": \"{}\"}}",
+                "\n## {} ({}) · confidence {} · by {by}; full artifact: task_status {{\"id\": \"{}\"}}",
                 n.id,
                 n.kind,
                 a.confidence,
@@ -59,7 +59,7 @@ fn render_artifact(out: &mut String, n: &Node, a: &HandoffArtifact, mode: Hydrat
             ln!(out, "Findings: {}", excerpt(&a.findings, REFERENCE_FINDINGS_CHARS));
         }
         Hydrate::Inline => {
-            ln!(out, "\n## {} ({}) — confidence {} — by {by}", n.id, n.kind, a.confidence);
+            ln!(out, "\n## {} ({}) · confidence {} · by {by}", n.id, n.kind, a.confidence);
             ln!(out, "Findings: {}", a.findings);
             bullets(out, "Evidence", &a.evidence);
             bullets(out, "Edge cases", &a.edge_cases);
@@ -69,7 +69,7 @@ fn render_artifact(out: &mut String, n: &Node, a: &HandoffArtifact, mode: Hydrat
         }
     }
     if a.confidence == Confidence::Low {
-        ln!(out, "(LOW confidence — treat as a lead, not a result.)");
+        ln!(out, "(LOW confidence: treat as a lead, not a result.)");
     }
     bullets(out, "Not checked by the producer", &a.what_i_did_not_check);
     bullets(out, "Open questions", &a.open_questions);
@@ -97,7 +97,7 @@ fn render_artifact(out: &mut String, n: &Node, a: &HandoffArtifact, mode: Hydrat
         }
         ln!(
             out,
-            "Acceptance — run these before trusting this input; if one fails, re-open the producer (task_control op=reopen id={}):",
+            "Acceptance: run these before trusting this input; if one fails, re-open the producer (task_control op=reopen id={}):",
             n.id
         );
         for a in &c.acceptance {
@@ -112,7 +112,7 @@ impl Graph {
     pub fn assemble_input(&self, id: &TaskId, mode: Hydrate) -> Result<String, TaskError> {
         let n = self.get(id)?;
         let mut out = String::new();
-        let role = if n.expanded { " — synthesis join: its children and their gate are done" } else { "" };
+        let role = if n.expanded { " (synthesis join; its children and their gate are done)" } else { "" };
         ln!(out, "# Task {} ({}){role}", n.id, n.kind);
         ln!(out, "{}", n.content.trim());
 
@@ -225,7 +225,7 @@ impl Graph {
             lines.push(format!("- {} [{}] {state}", n.id, n.kind));
         }
         let mut s = format!(
-            "{} tasks — {done} completed, {running} running, {ready} ready, {blocked} blocked, {failed} failed, {stopped} stopped · {}\n",
+            "{} tasks: {done} completed, {running} running, {ready} ready, {blocked} blocked, {failed} failed, {stopped} stopped · {}\n",
             self.len(),
             self.growth()
         );

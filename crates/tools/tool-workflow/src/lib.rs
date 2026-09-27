@@ -1,13 +1,13 @@
-//! `00`/`10` — workflows: the `ralph` loop. One prompt is fed to the session again after every
+//! Workflows: the `ralph` loop. One prompt is fed to the session again after every
 //! turn until a reply carries the completion promise or the iteration budget runs out.
 //!
-//! * `ralph_start {prompt, completion_promise, max_iterations?}` — starts a loop; the first
+//! * `ralph_start {prompt, completion_promise, max_iterations?}`: starts a loop; the first
 //!   iteration is fed when the current turn ends. One loop runs at a time.
-//! * `ralph_stop {id?, reason?}` — ends it without finishing (agents stop loops agents started).
-//! * `ralph_status {id?}` — the running loop (or the latest): iteration, budget, outcome.
+//! * `ralph_stop {id?, reason?}`: ends it without finishing (agents stop loops agents started).
+//! * `ralph_status {id?}`: the running loop (or the latest): iteration, budget, outcome.
 //!
 //! **Completion** is `<promise>PROMISE</promise>` in the final assistant text of a loop-fed turn
-//! (whitespace inside the tags is ignored; case matters). The tags keep a reply that merely
+//! (whitespace inside the tags is ignored; case matters). The tags keep a reply that only
 //! *mentions* the promise ("I will print DONE when…") from ending the loop; every fed prompt
 //! repeats the exact form. A promise said in the turn that started the loop does not count: only
 //! iterations are checked.
@@ -44,7 +44,7 @@ pub fn schema_start(_: &BoundWorld) -> RootSchema {
         "type": "object",
         "properties": {
             "prompt": {"type": "string", "description": "The task, given again verbatim after every turn until it is done."},
-            "completion_promise": {"type": "string", "description": "Short phrase you will write as <promise>PHRASE</promise> once the task is truly complete, e.g. ALL TESTS PASS."},
+            "completion_promise": {"type": "string", "description": "Short phrase you will write as <promise>PHRASE</promise> once the task is complete, e.g. ALL TESTS PASS."},
             "max_iterations": {"type": "integer", "minimum": 1, "description": "Most iterations before the loop stops unfinished."}
         },
         "required": ["prompt", "completion_promise"]
@@ -56,7 +56,7 @@ pub fn schema_stop(_: &BoundWorld) -> RootSchema {
         "type": "object",
         "properties": {
             "id": {"type": "string", "description": "The loop id; omit for the running loop."},
-            "reason": {"type": "string", "description": "Why it stops; recorded in the log."}
+            "reason": {"type": "string", "description": "The reason it stops; recorded in the log."}
         }
     }))
 }
@@ -71,7 +71,7 @@ pub fn schema_status(_: &BoundWorld) -> RootSchema {
 pub static TOOLS: &[ToolDecl] = &[
     ToolDecl::new(
         "ralph_start",
-        "Start a ralph loop: after this turn ends, the session is given `prompt` again after every turn until a reply of yours ends \
+        "Start a ralph loop: after this turn ends, the session gets `prompt` again after every turn until a reply of yours ends \
          with <promise>COMPLETION_PROMISE</promise>, or max_iterations run out. Use it for long tasks that need many passes. One \
          loop runs at a time.",
         Consequence::ReadOnly,
@@ -176,7 +176,7 @@ declare_capability!(
     requires = [],
     tools = TOOLS,
     entry_kinds = ["workflow/Started", "workflow/Iteration", "workflow/Finished"],
-    doc = "ralph_start / ralph_stop / ralph_status: re-feed one prompt after every turn until <promise>…</promise> or the budget ends (00, 10)."
+    doc = "ralph_start / ralph_stop / ralph_status: re-feed one prompt after every turn until <promise>…</promise> or the budget ends."
 );
 
 fn lock(m: &Mutex<Workflows>) -> MutexGuard<'_, Workflows> {
@@ -255,8 +255,8 @@ pub fn start(m: &Mutex<Workflows>, default_iterations: u32, max_iterations: u32,
         Ok((e, w)) => {
             let Event::Started { workflow } = &e else { return refused(WorkflowError::BadEvent("ralph_start planned no start".into())) };
             let text = format!(
-                "Started {id}. When this turn ends the session is given the prompt again, up to {n} times, until a reply of yours ends with \
-                 <promise>{p}</promise>. Write that only when the task is truly done. ralph_status shows progress; ralph_stop ends the loop.",
+                "Started {id}. After this turn ends, the session gets the prompt again, up to {n} times, until a reply of yours ends with \
+                 <promise>{p}</promise>. Write that only when the task is done. ralph_status shows progress; ralph_stop ends the loop.",
                 id = workflow.id,
                 n = workflow.max_iterations,
                 p = workflow.promise

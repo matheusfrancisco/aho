@@ -1,6 +1,6 @@
 -------------------------------- MODULE Tasks -------------------------------
 (***************************************************************************)
-(* The swarm task graph (docs 12, 13) as its fold enforces it:             *)
+(* The swarm task graph as its fold enforces it:                           *)
 (* aho_tasks::Graph::apply. Every Task/* event is one action carrying the  *)
 (* guards the Rust fold checks, so a trace is the Task/* entries of a log. *)
 (* Next offers those events over a small instance (Work ids, two agents,   *)
@@ -17,15 +17,15 @@
 (*   ReclaimCapped      reclaims <= max_reclaims; ReclaimCap is earned     *)
 (*   OwnerIffRunning, OneNodePerWorker, WorkerBudget   ownership           *)
 (*   VerifyNotOverFailingInvariant   a verify gate passed over no covering *)
-(*                      invariant that was Fail or Stale (docs 09, 13)     *)
+(*                      invariant that was Fail or Stale                   *)
 (*                                                                         *)
 (* The invariant evidence is state too: `inv` is the latest               *)
 (* Invariant/Checked per id (State.invariants) and `code` the tree of the  *)
 (* latest Workspace/Checkpoint; a check of other code is Stale             *)
-(* (aho_inspect::invariants). Which invariants cover a verify gate is     *)
-(* decided by file paths outside the model (tool-tasks); a Completed      *)
-(* event names them with the status it read, and the step holds only if   *)
-(* that status is the log's.                                              *)
+(* (aho_inspect::invariants). File paths outside the model (tool-tasks)    *)
+(* decide which invariants cover a verify gate; a Completed event names    *)
+(* them with the status it read, and the step holds only if that status is *)
+(* the log's.                                                              *)
 (*                                                                         *)
 (* Not modelled: artifact text (thin artifacts and deep-mode contracts are *)
 (* refused before an event is built, by HandoffArtifact::thin_reason and   *)
@@ -486,8 +486,8 @@ WorkerBudget ==
     /\ Cardinality(Live) <= cfg.maxLive
     /\ Cardinality(members) <= cfg.maxMembers
 
-(* Docs 09, 13: a verify gate cannot pass while an invariant covering it  *)
-(* is Fail or Stale; what a passed verify gate saw was neither.           *)
+(* A verify gate cannot pass while an invariant covering it is Fail or     *)
+(* Stale; what a passed verify gate saw was neither.                       *)
 VerifyNotOverFailingInvariant ==
     \A g \in PassedGates : IsVerify(g) => \A s \in node[g].seen : s.status \notin Blocking
 

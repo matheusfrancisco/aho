@@ -1,4 +1,4 @@
-//! `12` — the swarm task-graph tools over the `aho-tasks` engine.
+//! The swarm task-graph tools over the `aho-tasks` engine.
 //!
 //! | tool | class | who |
 //! |---|---|---|
@@ -10,7 +10,7 @@
 //! | `task_status` | ReadOnly, concurrency-safe | anyone: the graph, or one task with its artifact |
 //! | `task_control` | TalksToHuman | `stop` (own subtree) and `reopen` (failed acceptance) directly; `retry`, `reassign`, `replace`, `salvage` only with the operator's approval (`ApprovalHandle`) |
 //!
-//! The graph tools are `ReadOnly`: they change nothing in any world, only the session log.
+//! The graph tools are `ReadOnly`: they change only the session log, no world.
 //!
 //! # Contract with the session: `value.events`
 //!
@@ -34,7 +34,7 @@
 //!
 //! A verify gate's pass also names every invariant covering the files its scope handed over, with
 //! its status as the session log has it at that moment ([`verify`]); a Fail or Stale one refuses
-//! the pass (`GateError::InvariantNotPassing`, docs 09 and 13).
+//! the pass (`GateError::InvariantNotPassing`).
 
 #![forbid(unsafe_code)]
 
@@ -172,7 +172,7 @@ impl Config for SwarmConfig {
                 "swarm.max_reclaims",
                 Ty::Int,
                 Some(json!(d.max_reclaims)),
-                "How many times a task is reclaimed from a dead worker before it fails.",
+                "Times a task is reclaimed from a dead worker before it fails.",
             ),
         ]
     }
@@ -254,7 +254,7 @@ declare_capability!(
         "Task/Stopped",
         "Task/Resumed"
     ],
-    doc = "Swarm task graph: seed, expand, claim, complete with typed hand-off artifacts, structural gates, operator control (12)."
+    doc = "Swarm task graph: seed, expand, claim, complete with typed hand-off artifacts, structural gates, operator control."
 );
 
 fn lock(m: &Mutex<Ledger>) -> MutexGuard<'_, Ledger> {
@@ -650,7 +650,7 @@ fn status(ledger: &Mutex<Ledger>, view: &ExecView) -> ExecOutcome {
         Some(aho_tasks::Derived::Ready) => "ready".into(),
         _ => n.status.to_string(),
     };
-    let mut text = format!("{} ({}) — {derived}\n{}", n.id, n.kind, n.content);
+    let mut text = format!("{} ({}): {derived}\n{}", n.id, n.kind, n.content);
     if !n.depends_on.is_empty() {
         text.push_str(&format!("\nDepends on: {}", n.depends_on.iter().map(TaskId::to_string).collect::<Vec<_>>().join(", ")));
     }

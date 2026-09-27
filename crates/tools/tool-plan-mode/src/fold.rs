@@ -1,8 +1,8 @@
 //! `plan/*` entries and their fold.
 //!
-//! * `Entered{by, at, reason, restore, allowed}` — `restore` is the policy before plan mode,
+//! * `Entered{by, at, reason, restore, allowed}`: `restore` is the policy before plan mode,
 //!   `allowed` the narrowed one: `allowed ⊆ restore ∩ {ReadOnly, TalksToHuman}`.
-//! * `Reviewed{at, plan, outcome, allowed}` — the operator's answer to one `exit_plan_mode`.
+//! * `Reviewed{at, plan, outcome, allowed}`: the operator's answer to one `exit_plan_mode`.
 //!   Only `allowed_once` leaves plan mode, and only if the policy after it contains `restore`
 //!   again; every other outcome keeps plan mode on.
 
@@ -98,7 +98,7 @@ impl Event {
 }
 
 impl PlanMode {
-    /// How plan mode was last left, for the context line.
+    /// The way plan mode was last left, for the context line.
     pub fn left_how(&self) -> String {
         match (self.last_outcome, self.left_at) {
             (Some(ApprovalOutcome::AllowedOnce), Some(_)) => "the operator approved the plan".into(),

@@ -1,4 +1,4 @@
-//! `00`/`07` — PTY terminals as tools: `terminal_open`, `terminal_send`, `terminal_read`,
+//! PTY terminals as tools: `terminal_open`, `terminal_send`, `terminal_read`,
 //! `terminal_resize`, `terminal_close`, `terminal_list`, over the bound world's `Terminals` seam
 //! (`aho-term`; `pty-host` under `world = host`).
 //!
@@ -35,7 +35,7 @@ pub const DEFAULT_READ_TIMEOUT_MS: u64 = 2_000;
 pub const DEFAULT_WAIT_TIMEOUT_MS: u64 = 10_000;
 pub const MAX_TIMEOUT_MS: u64 = 600_000;
 pub const DEFAULT_IDLE_MS: u64 = 300;
-/// How long `terminal_open` lets the program print its first screen (prompt, banner).
+/// Time `terminal_open` gives the program to print its first screen (prompt, banner).
 const OPEN_SETTLE: Duration = Duration::from_millis(250);
 const OPEN_SETTLE_MAX: Duration = Duration::from_secs(2);
 
@@ -210,7 +210,7 @@ fn schema_id(_: &BoundWorld) -> RootSchema {
 
 // ───────────────────────────── check ─────────────────────────────
 
-/// `04` step 3 for typed input: every line `terminal_send` would type goes through the shell
+/// Decision-chain step 3 for typed input: every line `terminal_send` would type goes through the shell
 /// classifier. `Catastrophic` → Deny; `Confirm` → Ask unless a real `justification` is given.
 pub fn check_send(args: &Value, view: &PolicyView) -> Option<Decision> {
     let typed = typed_text(args);
@@ -287,7 +287,7 @@ fn size_arg(args: &Value, default: Size) -> Result<Size, ExecOutcome> {
     Size::new(dim("cols", default.cols)?, dim("rows", default.rows)?).map_err(term_err)
 }
 
-/// Why a read returned.
+/// The reason a read returned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Ended {
     Matched,

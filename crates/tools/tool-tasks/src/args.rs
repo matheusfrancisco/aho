@@ -127,7 +127,7 @@ fn kind_schema() -> Value {
 fn task_item(with_parent: bool) -> Value {
     let mut props = json!({
         "id": {"type": "string", "description": "Stable id you choose (letters, digits, . _ : / -)."},
-        "content": {"type": "string", "description": "What the worker should do."},
+        "content": {"type": "string", "description": "The work the worker should do."},
         "kind": kind_schema(),
         "depends_on": ids_schema("Tasks that must complete first; their artifacts become this task's inputs."),
     });
@@ -142,11 +142,11 @@ pub(crate) fn artifact_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "findings": {"type": "string", "description": "What you found or built."},
+            "findings": {"type": "string", "description": "Your findings, or what you built."},
             "evidence": list("Files, lines, command output backing the findings."),
             "edge_cases": list("Edge cases you considered."),
-            "validation": {"type": "string", "description": "How you validated it."},
-            "open_questions": list("What remains open."),
+            "validation": {"type": "string", "description": "The way you validated it."},
+            "open_questions": list("Questions still open."),
             "confidence": {"type": "string", "description": "low | medium | high (a 0-1 score or `7/10` also reads)."},
             "what_i_did_not_check": {"type": "array", "items": {"type": "string"}, "minItems": 1,
                 "description": "Required, never empty: what you did not verify."},

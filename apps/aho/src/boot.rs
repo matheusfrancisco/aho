@@ -1,4 +1,4 @@
-//! Booting a session the way every verb that owns one does (01, 12): the composition and its
+//! Booting a session the way every verb that owns one does: the composition and its
 //! plan, the root subagent runtime (`subagent-inproc` boots children from it), and for
 //! long-lived hosts (`aho serve`, `aho tui`, `aho web`, `aho webhook`) the schedule and workflow
 //! drivers, so `schedule_*` and `ralph_*` tools have something that fires them.
@@ -20,7 +20,7 @@ use subagent_inproc::SubagentRuntime;
 use crate::ctx::{Ctx, hex, session_dir_of, workspace_of};
 
 pub fn operator() -> Operator {
-    // Whoever holds this terminal (or owns this process's stdio) is the operator (04, 08).
+    // Whoever holds this terminal (or owns this process's stdio) is the operator.
     Operator::authenticate(OperatorProof::local_tty())
 }
 
@@ -39,7 +39,7 @@ pub struct Live {
     pub session: Arc<Session>,
     /// `Some` for long-lived hosts; shut down when the session closes.
     pub drivers: Option<Drivers>,
-    /// What the drivers were seeded with, to host them again (`session_drive::host`).
+    /// The drivers' seed, to host them again (`session_drive::host`).
     pub seed: Option<DriverSeed>,
 }
 
@@ -66,14 +66,14 @@ impl Host {
     }
 
     /// Boots (or resumes) session `id` over `log`. `drive` hosts the schedule/workflow drivers.
-    /// A resumed log whose sealed plan is not this plan first records the change (03).
+    /// A resumed log whose sealed plan is not this plan first records the change.
     pub async fn boot(&self, id: SessionId, log: Arc<dyn LogStore>, approval: Arc<dyn Approval>, drive: bool) -> Result<Live, String> {
         let p = &self.planned;
         if log.head().is_some() {
             record_resume(&*log, p)?;
         }
         let mut seed = Registry::default();
-        // `session_query` (06): the cross-session index next to these logs, for the agent's tool.
+        // `session_query`: the cross-session index next to these logs, for the agent's tool.
         seed.services
             .insert(tool_session::INDEX_SERVICE.into(), Arc::new(crate::ctx::session_index(&self.dir).map_err(|e| e.to_string())?));
         SubagentRuntime {
@@ -115,10 +115,10 @@ impl Host {
     }
 }
 
-/// `03`: a session resumed under a plan other than the one its log sealed says so before it runs
-/// — `CommandRun{resume, argv}` by the operator who started this process, the entries that make
+/// A session resumed under a plan other than the one its log sealed says so before it runs:
+/// `CommandRun{resume, argv}` by the operator who started this process, the entries that make
 /// its fold match the plan (config, capability states, policy epoch citing that command, plan
-/// seal), `CommandDone` — so `aho explain`, `session.fold` and replay see what it runs under.
+/// seal), then `CommandDone`. `aho explain`, `session.fold` and replay then see what it runs under.
 /// Returns how many plan entries were written (0 when the plan is unchanged).
 pub fn record_resume(log: &dyn LogStore, p: &Planned) -> Result<usize, String> {
     let entries = aho_control::branch(log)?;

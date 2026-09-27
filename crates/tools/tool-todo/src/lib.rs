@@ -1,7 +1,7 @@
-//! `10` — `todo_write`: the working agent's task list as whole-list snapshots on the session log.
+//! `todo_write`: the working agent's task list as whole-list snapshots on the session log.
 //!
 //! * The model sends the entire list every call (`todos: [{content, status}]`, status
-//!   `pending | in_progress | completed`); the new list replaces the old — last write wins on
+//!   `pending | in_progress | completed`); the new list replaces the old, and the last write wins on
 //!   replay. An empty list clears it.
 //! * Invariants, checked by the tool and again by the fold: every `content` is trimmed and
 //!   non-empty, contents are unique, at most one item is `in_progress`.
@@ -131,7 +131,7 @@ pub fn parse(args: &Value) -> Result<Vec<Todo>, TodoError> {
     Ok(out)
 }
 
-/// `2/5 done · in progress: write the tests` — the one line the model gets back.
+/// `2/5 done · in progress: write the tests`: the one line the model gets back.
 pub fn summary(items: &[Todo]) -> String {
     if items.is_empty() {
         return "Todo list cleared.".into();
@@ -164,7 +164,7 @@ impl Event {
         let mut v = serde_json::to_value(self).map_err(|e| TodoError::BadEvent(format!("Todo/Written did not serialize: {e}")))?;
         Ok(v.get_mut("body").map(Value::take).unwrap_or(Value::Null))
     }
-    /// `{ "ns": "Todo", "name": "Written", "body": .. }` — the shape returned under `value.events`.
+    /// `{ "ns": "Todo", "name": "Written", "body": .. }`: the shape returned under `value.events`.
     pub fn to_json(&self) -> Result<Value, TodoError> {
         Ok(json!({ "ns": NS, "name": self.name(), "body": self.body()? }))
     }
@@ -288,7 +288,7 @@ declare_capability!(
     requires = [],
     tools = TOOLS,
     entry_kinds = ["Todo/Written"],
-    doc = "todo_write: the working agent's whole-list task snapshots, invariants checked in the fold (10)."
+    doc = "todo_write: the working agent's whole-list task snapshots, invariants checked in the fold."
 );
 
 /// The tool body: validate, then hand back the snapshot event and the summary line.

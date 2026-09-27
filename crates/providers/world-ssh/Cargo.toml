@@ -3,7 +3,7 @@ name = "world-ssh"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "SSH world: fs + processes + shadow-git snapshots on a remote host over the system ssh client (ControlMaster); enforced by: remote host (07, 11, 15)"
+description = "SSH world: fs + processes + shadow-git snapshots on a remote host over the system ssh client (ControlMaster); enforced by: remote host"
 
 [dependencies]
 aho-types.workspace = true

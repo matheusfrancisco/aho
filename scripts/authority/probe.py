@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prove approved provider access works and resolved consumer aliases are rejected.
 
-Requires the active Rust toolchain's Clippy component. This deliberately does not
+Requires the active Rust toolchain's Clippy component. This does not
 compile the workspace, so the fixture cannot pass because unrelated packages fail.
 Every negative case must fail specifically with clippy::disallowed_methods and no
 other compiler error. Artifacts are permanent, under the mandatory scratch root.

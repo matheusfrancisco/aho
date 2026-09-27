@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A stand-in for qemu-system-* (07: tests run against stub QEMU): it honours exactly the argv
+"""A stand-in for qemu-system-* so tests run without a hypervisor. It honours exactly the argv
 world-vm builds. QMP on the -qmp socket (greeting, capabilities, query-uuid, query-status,
 system_powerdown, quit), the real vm-guest-agent on the -chardev agent socket (env
 AHO_STUB_AGENT; its workspace is $AHO_STUB_ROOT/<-name>), a connection to the -netdev stream

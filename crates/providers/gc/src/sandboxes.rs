@@ -1,6 +1,6 @@
-//! Sandboxes (07): a session's namespace sandbox (`<id>.ns`), its network (`<id>.net`), and its
-//! VM machines (under `vm.dir/state/<id>`). They persist on purpose while the session exists —
-//! only `aho sandbox destroy` or the end of a VM lease retires them (04) — so a sandbox is an
+//! Sandboxes: a session's namespace sandbox (`<id>.ns`), its network (`<id>.net`), and its
+//! VM machines (under `vm.dir/state/<id>`). They persist on purpose while the session exists
+//! (only `aho sandbox destroy` or the end of a VM lease retires them), so a sandbox is an
 //! orphan only when its session's log is gone, and a machine also when its lease has ended.
 //! Machines of other projects' sessions share `vm.dir`; each owner records its session
 //! directory, and only this one's are judged.

@@ -1,5 +1,5 @@
 //! The normalizer over records recorded from the real Claude Code binary (scrubbed; see
-//! `fixtures/PROVENANCE.txt`). Never hand-written samples (12).
+//! `fixtures/PROVENANCE.txt`). Never hand-written samples.
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

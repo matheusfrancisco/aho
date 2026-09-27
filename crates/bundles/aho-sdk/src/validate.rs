@@ -1,6 +1,6 @@
 //! Strict validation of JSON values and whole frames against the [`Protocol`] table: every
 //! required field present with the right type, no field the table does not name, every enum
-//! value and union tag known. Readers of the wire ignore unknown fields (12); this check does
+//! value and union tag known. Readers of the wire ignore unknown fields; this check does
 //! not, because it is what proves the table and the server agree (`tests/schema.rs`).
 
 use serde_json::Value;

@@ -1,10 +1,10 @@
-//! Holds the hand-maintained protocol table (`aho_sdk::protocol`) to what surface-rpc really
+//! Holds the hand-maintained protocol table (`aho_sdk::protocol`) to what surface-rpc
 //! sends and accepts. surface-rpc builds its payloads with `json!` and the log types carry no
 //! schema derives, so this is the check that makes the generated SDKs trustworthy:
 //!
 //! * surface-rpc's committed wire snapshot validates strictly (no unknown or missing field);
 //! * one sample of every entry kind, transition, stream chunk, and nested variant, serialized by
-//!   the server's own functions, validates — and together they exercise every union variant and
+//!   the server's own functions, validates, and together they exercise every union variant and
 //!   enum value the table lists (a table row nothing produces is as wrong as a missing one);
 //! * the frames of a live session (every method called once) validate;
 //! * the params structs surface-rpc decodes agree with the table on names and optionality;

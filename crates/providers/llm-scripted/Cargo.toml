@@ -3,7 +3,7 @@ name = "llm-scripted"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Deterministic scripted model route for system tests (01)"
+description = "Deterministic scripted model route for system tests"
 
 [dependencies]
 aho-types.workspace = true

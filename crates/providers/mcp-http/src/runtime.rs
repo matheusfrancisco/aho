@@ -12,7 +12,7 @@ pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// The provider's I/O runtime: one named thread driving a current-thread tokio runtime. HTTP
 /// exchanges and GET listeners run here, whatever executor (if any) the caller is on. The thread
-/// ends — cancelling whatever still runs — when the last handle drops.
+/// ends when the last handle drops, cancelling whatever still runs.
 pub struct IoRuntime {
     pub(crate) handle: tokio::runtime::Handle,
     thread: std::thread::ThreadId,
@@ -87,7 +87,7 @@ impl ToolTable {
     }
 
     /// Phase one against every other server and every name another transport holds, then phase
-    /// two (`10`). A fetch failure keeps the previous generation; a conflict installs zero tools.
+    /// two. A fetch failure keeps the previous generation; a conflict installs zero tools.
     pub fn install(&self, server: &str, fetched: Result<Vec<RemoteTool>, McpError>) -> Result<Generation, McpError> {
         let checked = fetched.and_then(|tools| {
             let clash = tools.iter().map(|t| normalize(server, &t.raw_name)).find_map(|n| self.taken.get(&n).map(|w| (n, w.clone())));

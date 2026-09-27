@@ -85,10 +85,7 @@ fn def(o: &mut String, d: &Def) {
 
 pub fn protocol(p: &Protocol) -> String {
     let mut o = String::new();
-    header(
-        &mut o,
-        "The aho rpc protocol (08, 12) as types. Readers ignore unknown fields, so a newer server's additive fields never break them.",
-    );
+    header(&mut o, "The aho rpc protocol as types. Readers ignore unknown fields, so a newer server's additive fields never break them.");
     o.push_str(&format!("export const VERSION_MIN = {};\nexport const VERSION_MAX = {};\n\n", p.version_min, p.version_max));
     o.push_str("/** Any JSON value. */\nexport type Json = null | boolean | number | string | Json[] | { [key: string]: Json };\n");
     for d in p.defs {
@@ -135,7 +132,7 @@ fn takes_params(p: &Protocol, params: Option<&str>) -> Option<(&'static str, boo
 
 pub fn client(p: &Protocol) -> String {
     let mut o = String::new();
-    header(&mut o, "A typed client for `aho rpc` (08): one method per rpc method, the Session API 1:1.");
+    header(&mut o, "A typed client for `aho rpc`: one method per rpc method, the Session API 1:1.");
     o.push_str(
         "import { Connection } from \"./runtime.ts\";
 import type { SpawnOptions } from \"./runtime.ts\";

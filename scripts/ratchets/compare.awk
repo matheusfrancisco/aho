@@ -1,4 +1,4 @@
-# Ratchet comparison (doc 12). Input: baseline TSV then current TSV, both "path<TAB>value" with a
+# Ratchet comparison. Input: baseline TSV then current TSV, both "path<TAB>value" with a
 # "__total__" row. A file may not grow, a file absent from the baseline may not appear, and the
 # total may not grow. Exits 1 on any violation; reports how far the ratchet could tighten.
 

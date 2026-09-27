@@ -1,6 +1,6 @@
 //! LSP base protocol: `Content-Length: N\r\n\r\n` + N bytes of JSON, over one byte stream.
 //!
-//! The decoder is fed whatever a read returned — half a header, three messages at once — and
+//! The decoder is fed whatever a read returned (half a header, three messages at once) and
 //! hands back complete messages in order. A malformed header is reported and its header block
 //! discarded, so the caller decides whether the stream is still worth reading.
 
@@ -271,7 +271,7 @@ mod tests {
         let one = encode(&msg);
         let mut d = Decoder::new();
         for _ in 0..500 {
-            // Leave one byte behind each round so the buffer is never simply cleared.
+            // Leave one byte behind each round so the buffer is never cleared wholesale.
             d.push(&one);
             d.push(&one[..1]);
             assert_eq!(d.next().unwrap(), Some(msg.clone()));

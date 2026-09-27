@@ -1,5 +1,5 @@
-//! `aho rpc` while `aho serve` runs (12, "one daemon, thin surfaces"): this process speaks the rpc
-//! surface's protocol — what the TS and Python SDKs speak (08) — on its stdio (or on `--socket`),
+//! `aho rpc` while `aho serve` runs ("one daemon, thin surfaces"): this process speaks the rpc
+//! surface's protocol (the one the TS and Python SDKs speak) on its stdio (or on `--socket`),
 //! and the daemon that owns the session does the work. Clients see the same frames as from an
 //! in-process `aho rpc`:
 //!
@@ -209,7 +209,7 @@ async fn call(conn: &Conn, sid: SessionId, cards: &Cards, method: &str, params: 
     }
 }
 
-/// `[p]` on the card (05): the card's `preset_cut` becomes `policy.preset` through the same plan →
+/// `[p]` on the card: the card's `preset_cut` becomes `policy.preset` through the same plan →
 /// apply as `aho preset`, and the call is allowed for the session.
 async fn answer_with_preset(conn: &Conn, _sid: SessionId, cards: &Cards, id: u64) -> Result<Value, String> {
     if !cards_of(cards).contains_key(&id) {

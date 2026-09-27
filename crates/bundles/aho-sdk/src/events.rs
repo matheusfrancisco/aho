@@ -1,7 +1,7 @@
-//! Typed views of what the server sends (08): events, and the replies the typed client methods
+//! Typed views of what the server sends: events, and the replies the typed client methods
 //! decode. Log entries, transitions, and policy state are the aho-log types themselves; only the
 //! payloads surface-rpc projects with `json!` (stream chunks, approval cards, the fold) have a
-//! type here, and `tests/schema.rs` holds each to the frames the server really sends.
+//! type here, and `tests/schema.rs` holds each to the frames the server sends.
 
 use std::collections::BTreeMap;
 
@@ -26,7 +26,7 @@ pub enum Event {
     /// A failure outside any request (a lagging client, a log write that did not land).
     Error(String),
     /// A frame this client cannot type: a newer server's event kind, or a payload that does not
-    /// decode. Kept raw; the wire rule is that readers skip what they do not know (12).
+    /// decode. Kept raw; the wire rule is that readers skip what they do not know.
     Unknown { event: String, payload: Value },
 }
 
@@ -50,7 +50,7 @@ pub struct Idle {
     pub transition: Transition,
 }
 
-/// The approval card as the server sends it (05): the fields every surface renders.
+/// The approval card as the server sends it: the fields every surface renders.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ApprovalCard {
     /// Answer with this id.
@@ -60,7 +60,7 @@ pub struct ApprovalCard {
     pub cap: Option<String>,
     pub class: Consequence,
     pub args: Value,
-    /// Which link of the decision chain asked (`Rule`, `Preset`, …).
+    /// The decision-chain link that asked (`Rule`, `Preset`, …).
     pub reason: String,
     /// The rendered card text.
     pub why: String,
@@ -113,7 +113,7 @@ pub(crate) struct RewindReply {
     pub entry: EntryId,
 }
 
-/// `session.subscribe`: how many entries were replayed before the reply, and the log head.
+/// `session.subscribe`: the number of entries replayed before the reply, and the log head.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Subscribed {
     pub replayed: u64,
@@ -130,7 +130,7 @@ pub struct Answered {
     pub wrote: Vec<String>,
 }
 
-/// How to answer an approval card.
+/// An answer to an approval card.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Answer {
     Allow(GrantScope),

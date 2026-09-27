@@ -1,4 +1,4 @@
-//! `13` — Lean 4 as the proof backend of the Formal seam. Artifacts go through the bound world's
+//! Lean 4 as the proof backend of the Formal seam. Artifacts go through the bound world's
 //! `FsWrite` and lake/charon/aeneas run through its `Subprocess`, so both sides see one world.
 //!
 //! * `prove(module)` runs `lake build [module]` in `formal.lean.project` and turns the output
@@ -101,7 +101,7 @@ impl Config for LeanConfig {
     }
 }
 
-/// The world's filesystem and process spawner: artifacts and lake share one world (07, 13).
+/// The world's filesystem and process spawner: artifacts and lake share one world.
 pub struct LeanDeps {
     pub proc: SubprocessHandle,
     pub fs: FsWrite,
@@ -145,7 +145,7 @@ declare_capability!(
     tools = &[],
     unlock = Fix::cli(INSTALL),
     enforced_by = "the bound world (artifact IO uses FsWrite; lake/charon/aeneas run through Subprocess)",
-    doc = "Lean 4 proofs via lake; Rust → Lean translation via Charon + Aeneas; definition mutants (13)."
+    doc = "Lean 4 proofs via lake; Rust → Lean translation via Charon + Aeneas; definition mutants."
 );
 
 /// The Lean backend, usable without a composition (tests, `aho doctor`).

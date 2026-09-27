@@ -1,7 +1,7 @@
-//! `07` — terminals on the host: the `Terminals` seam (`aho-term`) for `world = host`.
+//! Terminals on the host: the `Terminals` seam (`aho-term`) for `world = host`.
 //!
 //! Each terminal is a `portable-pty` pseudo-terminal whose program is its own session leader in
-//! the workspace root. Output is rendered by `vt100` into the screen and, in parallel, into a
+//! the workspace root. `vt100` renders output into the screen and, in parallel, into a
 //! plain-text transcript (`Transcript`) read with cursors. `close` kills the whole tree: every
 //! process in the leader's session plus descendants that left it (`tree`), because a hung-up
 //! shell does not take its background jobs with it.

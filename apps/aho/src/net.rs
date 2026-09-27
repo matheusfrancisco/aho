@@ -1,4 +1,4 @@
-//! `aho net` (07): a session's sandbox network — `status`, `allow <dest>`, `map HOST:GUEST`.
+//! `aho net`: a session's sandbox network (`status`, `allow <dest>`, `map HOST:GUEST`).
 //! A running network is changed through its control socket and records the change in its own
 //! session log; a stopped one is opened here, changed, and the change is appended as the
 //! operator (refused, before anything changes, while another process drives the session).
@@ -48,7 +48,7 @@ pub async fn run(ctx: &Ctx, sub: &NetVerb, session: Option<&str>, json_out: bool
     }
 
     // No live network: this process changes the state directory, and records the change as the
-    // operator, so the writer is secured first — a refused writer leaves everything untouched.
+    // operator, so the writer is secured first: a refused writer leaves everything untouched.
     let (_, entries) = branch(&s.path)?;
     let w = Writer::open(ctx, &dir, &s, &state_of(&entries)?).await.map_err(|why| {
         err(format!("{why}, so the network was not changed: two processes never write one log. Run this from the client that drives it"))

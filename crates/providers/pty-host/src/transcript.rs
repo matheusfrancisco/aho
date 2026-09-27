@@ -1,4 +1,4 @@
-//! The terminal's output as plain text lines — what scrolled by, not what is on screen now.
+//! The terminal's output as plain text lines: what scrolled by, not what is on screen now.
 //!
 //! A small line discipline over `vte`: printable text lands at the cursor column, `\r` returns
 //! to column 0 (so progress bars overwrite in place), `\b` and cursor-left/right move, erase-in-line

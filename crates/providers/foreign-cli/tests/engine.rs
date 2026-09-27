@@ -1,5 +1,5 @@
 //! The engine without a real CLI: refusals, launch failure, and crash recovery from the parent
-//! log (12: crash-honest receipts). The CLI format here is a minimal test transcript; the real
+//! log (crash-honest receipts). The CLI format here is a minimal test transcript; the real
 //! formats are tested against recorded fixtures in `subagent-claude` / `subagent-codex`.
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
 #![allow(clippy::unwrap_used, clippy::expect_used)]

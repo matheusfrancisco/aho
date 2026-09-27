@@ -1,14 +1,14 @@
-//! `00` (session query tools, from deepseek-harness `tool-session-query`), `06` (the log is the only
-//! store), `11` (forks and rewinds): the agent queries its own session log.
+//! The agent queries its own session log (the only store) across forks and rewinds. The tools
+//! follow deepseek-harness `tool-session-query`.
 //!
-//! * `session_search{query, regex?, case_sensitive?, kinds?, tool?, turn_from?, turn_to?, limit?, branch?, at?}` —
+//! * `session_search{query, regex?, case_sensitive?, kinds?, tool?, turn_from?, turn_to?, limit?, branch?, at?}`:
 //!   literal (default) or regex search over messages, tool calls, tool results and notes on one branch;
 //!   ranked, capped, returns entry ids + snippets. A bad regex is a tool error, nothing is searched.
-//! * `session_trace{id | call}` — the causal chain of an entry or a tool call across every branch:
+//! * `session_trace{id | call}`: the causal chain of an entry or a tool call across every branch:
 //!   request → call → approval → op started → op done → result → checkpoint → rewinds, with fork points.
-//! * `event_get{id}` — one entry, whole, as redacted JSON, with where it sits in the tree.
-//! * `event_list{from?, to?, turn_from?, turn_to?, kinds?, limit?, branch?, at?}` — a window of one-line summaries.
-//! * `session_query{query, limit?}` — indexed cross-session DSL search when the operator seeds
+//! * `event_get{id}`: one entry, whole, as redacted JSON, with where it sits in the tree.
+//! * `event_list{from?, to?, turn_from?, turn_to?, kinds?, limit?, branch?, at?}`: a window of one-line summaries.
+//! * `session_query{query, limit?}`: indexed cross-session DSL search when the operator seeds
 //!   `aho.session_index`; results always include a session id and a local entry id.
 //!
 //! # Branches
@@ -16,9 +16,9 @@
 //! (`aho session branches`); `at` reads the branch as it was at any entry (its ancestors only). Trace
 //! and get address entries by id on any branch and say which branch heads contain them.
 //!
-//! # What the model may see (decision)
-//! The agent reads the same log the operator reads (`05`): every durable entry — including
-//! approvals, policy epochs, capability deltas, request headers and non-secret config — is
+//! # Model visibility (decision)
+//! The agent reads the same log the operator reads: every durable entry (including
+//! approvals, policy epochs, capability deltas, request headers and non-secret config) is
 //! visible metadata. Three things are not:
 //! 1. **Secrets.** Config values the resolver redacted (`{"digest": <hex>}`, `aho-config`/`aho-compose`)
 //!    render as `[secret]`; the plaintext of every loadout secret, and its digest, is replaced by

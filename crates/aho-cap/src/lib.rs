@@ -1,10 +1,10 @@
-//! `02` — the one extension point. A tool, a provider, a world, a surface, a panel, a hook:
+//! The one extension point. A tool, a provider, a world, a surface, a panel, a hook:
 //! all implement `Capability`. There is no other plugin API.
 //!
 //! Two phases, both here:
-//! * `plan(manifests, loadout, env)` — pure. Seam bindings, exclusive bundles, requirement
+//! * `plan(manifests, loadout, env)`: pure. Seam bindings, exclusive bundles, requirement
 //!   checks, states, fixes, ceilings. `aho plan` is this plus rendering.
-//! * `Composition::start(plan, loadout)` — builds Active rows in plan order, lets each register,
+//! * `Composition::start(plan, loadout)`: builds Active rows in plan order, lets each register,
 //!   and diffs what it registered against its manifest (`ManifestDrift` → Broken).
 //!
 //! ```compile_fail
@@ -99,7 +99,7 @@ pub use Origin_ as CapOrigin;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub enum Route {
     /// The bound world's network: aho-net in sandbox worlds (enforced); under `world = host` the world
-    /// provides the host network and says `enforced by: policy only` (07). Tools hold only this route.
+    /// provides the host network and says `enforced by: policy only`. Tools hold only this route.
     Sandbox,
     /// The host's own network. Reachable only under `world = host`.
     Host,
@@ -134,7 +134,7 @@ pub trait Handle: Clone + Send + Sync + 'static {
     const KIND: HandleKind;
 }
 
-/// Ceilings are derived from handles, not self-reported (02).
+/// Ceilings are derived from handles, not self-reported.
 pub const fn ceiling(handles: &[HandleKind]) -> ConsequenceSet {
     let mut set = ConsequenceSet::EMPTY.with(Consequence::ReadOnly);
     let mut i = 0;
@@ -278,10 +278,10 @@ pub struct Manifest {
     pub config_keys: fn() -> Vec<ConfigKey>,
     pub replaces: &'static [CapabilityId],
     pub unlock: Option<Fix>,
-    /// For worlds: what actually enforces isolation (`policy only`, `Linux namespaces`, …).
+    /// For worlds: what enforces isolation (`policy only`, `Linux namespaces`, …).
     pub enforced_by: Option<&'static str>,
     pub invariants: &'static [Invariant],
-    /// TLA+ modules / Lean theorems covering this capability's entry kinds (13).
+    /// TLA+ modules / Lean theorems covering this capability's entry kinds.
     pub formal: &'static [SpecRef],
     pub doc: &'static str,
 }
@@ -296,7 +296,7 @@ impl Manifest {
     }
 }
 
-/// Closed — never a closure, so every Locked node renders a fix (05).
+/// Closed (never a closure), so every Locked node renders a fix.
 #[derive(Debug)]
 pub enum Requirement {
     Seam(SeamId),
@@ -358,15 +358,15 @@ pub struct ToolDecl {
     pub destructive: bool,
     /// Schema may depend on the bound world (e.g. `escalate` exists only if the world confines).
     pub schema: fn(&BoundWorld) -> RootSchema,
-    /// Anything but an explicit `Safe` is a barrier (10).
+    /// Anything but an explicit `Safe` is a barrier.
     pub concurrency: fn(&Value) -> Concurrency,
     pub interrupt: Interrupt,
     /// Spill threshold in chars; `None` = never spill (`read`).
     pub max_inline: Option<usize>,
-    /// Tool's own opinion in the decision chain (04 step 3). `None` = passthrough.
+    /// Tool's own opinion in the decision chain (step 3). `None` = passthrough.
     pub check: fn(&Value, &PolicyView) -> Option<Decision>,
     pub present: Present,
-    /// Operation metadata (16): how a crash mid-dispatch folds on resume.
+    /// Operation metadata: how a crash mid-dispatch folds on resume.
     pub op_kind: OpKind,
     pub rerunnable: bool,
     pub external_effect: bool,
@@ -506,7 +506,7 @@ pub struct Present {
     pub result: fn(&Value, &Value) -> Card,
 }
 
-/// What a tool's own `check` may return (04 step 3). The full chain and reasons live in `aho-policy`.
+/// The result of a tool's own `check` (step 3). The full chain and reasons live in `aho-policy`.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum Decision {
     Allow,
@@ -537,7 +537,7 @@ impl BoundWorld {
     }
 }
 
-/// A fold-checker run in every test root and by `aho session verify` (10, 13).
+/// A fold-checker run in every test root and by `aho session verify`.
 #[derive(Debug)]
 pub struct Invariant {
     pub name: &'static str,
@@ -589,7 +589,7 @@ pub enum PostDecision {
     Block { feedback: String, deferred_context: Vec<String> },
 }
 
-/// What a tool body receives. `args` are the model's bytes; derived views are separate.
+/// The input to a tool body. `args` are the model's bytes; derived views are separate.
 pub struct ExecRequest {
     pub view: ExecView,
     pub cancel: CancelToken,
@@ -639,7 +639,7 @@ impl ExecOutcome {
     }
 }
 
-/// Cancellation tree token with a fire epoch (12): children see a parent's cancel.
+/// Cancellation tree token with a fire epoch: children see a parent's cancel.
 #[derive(Clone, Debug, Default)]
 pub struct CancelToken {
     inner: Arc<std::sync::atomic::AtomicU64>,
@@ -706,7 +706,7 @@ pub struct HookOutput {
     pub stop: Option<String>,
 }
 
-/// Hooks are veto-`⊓`: an erroring hook never becomes Allow (12). Default Deny.
+/// Hooks are veto-`⊓`: an erroring hook never becomes Allow. Default Deny.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum OnError {
     Allow,
@@ -742,7 +742,7 @@ impl Registry {
     }
 }
 
-/// What a capability may register, and with what power (02 table).
+/// The registrations a capability may make, and the power of each.
 pub struct Registrar<'a> {
     grant: &'a Grant,
     reg: &'a mut Registry,
@@ -819,7 +819,7 @@ pub struct Discovered {
     pub doc: String,
 }
 
-/// The only ambient environment a capability may see (12: home redirect for tests).
+/// The only ambient environment a capability may see (tests redirect `home`).
 #[derive(Clone, Debug, Serialize)]
 pub struct Env {
     pub home: String,

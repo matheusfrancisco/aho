@@ -1,5 +1,4 @@
-//! A real session's job outlives the process that started it (12: crash-honest receipts; "`aho gc`
-//! reaps children orphaned by a dead identity"). The session's operations table writes the
+//! A real session's job outlives the process that started it. The session's operations table writes the
 //! `Child/Spawned` receipt when `bash` starts the job; the owner is killed; `aho gc` holds the
 //! child back on the first scan that finds the owner gone, lists it on the second, and reaps it.
 //!

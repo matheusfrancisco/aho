@@ -1,15 +1,15 @@
-//! `04`/`10`/`12`/`16` — in-process subagents. A child is a full [`aho_session::Session`] over
-//! its own log (`<session.dir>/<parent>/<child>.jsonl`, or memory), run to idle inside the
-//! parent's tool operation — a `Remote` op (16), so the parent sees a placeholder and keeps
-//! working while the child runs.
+//! In-process subagents. A child is a full [`aho_session::Session`] over its own log
+//! (`<session.dir>/<parent>/<child>.jsonl`, or memory), run to idle inside the parent's tool
+//! operation as a `Remote` op, so the parent sees a placeholder and keeps working while the
+//! child runs.
 //!
-//! * Policy = `aho_policy::child_policy(parent, decl_cut, is_async, bubble)` (04): narrow-only;
+//! * Policy = `aho_policy::child_policy(parent, decl_cut, is_async, bubble)`: narrow-only;
 //!   an async child cannot reach a human unless bubbled. Operator rules survive into the child
 //!   because it resolves the same loadout.
 //! * The child log starts with `Subagent/Descriptor`; a fork then re-appends the parent's
-//!   completed-turn prefix in order — never the open turn (06, 10); then
-//!   `Policy/Epoch{by: System("delegation")}` so the child's fold is self-contained (04).
-//! * Depth is monotone: `max(inherited + 1, requested)`, capped by `subagent.max_depth` (10).
+//!   completed-turn prefix in order (never the open turn); then
+//!   `Policy/Epoch{by: System("delegation")}` so the child's fold is self-contained.
+//! * Depth is monotone: `max(inherited + 1, requested)`, capped by `subagent.max_depth`.
 //! * The parent log gets `Subagent/Started` / `Subagent/Ended`: `tool-subagent` returns them in
 //!   its result's `value.events`, which the session appends after the tool result.
 //!
@@ -63,7 +63,7 @@ pub struct SubagentRuntime {
     pub spill_dir: PathBuf,
     /// `Some(dir)`: child logs live at `<dir>/<parent>/<child>.jsonl`; `None`: in memory.
     pub session_dir: Option<PathBuf>,
-    /// The session this runtime belongs to — the parent of every child it starts.
+    /// The session this runtime belongs to: the parent of every child it starts.
     pub session: SessionId,
     /// That session's log (the fork source).
     pub log: Arc<dyn LogStore>,
@@ -112,7 +112,7 @@ impl Config for InprocConfig {
             "subagent.max_depth",
             Ty::Int,
             Some(json!(DEFAULT_MAX_DEPTH)),
-            "Deepest delegation allowed: the root session is depth 0, its children 1, … A spawn past it is refused (10).",
+            "Deepest delegation allowed: the root session is depth 0, its children 1, … A spawn past it is refused.",
         )]
     }
     fn from_loadout(l: &Loadout) -> Result<Self, ConfigError> {
@@ -223,7 +223,7 @@ impl InProc {
         self.find(child).map(|c| c.session.clone())
     }
 
-    /// Where the child's JSONL log lives (`None` for in-memory children or unknown ids).
+    /// The child's JSONL log path (`None` for in-memory children or unknown ids).
     pub fn child_log_path(&self, child: SessionId) -> Option<PathBuf> {
         self.find(child).and_then(|c| c.log_path.clone())
     }
@@ -310,7 +310,7 @@ impl InProc {
         };
         seed_child_log(&*log, &self.rt, &req, &policy, depth, prefix.as_ref())?;
 
-        // 04: an async child cannot talk to a human unless bubbled; a foreground child asks
+        // An async child cannot talk to a human unless bubbled; a foreground child asks
         // through the parent's own approval channel.
         let approval: Arc<dyn Approval> = if !req.is_async || req.bubble { self.parent_approval.clone() } else { Arc::new(NeverApproval) };
         let mut seed = self.rt.seed.clone();
@@ -365,7 +365,7 @@ impl SubagentProvider for InProc {
         Box::pin(async move {
             let c = self.get(child)?;
             if !self.start_run(&c, text.clone()) {
-                // A run is going: the text joins it at the next request boundary (12).
+                // A run is going: the text joins it at the next request boundary.
                 c.session.steer(text, false);
             }
             Ok(())
@@ -377,7 +377,7 @@ impl SubagentProvider for InProc {
             let c = self.get(child)?;
             if c.running() {
                 c.interrupted.store(true, Ordering::SeqCst);
-                // `abort` ends the child's turn with no further model request (12); a steer here would
+                // `abort` ends the child's turn with no further model request; a steer here would
                 // sit queued and reach the child's next run as a stale instruction.
                 c.session.abort();
             }
@@ -420,7 +420,7 @@ fn balanced(s: &aho_log::State) -> bool {
 }
 
 /// The parent's fork point: the last `Turn/End` on the head branch at which no turn, call, or
-/// operation is open. The in-flight turn is unbalanced and never inherited (06).
+/// operation is open. The in-flight turn is unbalanced and never inherited.
 pub fn fork_point(log: &dyn LogStore) -> Option<EntryId> {
     let entries = log.read_branch(log.head()?).ok()?;
     let folds = CustomFolds::new();
@@ -445,7 +445,7 @@ fn fork_prefix(log: &dyn LogStore, at: EntryId) -> Result<Prefix, SubagentError>
         .ok_or_else(|| provider_err(format!("fork point {} is not on the parent's current branch; nothing was started", at.0)))?;
     if !matches!(entries[idx].kind, EntryKind::TurnEnd { .. }) {
         return Err(provider_err(format!(
-            "fork point {} is not a Turn/End: a fork inherits completed turns only (06); nothing was started",
+            "fork point {} is not a Turn/End: a fork inherits completed turns only; nothing was started",
             at.0
         )));
     }
@@ -518,7 +518,7 @@ fn seed_child_log(
 }
 
 /// Depth recorded in a child log's descriptor: an embedder resuming a child must pass
-/// `max(this, inherited)` so a resumed child cannot reset to 0 (10).
+/// `max(this, inherited)` so a resumed child cannot reset to 0.
 pub fn descriptor_depth(log: &dyn LogStore) -> Option<u32> {
     log.read_from(None).into_iter().find_map(|e| match e.kind {
         EntryKind::SubagentDescriptor { depth, .. } => Some(depth),

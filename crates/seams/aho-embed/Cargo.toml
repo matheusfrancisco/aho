@@ -3,7 +3,7 @@ name = "aho-embed"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Embed seam: local/remote embeddings with model id gating (12)"
+description = "Embed seam: local/remote embeddings with model id gating"
 
 [dependencies]
 aho-types.workspace = true

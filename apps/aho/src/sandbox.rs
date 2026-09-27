@@ -1,4 +1,4 @@
-//! Operator verbs over a session's sandbox (07): `aho sandbox status|destroy`, `aho export`, and
+//! Operator verbs over a session's sandbox: `aho sandbox status|destroy`, `aho export`, and
 //! the interactive `aho shell` into a namespace sandbox. None of them needs the session's
 //! network, so they work while the session runs in another process.
 

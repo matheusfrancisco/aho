@@ -1,6 +1,6 @@
-//! QEMU machines for a session (07): `vm-qemu` is the session's VM lab (the `vm` seam behind the
+//! QEMU machines for a session: `vm-qemu` is the session's VM lab (the `vm` seam behind the
 //! 13 `vm_*` tools, under an operator-granted lease), and `world-vm` (`seams.world = vm`) makes
-//! one of its machines — the sandbox VM, built from `vm.recipe` — the session's world: files,
+//! one of its machines (the sandbox VM, built from `vm.recipe`) the session's world: files,
 //! processes and terminals cross the guest agent on virtio-serial, the screen is the session
 //! desktop over RFB, and the only NIC is the session's aho-net network.
 //!

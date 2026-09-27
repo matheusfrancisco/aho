@@ -3,7 +3,7 @@ name = "aho-cap"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The one extension point: Capability, Deps, Manifest, Registrar, Composition, Resolver, Plan (02)."
+description = "The one extension point: Capability, Deps, Manifest, Registrar, Composition, Resolver, Plan."
 
 [dependencies]
 aho-types.workspace = true

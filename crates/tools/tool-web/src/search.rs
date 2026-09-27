@@ -1,10 +1,10 @@
 //! Search backends. Each is a real public API reached through the world's egress:
 //!
-//! * **Brave Search API** — `GET https://api.search.brave.com/res/v1/web/search?q=…&count=…` with
+//! * **Brave Search API**: `GET https://api.search.brave.com/res/v1/web/search?q=…&count=…` with
 //!   `X-Subscription-Token: <key>` and `Accept: application/json`; results live in
 //!   `web.results[]` as `{title, url, description, age?, extra_snippets?}` (descriptions carry
 //!   `<strong>` highlighting). A response without a `web` section means no web results.
-//! * **SearXNG** — `GET <instance>/search?q=…&format=json`; results live in `results[]` as
+//! * **SearXNG**: `GET <instance>/search?q=…&format=json`; results live in `results[]` as
 //!   `{url, title, content, engine, engines, score, publishedDate?}`. An instance that has not
 //!   enabled the `json` output format answers 403.
 

@@ -1,4 +1,4 @@
-//! Answering approval cards on the terminal (05): `y` allow once, `s` allow for the session,
+//! Answering approval cards on the terminal: `y` allow once, `s` allow for the session,
 //! `r` reject, `p` switch to the card's preset (when it names one), `Esc` / Ctrl-D / Ctrl-C
 //! cancel. One keypress, no Enter.
 

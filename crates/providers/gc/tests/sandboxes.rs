@@ -1,4 +1,4 @@
-//! Sandboxes under `aho gc` (04, 07): a session's sandbox, network and VM machines persist
+//! Sandboxes under `aho gc`: a session's sandbox, network and VM machines persist
 //! while its log exists, and become orphans when the log is gone or (for machines) the lease
 //! ended. Another project's machines in the shared VM directory are never judged here.
 #![allow(clippy::unwrap_used, clippy::expect_used)]

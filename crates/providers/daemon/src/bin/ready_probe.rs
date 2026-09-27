@@ -1,8 +1,8 @@
-//! Test helper for the readiness handshake (12 "Reload = exec-in-place with a readiness fd").
+//! Test helper for the readiness handshake of exec-in-place reload.
 //!
-//! * `signal` — takes the readiness fd, prints its pid, writes the ready byte.
-//! * `exit` — exits with status 3 without signalling.
-//! * `exec-into <path>` — takes the readiness fd, prints its pid, then exec's `<path> signal` in
+//! * `signal`: takes the readiness fd, prints its pid, writes the ready byte.
+//! * `exit`: exits with status 3 without signalling.
+//! * `exec-into <path>`: takes the readiness fd, prints its pid, then exec's `<path> signal` in
 //!   place (same pid) handing the fd on.
 
 #![forbid(unsafe_code)]

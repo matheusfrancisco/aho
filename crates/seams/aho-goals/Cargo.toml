@@ -3,7 +3,7 @@ name = "aho-goals"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Goals seam: state machine validated in the fold, round driver (10, 12)"
+description = "Goals seam: state machine validated in the fold, round driver"
 
 [dependencies]
 aho-types.workspace = true

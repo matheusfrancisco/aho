@@ -175,7 +175,7 @@ impl Graph {
         self.nodes.values().any(|n| n.status == Status::Running)
     }
 
-    /// What a node consumes: direct deps plus, through each gate dep, the gate's scope.
+    /// A node's inputs: direct deps plus, through each gate dep, the gate's scope.
     pub fn inputs(&self, id: &TaskId) -> Vec<TaskId> {
         let Some(n) = self.nodes.get(id) else { return vec![] };
         let mut out = Vec::new();
@@ -241,7 +241,7 @@ impl Graph {
     }
 
     /// A passing gate must name every done node in scope, cannot pass over Low siblings, is stale
-    /// if its scope grew after it started, and — a verify gate — cannot pass while one of the
+    /// if its scope grew after it started, and, for a verify gate, cannot pass while one of the
     /// `invariants` covering its files is Fail or Stale.
     pub fn validate_gate(&self, gate: &TaskId, artifact: &HandoffArtifact, invariants: &[InvariantSeen]) -> Result<(), GateError> {
         let g = match self.nodes.get(gate) {
@@ -679,7 +679,7 @@ impl Graph {
             return Err(TaskError::BadEvent(format!("`{id}` is not a verify gate; only a verify gate's pass names invariants")));
         }
         // a gate's verdict is checked first: work that entered its scope after dispatch is
-        // `StaleGateScope`, not merely an open dependency
+        // `StaleGateScope`, not an open dependency
         if n.kind.is_gate() {
             self.validate_gate(id, artifact, invariants).map_err(|err| TaskError::Gate { gate: id.clone(), err })?;
         }

@@ -3,7 +3,7 @@ name = "memory-local"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Long-term memory capability: JSON store under ~/.aho/memory, hybrid retrieval, suppression, extraction, maintenance (12)"
+description = "Long-term memory capability: JSON store under ~/.aho/memory, hybrid retrieval, suppression, extraction, maintenance"
 
 [dependencies]
 aho-types.workspace = true

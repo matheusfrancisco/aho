@@ -1,4 +1,4 @@
-//! `12` — long-term memory capability: the store, retrieval, the context producer, extraction
+//! Long-term memory capability: the store, retrieval, the context producer, extraction
 //! and maintenance.
 //!
 //! * **Store**: JSON files `<home>/.aho/memory/<blake3(project) short>.json` (project) and
@@ -9,7 +9,7 @@
 //!   the judge with majority consensus when one is configured and due (first retrieval, topic
 //!   change, every `memory.rerank.every_turns`), otherwise only the intersection with the last
 //!   verified set (carry-verified degradation); with no judge at all, the dynamic gate.
-//! * **Injection**: `Registrar::context` — see [`context`]; doc-12 suppression defaults.
+//! * **Injection**: `Registrar::context` (see [`context`]) with the default suppression rules.
 //! * **Extraction**: topic change / every `memory.extract.every_turns` / session end, through the
 //!   rule extractor (`remember:` / `note:` lines) plus the LLM extractor when a judge route exists.
 //! * **Judge route**: the Registry service `llm:memory` (add a `provider.memory` row on any llm
@@ -224,5 +224,5 @@ declare_capability!(
     tools = &[],
     provides_handles = [HandleKind::Custom("memory")],
     entry_kinds = ["Memory/Pruned", "Memory/Maintained", "Memory/Extracted", "Memory/ExtractFailed", "Memory/Error"],
-    doc = "Long-term memory under ~/.aho/memory: dense+BM25 → RRF → rerank (llm:memory) or dynamic gate; suppressed Snapshot injection; extraction on topic change / every N turns / session end; logged maintenance (12)."
+    doc = "Long-term memory under ~/.aho/memory: dense+BM25 → RRF → rerank (llm:memory) or dynamic gate; suppressed Snapshot injection; extraction on topic change / every N turns / session end; logged maintenance."
 );

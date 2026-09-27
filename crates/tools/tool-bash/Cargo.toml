@@ -3,7 +3,7 @@ name = "tool-bash"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "bash / bash_persistent with the blast-radius classifier as tool check; output streamed into the op (04, 12, 16)"
+description = "bash / bash_persistent with the blast-radius classifier as tool check; output streamed into the op"
 
 [dependencies]
 aho-types.workspace = true

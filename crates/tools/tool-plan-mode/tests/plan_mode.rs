@@ -1,7 +1,7 @@
 //! Plan mode against a session ceiling that implements the `aho_control::SessionCeiling`
 //! contract over the real lattice (`aho_policy::SandboxPolicy`), a real log and a real approval
 //! channel whose other end plays the operator. The ceiling below is the reference for the
-//! session-side implementation (see the crate's report: "Core changes needed").
+//! session-side implementation.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::{Arc, Mutex};

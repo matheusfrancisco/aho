@@ -1,5 +1,5 @@
-//! `08`/`10`/`12` — the shared engine for foreign-CLI subagent providers (`subagent-claude`,
-//! `subagent-codex`). Doc 12, "From openharness": **observe, don't wrap**.
+//! The shared engine for foreign-CLI subagent providers (`subagent-claude`, `subagent-codex`):
+//! **observe, don't wrap**.
 //!
 //! * The other CLI runs untouched, with the user's own credentials, in a PTY: a session of a
 //!   dedicated tmux server (`tmux -L aho-subagents`, one session `aho-<cli>-<child>` per child,
@@ -7,12 +7,12 @@
 //!   and answers to its dialogs are typed into its pane (bracketed paste, then Enter);
 //!   interrupts press Escape.
 //! * State comes from *its* transcript, tailed by byte offset ([`Tail`]): each CLI crate owns a
-//!   normalizer (a copy per CLI, never a shared abstraction — 12) that maps every record kind a
+//!   normalizer (one copy per CLI, never a shared abstraction) that maps every record kind a
 //!   recorded session of the real binary has shown onto [`Event`]s, or ignores it with a reason.
 //!   Unknown kinds are surfaced as `Subagent/Note`, never guessed at.
-//! * What the transcript says is mirrored into the **parent** log as `Subagent/*` entries
+//! * The provider mirrors the transcript into the **parent** log as `Subagent/*` entries
 //!   ([`mirror`]), each transcript-derived entry carrying the byte offset it came from.
-//! * Crash-honest receipts (12): a `Subagent/Receipt` is written before launch; a child whose
+//! * Crash-honest receipts: a `Subagent/Receipt` is written before launch; a child whose
 //!   transcript never appeared is *launching*, and after a crash becomes `blocked + uncertain`;
 //!   attached children resume their tail at the recorded offset; unconfirmed sends become
 //!   delivery `unknown`; a tmux session must be missing on two scans before the child is gone.

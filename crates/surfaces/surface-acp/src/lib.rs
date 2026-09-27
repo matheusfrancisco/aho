@@ -1,6 +1,5 @@
-//! `08`/`01` — the acp surface: aho as an ACP agent over stdio (08: "aho as an ACP server;
-//! `subagent-acp` is the client side"). Speaks ACP protocol version 1, types from schema
-//! release 1.23.0 (see `aho-acp`).
+//! The acp surface: aho as an ACP agent over stdio (`subagent-acp` is the client side). Speaks
+//! ACP protocol version 1, types from schema release 1.23.0 (see `aho-acp`).
 //!
 //! * One ACP session is one aho [`Session`]: `session/new` asks the embedder's
 //!   [`SessionFactory`] to boot one with the client's `cwd` and MCP servers; `session/load`
@@ -8,10 +7,10 @@
 //! * `session/prompt` runs one turn. Streamed text and thinking become `agent_message_chunk` /
 //!   `agent_thought_chunk`; `Tool/Call` becomes `tool_call` (kind from the consequence class),
 //!   `Op/Started` an `in_progress` update, `Tool/Result` a `completed`/`failed` update with the
-//!   result content; `Todo/Written` becomes `plan`. The answer (`stopReason`) is sent after every
+//!   result content; `Todo/Written` becomes `plan`. The answer (`stopReason`) follows every
 //!   update of the turn.
 //! * Approval cards become `session/request_permission` with `allow-once`, `allow-always` (aho's
-//!   session scope), and `reject-once`. Authority is process ownership (08): the ACP client is the
+//!   session scope), and `reject-once`. Authority is process ownership: the ACP client is the
 //!   operator, like the rpc surface; the agent never answers its own card.
 //! * `session/cancel` aborts the turn: the Session stops its running calls and ends the turn at
 //!   the next boundary (between steps, mid model request, or while waiting) without calling the
@@ -68,8 +67,7 @@ aho_cap::declare_capability!(
     provides = [],
     requires = [],
     tools = &[],
-    doc =
-        "ACP v1 over stdio: aho as an Agent Client Protocol agent; one ACP session per aho session, approvals as permission requests (08)."
+    doc = "ACP v1 over stdio: aho as an Agent Client Protocol agent; one ACP session per aho session, approvals as permission requests."
 );
 
 // ───────────────────────────── embedder API ─────────────────────────────
@@ -105,7 +103,7 @@ pub trait SessionFactory: Send + Sync + 'static {
     }
 }
 
-/// Where operator-facing diagnostics go (stdout is the protocol; `serve_stdio` uses stderr).
+/// Sink for operator-facing diagnostics (stdout is the protocol; `serve_stdio` uses stderr).
 pub type Diag = Arc<dyn Fn(&str) + Send + Sync>;
 
 #[derive(Clone)]
@@ -224,7 +222,7 @@ impl Agent {
         }
     }
 
-    /// Boots through the factory, logs the attachment (12), and starts forwarding.
+    /// Boots through the factory, logs the attachment, and starts forwarding.
     async fn attach(&self, req: SessionRequest) -> Result<Arc<live::Live>, RpcError> {
         let load = req.load.clone();
         let opened = self.factory.open(req.clone()).await.map_err(RpcError::internal)?;

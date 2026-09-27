@@ -1,5 +1,5 @@
-//! `08`/`12` — the rpc surface: NDJSON over stdio or a unix socket, every `Session` call 1:1,
-//! plus the `caps.*` verb set of 05. The SDK protocol and the default daemon topology.
+//! The rpc surface: NDJSON over stdio or a unix socket, every `Session` call 1:1,
+//! plus the `caps.*` verb set. It serves as the SDK protocol and the default daemon topology.
 //!
 //! Envelope: every frame carries `v`. The first client frame is `hello{min,max,…}`; the server
 //! answers `hello_ok{version, capabilities}` with the highest common version or an `error` and
@@ -7,7 +7,7 @@
 //! frame with `reply_to = id`. Events (`entry`, `stream`, `idle`, `approval`, `error`) carry
 //! `reply_to: null`. Authentication is process ownership: stdio, or a socket created `0600`.
 //!
-//! Takeover (12) is decided from the hello and logged as `SurfaceAttached`: allowed when the
+//! Takeover is decided from the hello and logged as `SurfaceAttached`: allowed when the
 //! session has no owner, the client is the owner, or it has local history and asks to take over.
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![forbid(unsafe_code)]
@@ -56,7 +56,7 @@ aho_cap::declare_capability!(
     provides = [],
     requires = [],
     tools = &[],
-    doc = "NDJSON rpc over stdio or a unix socket: versioned envelope, Session API 1:1, and the caps.* verb set (08, 12)."
+    doc = "NDJSON rpc over stdio or a unix socket: versioned envelope, Session API 1:1, and the caps.* verb set."
 );
 
 // ───────────────────────────── errors ─────────────────────────────
@@ -275,7 +275,7 @@ impl Conn {
         }
     }
 
-    /// `[p]` on the card (05): the smallest preset that admits the call becomes `policy.preset`
+    /// `[p]` on the card: the smallest preset that admits the call becomes `policy.preset`
     /// through the same plan → apply as `aho preset`, and this call is allowed for the session.
     fn answer_with_preset(&self, id: u64) -> Result<Value, String> {
         let caps =
@@ -343,7 +343,7 @@ impl Conn {
                     Ok((p, mode)) => {
                         let (s, v) = (self.session.clone(), self.v);
                         self.tasks.spawn(async move {
-                            // Process ownership is this surface's authentication (08).
+                            // Process ownership is this surface's authentication.
                             let op = Operator::authenticate(OperatorProof::local_tty());
                             match s.rewind(&op, CheckpointId(p.checkpoint), mode).await {
                                 Ok(e) => id.map(|_| ServerFrame::result(v, id, json!({ "entry": e }))),

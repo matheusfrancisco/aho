@@ -367,7 +367,7 @@ async fn mutation_records_each_mutant_and_vacuity() {
 
     let (v, text) = done(call(&t, &f, "invariant_mutate", json!({"id": "inv.strong", "spec": "Strong.tla"})).await);
     assert!(text.starts_with("Strong caught 1 of 2 mutants"), "{text}");
-    assert!(text.contains("- drop-guard:A#1 [caught]: drop-guard:A#1 changed — invariant Inv"), "{text}");
+    assert!(text.contains("- drop-guard:A#1 [caught]: drop-guard:A#1 changed; invariant Inv"), "{text}");
     let ev = events(&v);
     assert_eq!(ev.len(), 2, "no Vacuous verdict once a mutant is caught");
     assert_eq!(v["verdict"], json!({"verdict": "pass"}));

@@ -3,7 +3,7 @@ name = "mcp-stdio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "MCP client over stdio JSON-RPC 2.0; registers each classified server's tools as `mcp__<server>__<tool>` (10)"
+description = "MCP client over stdio JSON-RPC 2.0; registers each classified server's tools as `mcp__<server>__<tool>`"
 
 [dependencies]
 aho-types.workspace = true

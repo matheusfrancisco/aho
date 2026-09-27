@@ -1,16 +1,16 @@
-//! The rpc protocol as data (08, 12): every method with its params and result, every event with
-//! its payload, and every type those reference. The JSON Schema and the TS/Python SDKs are
-//! generated from this table ([`crate::codegen`]).
+//! The rpc protocol as data: every method with its params and result, every event with its
+//! payload, and every type those reference. The JSON Schema and the TS/Python SDKs are generated
+//! from this table ([`crate::codegen`]).
 //!
 //! surface-rpc builds its payloads with `serde_json::json!` and the log types carry no schema
 //! derives, so the table is maintained here and held to the server by `tests/schema.rs`: every
-//! frame surface-rpc produces — its committed snapshot, one sample of every entry kind and
-//! transition, and the live frames of a real session — must validate strictly against it
+//! frame surface-rpc produces (its committed snapshot, one sample of every entry kind and
+//! transition, and the live frames of a real session) must validate strictly against it
 //! ([`crate::validate`]). A field added, removed, or renamed on either side fails that test.
 //!
-//! Wire rules the table encodes (12): every frame carries `v`; unknown fields are ignored by
-//! readers (so generated types are open), a minor version only adds fields, a major version is a
-//! handshake decision.
+//! Wire rules the table encodes: every frame carries `v`; readers ignore unknown fields (so
+//! generated types are open), a minor version only adds fields, a major version is a handshake
+//! decision.
 
 /// A JSON type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -151,7 +151,7 @@ const fn method(name: &'static str, sdk: &'static str, params: Option<&'static s
     Method { name, sdk, params, result, doc }
 }
 
-/// `aho-log::EntryKind`, tag `type` (06).
+/// `aho-log::EntryKind`, tag `type`.
 const ENTRY_KINDS: &[Variant] = &[
     var("config_resolved", &[req("key", Str), req("sourced", Ref("Sourced"))]),
     var("cap_activated", &[req("id", Str), req("manifest_hash", HASH), req("deps", STRS), req("config_hash", HASH)]),
@@ -192,11 +192,11 @@ const ENTRY_KINDS: &[Variant] = &[
         &[
             req("call", CALL_ID),
             req("outcome", Ref("ToolOutcome")),
-            req("value", Json).doc("Canonical, schema-validated value (10); SDK callers read this."),
-            req("content", List(&Ref("ContentBlock"))).doc("What the model saw."),
+            req("value", Json).doc("Canonical, schema-validated value; SDK callers read this."),
+            req("content", List(&Ref("ContentBlock"))).doc("The content the model saw."),
             req("spill_ref", Opt(&HASH)),
             req("meta", Opt(&Ref("Card"))),
-            req("late", Bool).doc("Arrived after the request boundary it belonged to (16)."),
+            req("late", Bool).doc("Arrived after the request boundary it belonged to."),
         ],
     ),
     var(
@@ -272,13 +272,13 @@ const TRANSITIONS: &[Variant] = &[
 pub static DEFS: &[Def] = &[
     // ── scalars and ids (aho-types) ──
     alias("Hash", Str, "blake3 digest as 64 lowercase hex characters."),
-    alias("EntryId", UInt, "Log entry id, monotonic per log (06); resubscribe `from` the last one seen."),
+    alias("EntryId", UInt, "Log entry id, monotonic per log; resubscribe `from` the last one seen."),
     alias("TurnId", UInt, "Turn number within a session."),
     alias("StepId", UInt, "Model request number within a session."),
-    alias("Epoch", UInt, "Policy epoch; every widening of the policy starts a new one (04)."),
-    alias("OpId", UInt, "Operation behind a tool call (16)."),
-    alias("LeaseId", UInt, "Lease on a leased resource (04)."),
-    alias("CheckpointId", UInt, "Workspace checkpoint (11)."),
+    alias("Epoch", UInt, "Policy epoch; every widening of the policy starts a new one."),
+    alias("OpId", UInt, "Operation behind a tool call."),
+    alias("LeaseId", UInt, "Lease on a leased resource."),
+    alias("CheckpointId", UInt, "Workspace checkpoint."),
     alias("Timestamp", UInt, "Milliseconds since the Unix epoch."),
     alias("SessionId", Str, "u128 session id as a decimal string (`hello_ok.session` is the same id in lowercase hex)."),
     alias("AgentId", Str, "u128 agent id as a decimal string."),
@@ -295,7 +295,7 @@ pub static DEFS: &[Def] = &[
             "controls_desktop",
             "talks_to_human",
         ],
-        "What a tool can do (02); every tool declares one class.",
+        "Consequence class of a tool; every tool declares one.",
     ),
     alias("ConsequenceSet", List(&Ref("Consequence")), "A set of consequence classes, in class order."),
     union(
@@ -307,7 +307,7 @@ pub static DEFS: &[Def] = &[
             var("agent", &[req("id", Ref("AgentId")), req("turn", Ref("TurnId"))]),
             var("system", &[req("name", Str)]),
         ],
-        "Who caused an entry (04).",
+        "The actor that caused an entry.",
     ),
     union(
         "ContentBlock",
@@ -327,11 +327,11 @@ pub static DEFS: &[Def] = &[
         &[req("input_tokens", UInt), req("output_tokens", UInt), req("cache_read_tokens", UInt), req("cache_write_tokens", UInt)],
         "Token counts.",
     ),
-    strs("StopReason", &["end_turn", "tool_use", "max_tokens", "refusal", "aborted", "error"], "Why the model stopped."),
+    strs("StopReason", &["end_turn", "tool_use", "max_tokens", "refusal", "aborted", "error"], "The reason the model stopped."),
     strs(
         "Form",
         &["prompt", "snapshot", "catalog", "instructions", "notice"],
-        "Source label of injected context (10); surfaces read this, never prose.",
+        "Source label of injected context; surfaces read this, never prose.",
     ),
     union(
         "Card",
@@ -344,9 +344,9 @@ pub static DEFS: &[Def] = &[
             var("read", &[req("path", Str), req("range", Opt(&Tuple(&[UInt, UInt])))]),
             var("web", &[req("url", Str), req("title", Str)]),
         ],
-        "Presentation intent for a tool result (10).",
+        "Presentation intent for a tool result.",
     ),
-    // ── config provenance (aho-config, 03) ──
+    // ── config provenance (aho-config) ──
     union(
         "Layer",
         "layer",
@@ -360,9 +360,9 @@ pub static DEFS: &[Def] = &[
             var("arg", &[]),
             var("runtime", &[req("name", Str)]),
         ],
-        "Config layer, lowest rank first (03).",
+        "Config layer, lowest rank first.",
     ),
-    strs("Scope", &["machine", "user", "project", "invocation", "session"], "Config breadth (03)."),
+    strs("Scope", &["machine", "user", "project", "invocation", "session"], "Config breadth."),
     union(
         "Where",
         "at",
@@ -373,9 +373,9 @@ pub static DEFS: &[Def] = &[
             var("flag", &[req("flag", Str)]),
             var("entry", &[req("id", ENTRY_ID)]),
         ],
-        "Where a config value was written.",
+        "The place a config value was written.",
     ),
-    obj("Origin", &[req("layer", Ref("Layer")), req("scope", Ref("Scope")), req("at", Ref("Where"))], "Where a config value came from."),
+    obj("Origin", &[req("layer", Ref("Layer")), req("scope", Ref("Scope")), req("at", Ref("Where"))], "The origin of a config value."),
     obj(
         "Sourced",
         &[
@@ -383,9 +383,9 @@ pub static DEFS: &[Def] = &[
             req("winner", Ref("Origin")),
             req("shadowed", List(&Tuple(&[Ref("Origin"), Json]))).doc("Every loser, most specific first."),
         ],
-        "A resolved config value with its winning origin (03).",
+        "A resolved config value with its winning origin.",
     ),
-    // ── log (aho-log, 06) ──
+    // ── log (aho-log) ──
     union(
         "CapDeltaOp",
         "op",
@@ -398,21 +398,21 @@ pub static DEFS: &[Def] = &[
         ],
         "A capability state change after bootstrap.",
     ),
-    strs("ApprovalOutcome", &["allowed_once", "rejected", "cancelled", "unavailable"], "How an approval request ended."),
-    strs("GrantScope", &["once", "session", "until_revoked"], "How long an allow holds."),
-    union("Transition", "transition", TRANSITIONS, "How a step or turn ended (10)."),
+    strs("ApprovalOutcome", &["allowed_once", "rejected", "cancelled", "unavailable"], "The way an approval request ended."),
+    strs("GrantScope", &["once", "session", "until_revoked"], "The duration an allow holds."),
+    union("Transition", "transition", TRANSITIONS, "The way a step or turn ended."),
     union(
         "ToolOutcome",
         "outcome",
         &[var("ok", &[]), var("err", &[req("code", Str), req("reason", Str)]), var("cancelled", &[req("reason", Ref("CancelReason"))])],
-        "How a tool call ended.",
+        "The outcome of a tool call.",
     ),
     strs(
         "CancelReason",
         &["aborted", "before_dispatch", "sibling_failed", "user_interrupted", "rewind", "reload"],
-        "Why a call or operation was cancelled.",
+        "The reason a call or operation was cancelled.",
     ),
-    strs("OpKind", &["process", "io", "timer", "remote", "compute"], "What an operation waits on (16)."),
+    strs("OpKind", &["process", "io", "timer", "remote", "compute"], "The resource an operation waits on."),
     union(
         "OpStatus",
         "status",
@@ -422,7 +422,7 @@ pub static DEFS: &[Def] = &[
             var("cancelled", &[req("reason", Ref("CancelReason"))]),
             var("uncertain", &[req("last_seen", TIMESTAMP)]),
         ],
-        "How an operation ended; `uncertain` = the process died mid-dispatch and it may or may not have happened (16).",
+        "The final status of an operation; `uncertain` = the process died mid-dispatch and it may or may not have happened.",
     ),
     obj(
         "ProcessIdentity",
@@ -433,22 +433,22 @@ pub static DEFS: &[Def] = &[
         "Takeover",
         "takeover",
         &[var("allowed", &[]), var("refused", &[req("reason", Str)])],
-        "Whether an attaching surface took the session (12).",
+        "The takeover decision for an attaching surface.",
     ),
-    strs("RecoveryRole", &["initiator", "interrupted_peer", "headless"], "Role in a crash recovery (12)."),
+    strs("RecoveryRole", &["initiator", "interrupted_peer", "headless"], "Role in a crash recovery."),
     union(
         "CheckpointCause",
         "cause",
         &[var("tool_result", &[req("call", CALL_ID)]), var("turn_end", &[]), var("manual", &[]), var("pre_rewind", &[])],
-        "Why a workspace checkpoint was taken (11).",
+        "The reason a workspace checkpoint was taken.",
     ),
-    strs("RewindMode", &["both", "chat_only", "code_only"], "What a rewind restored (11)."),
-    strs("FormalKind", &["tla", "lean"], "Invariant language (13)."),
+    strs("RewindMode", &["both", "chat_only", "code_only"], "The scope a rewind restored."),
+    strs("FormalKind", &["tla", "lean"], "Invariant language."),
     union(
         "CheckMode",
         "mode",
         &[var("bounded", &[req("n", UInt)]), var("inductive", &[]), var("proof", &[]), var("trace", &[])],
-        "How an invariant was checked (13).",
+        "The method that checked an invariant.",
     ),
     union(
         "Verdict",
@@ -460,7 +460,7 @@ pub static DEFS: &[Def] = &[
             var("stale", &[]),
             var("vacuous", &[]),
         ],
-        "An invariant check result (13).",
+        "An invariant check result.",
     ),
     union(
         "CapState",
@@ -472,12 +472,12 @@ pub static DEFS: &[Def] = &[
             var("broken", &[req("err", Str)]),
             var("unlocked", &[]),
         ],
-        "A capability's state in the fold (02, 05).",
+        "A capability's state in the fold.",
     ),
     obj(
         "PolicyState",
         &[req("epoch", Ref("Epoch")), req("allowed", Ref("ConsequenceSet")), req("preset", Str)],
-        "The current policy epoch (04).",
+        "The current policy epoch.",
     ),
     obj(
         "Entry",
@@ -490,14 +490,14 @@ pub static DEFS: &[Def] = &[
             req("by", Ref("Principal")),
             req("kind", Ref("EntryKind")),
         ],
-        "One session log entry (06).",
+        "One session log entry.",
     ),
-    union("EntryKind", "type", ENTRY_KINDS, "What an entry records: closed core kinds plus namespaced `custom` (06)."),
-    // ── envelope and handshake (08, 12) ──
+    union("EntryKind", "type", ENTRY_KINDS, "An entry's payload: closed core kinds plus namespaced `custom`."),
+    // ── envelope and handshake ──
     obj(
         "ClientFrame",
         &[req("v", UInt), opt("id", Opt(&UInt)).doc("Absent = notification: no reply."), req("method", Str), opt("params", Json)],
-        "Client → server. Unknown fields are ignored.",
+        "Client → server. Readers ignore unknown fields.",
     ),
     obj(
         "ServerFrame",
@@ -507,14 +507,14 @@ pub static DEFS: &[Def] = &[
             req("event", Str),
             req("payload", Json),
         ],
-        "Server → client. Unknown fields are ignored.",
+        "Server → client. Readers ignore unknown fields.",
     ),
     obj(
         "Hello",
         &[
             req("min", UInt),
             req("max", UInt),
-            opt("client_instance", Str).doc("Stable per client install; the owner of a session is a client instance (12)."),
+            opt("client_instance", Str).doc("Stable per client install; the owner of a session is a client instance."),
             opt("has_local_history", Bool),
             opt("allow_takeover", Bool).doc("Take the session from its owner; needs `has_local_history`."),
         ],
@@ -530,14 +530,14 @@ pub static DEFS: &[Def] = &[
         ],
         "The server's answer to `hello`.",
     ),
-    obj("ErrorPayload", &[req("message", Str)], "What happened, what the server did, how to change it."),
+    obj("ErrorPayload", &[req("message", Str)], "Message: what happened, what the server did, how to change it."),
     obj("Empty", &[], "No fields."),
     // ── session.* params and results ──
     obj(
         "PromptParams",
         &[
             req("text", Str),
-            opt("client_key", Opt(&Str)).doc("Caller-chosen dedup key: a prompt whose key the log has seen is not run again (16)."),
+            opt("client_key", Opt(&Str)).doc("Caller-chosen dedup key: a prompt whose key the log has seen is not run again."),
         ],
         "`session.prompt` params.",
     ),
@@ -554,7 +554,7 @@ pub static DEFS: &[Def] = &[
         "`session.subscribe` result.",
     ),
     obj("Checkpoint", &[req("id", Ref("CheckpointId")), req("tree", HASH), req("entry", ENTRY_ID)], "A workspace checkpoint in the fold."),
-    obj("InvariantState", &[req("verdict", Ref("Verdict")), req("code_hash", HASH)], "An invariant's latest verdict (13)."),
+    obj("InvariantState", &[req("verdict", Ref("Verdict")), req("code_hash", HASH)], "An invariant's latest verdict."),
     obj(
         "Fold",
         &[
@@ -575,10 +575,10 @@ pub static DEFS: &[Def] = &[
         ],
         "`session.fold`: the folded state a thin client reduces over (surface-local state excluded).",
     ),
-    strs("RewindModeName", &["both", "chat", "code", "chat_only", "code_only"], "What `session.rewind` restores; default `both`."),
+    strs("RewindModeName", &["both", "chat", "code", "chat_only", "code_only"], "The scope `session.rewind` restores; default `both`."),
     obj("RewindParams", &[req("checkpoint", Ref("CheckpointId")), opt("mode", Opt(&Ref("RewindModeName")))], "`session.rewind` params."),
     obj("RewindResult", &[req("entry", ENTRY_ID).doc("The entry the rewound branch continues from.")], "`session.rewind` result."),
-    // ── approvals (04, 05) ──
+    // ── approvals ──
     strs(
         "AnswerOutcome",
         &["allow", "allow_once", "allow_session", "reject", "cancel", "preset"],
@@ -606,7 +606,7 @@ pub static DEFS: &[Def] = &[
             req("cap", Opt(&Str)).doc("The capability that registered the tool."),
             req("class", Ref("Consequence")),
             req("args", Json),
-            req("reason", Str).doc("Which link of the decision chain asked (`Rule`, `Preset`, …)."),
+            req("reason", Str).doc("The decision-chain link that asked (`Rule`, `Preset`, …)."),
             req("why", Str).doc("The rendered card text."),
             req("world", Str),
             req("enforced_by", Str),
@@ -614,7 +614,7 @@ pub static DEFS: &[Def] = &[
             req("preset_cut", Opt(&Str)).doc("The preset the `preset` answer writes; `null` = no preset admits the call."),
             req("epoch_next", Ref("Epoch")),
         ],
-        "A tool call waiting for a human (05): the same fields every surface renders.",
+        "A tool call waiting for a human: the same fields every surface renders.",
     ),
     // ── events ──
     union(
@@ -630,7 +630,7 @@ pub static DEFS: &[Def] = &[
         "A live model stream chunk; never durable (the log has the final message).",
     ),
     obj("Idle", &[req("turn", Ref("TurnId")), req("transition", Ref("Transition"))], "The session went idle."),
-    // ── caps.* (05) ──
+    // ── caps.* ──
     obj("CapsListParams", &[opt("kind", Str).doc("Only rows of this kind (`tool`, `provider`, …).")], "`caps.list` params."),
     obj("CapsTreeParams", &[opt("id", Str).doc("One node instead of the whole tree.")], "`caps.tree` params."),
     obj("CapsWhyParams", &[req("id", Str)], "`caps.why` params."),
@@ -662,7 +662,7 @@ pub static DEFS: &[Def] = &[
             req("applied", Bool),
             req("wrote", Opt(&STRS)),
         ],
-        "A planned (and with `apply`, written) configuration change (05: plan → diff → apply).",
+        "A planned (and with `apply`, written) configuration change (plan → diff → apply).",
     ),
 ];
 
@@ -690,7 +690,7 @@ pub static METHODS: &[Method] = &[
         "Replays entries after `from` as `entry` events, then streams live events on this connection.",
     ),
     method("session.fold", "fold", None, Ref("Fold"), "The folded session state."),
-    method("session.rewind", "rewind", Some("RewindParams"), Ref("RewindResult"), "Rewinds chat and/or code to a checkpoint (11)."),
+    method("session.rewind", "rewind", Some("RewindParams"), Ref("RewindResult"), "Rewinds chat and/or code to a checkpoint."),
     method(
         "approval.answer",
         "answer_approval",
@@ -698,17 +698,17 @@ pub static METHODS: &[Method] = &[
         Ref("AnswerResult"),
         "Answers one approval card; a card is answered once.",
     ),
-    method("caps.list", "caps_list", Some("CapsListParams"), Json, "Inventory rows (05); shape owned by aho-inspect."),
-    method("caps.tree", "caps_tree", Some("CapsTreeParams"), Json, "The capability tree (05); shape owned by aho-inspect."),
+    method("caps.list", "caps_list", Some("CapsListParams"), Json, "Inventory rows; shape owned by aho-inspect."),
+    method("caps.tree", "caps_tree", Some("CapsTreeParams"), Json, "The capability tree; shape owned by aho-inspect."),
     method(
         "caps.explain",
         "caps_explain",
         Some("CapsExplainParams"),
         Json,
-        "Where a setting's value comes from, or why a capability is in its state (05); shape owned by aho-inspect.",
+        "Explains where a setting's value comes from, or why a capability is in its state; shape owned by aho-inspect.",
     ),
-    method("caps.why", "caps_why", Some("CapsWhyParams"), Json, "Why a capability is in its state and how to change it (05)."),
-    method("caps.plan", "caps_plan", Some("CapsPlanParams"), Json, "The resolved plan, or the diff a patch layer would make (05)."),
+    method("caps.why", "caps_why", Some("CapsWhyParams"), Json, "Explains why a capability is in its state and how to change it."),
+    method("caps.plan", "caps_plan", Some("CapsPlanParams"), Json, "The resolved plan, or the diff a patch layer would make."),
     method("caps.set", "caps_set", Some("CapsSetParams"), Ref("Proposal"), "Plans one setting; `apply` writes it."),
     method("caps.enable", "caps_enable", Some("CapsSwitchParams"), Ref("Proposal"), "Plans `caps.<id>.enabled = true`; `apply` writes it."),
     method(

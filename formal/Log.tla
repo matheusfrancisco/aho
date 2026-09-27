@@ -1,9 +1,9 @@
 -------------------------------- MODULE Log --------------------------------
 (***************************************************************************)
-(* The session log (docs 06, 13) and the structural rules its fold         *)
-(* enforces (aho_log::step). The store is a tree: every entry gets a fresh *)
-(* id and a parent, and a branch is read in id order, so a trace is one    *)
-(* branch. The fold state is kept incrementally, as in the Rust fold.      *)
+(* The session log and the structural rules its fold enforces              *)
+(* (aho_log::step). The store is a tree: every entry gets a fresh id and a *)
+(* parent, and a branch is read in id order, so a trace is one branch. The *)
+(* fold keeps its state incrementally, as the Rust fold does.              *)
 (*                                                                         *)
 (*   AppendOnly           ids only grow; every earlier entry is kept as is *)
 (*   AtMostOneResult      tool.at_most_one_result                          *)

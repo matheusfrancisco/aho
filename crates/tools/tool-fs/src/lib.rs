@@ -1,4 +1,4 @@
-//! `10` — the fs tools: `read`, `read_image`, `glob`, `grep`, `write`, `edit`,
+//! The fs tools: `read`, `read_image`, `glob`, `grep`, `write`, `edit`,
 //! `str_replace_editor`. They run in whatever world is bound (FsRead + FsWrite handles).
 //!
 //! Read ledger: every read records `path → version`. `write`/`edit` of an existing file that was
@@ -45,7 +45,7 @@ impl ReadLedger {
     pub fn record(&self, key: String, v: FileVersion) {
         self.0.lock().unwrap_or_else(|p| p.into_inner()).insert(key, v);
     }
-    /// Forget everything (compaction clears the ledger, 10).
+    /// Forget everything (compaction clears the ledger).
     pub fn clear(&self) {
         self.0.lock().unwrap_or_else(|p| p.into_inner()).clear();
     }
@@ -357,7 +357,7 @@ fn lines_of(n: usize) -> String {
 }
 
 impl ToolFs {
-    /// The ledger this instance keeps (a forked child may be seeded from it, 10).
+    /// The ledger this instance keeps (a forked child may be seeded from it).
     pub fn ledger(&self) -> &ReadLedger {
         &self.ledger
     }

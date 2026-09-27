@@ -26,7 +26,7 @@ pub const BASE_URL: &str = "https://api.anthropic.com";
 pub const KIMI_BASE_URL: &str = "https://api.kimi.com/coding";
 pub const COPILOT_BASE_URL: &str = "https://api.individual.githubcopilot.com";
 
-/// Idle time allowed between streamed bytes (long thinking phases stream pings, not silence).
+/// Idle time allowed between streamed bytes (long thinking phases stream pings).
 const READ_TIMEOUT: Duration = Duration::from_secs(600);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -315,5 +315,5 @@ declare_capability!(
     provides = [SeamId(aho_llm::SEAM)],
     requires = [Requirement::AnyOf(&[Requirement::Credential("anthropic"), Requirement::Credential("kimi-coding")])],
     tools = &[],
-    doc = "Anthropic Messages protocol: routes `anthropic` and `kimi-coding`; OAuth-aware auth and prompt caching; late results as user blocks (16)."
+    doc = "Anthropic Messages protocol: routes `anthropic` and `kimi-coding`; OAuth-aware auth and prompt caching; late results as user blocks."
 );

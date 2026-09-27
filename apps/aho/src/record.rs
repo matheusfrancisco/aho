@@ -1,4 +1,4 @@
-//! Operator entries for a session some process may be running (03, 05, 12). Two processes never
+//! Operator entries for a session some process may be running. Two processes never
 //! write one log: this process appends when nothing drives the session; when the daemon holds
 //! it, the entries go through the daemon's `session.command` on a connection that drives the
 //! session for the command (a client driving it there makes this one a read-only stranger, so
@@ -24,7 +24,7 @@ pub enum Writer {
 }
 
 impl Writer {
-    /// How this process may write operator entries into session `s` (folded as `st`). `Err`
+    /// Decides how this process may write operator entries into session `s` (folded as `st`). `Err`
     /// says who drives it instead.
     pub async fn open(ctx: &Ctx, dir: &Path, s: &SessionFile, st: &State) -> Result<Writer, String> {
         if let Some((socket, conn, status)) = crate::serve::holding(ctx, dir, s.id).await.map_err(|e| e.to_string())? {
@@ -115,7 +115,7 @@ fn op_name(op: &CapDeltaOp) -> &'static str {
     }
 }
 
-/// The entry as `aho` names it on screen (05: `Cap/Delta{Activated skill.deploy, by: Operator}`).
+/// The entry as `aho` names it on screen (`Cap/Delta{Activated skill.deploy, by: Operator}`).
 fn render(k: &EntryKind) -> Option<String> {
     Some(match k {
         EntryKind::CapDelta { id, op, .. } => format!("Cap/Delta{{{} {id}, by: Operator}}", op_name(op)),
@@ -126,10 +126,10 @@ fn render(k: &EntryKind) -> Option<String> {
     })
 }
 
-/// `03`/`05`: after an operator command wrote a config file, the session it concerns (`which`,
-/// or the latest) records the change — `CommandRun{name, args}`, the entries that make its fold
-/// match `after` (config, capability states, policy epoch citing the command, plan seal),
-/// `CommandDone` — so the running session and every projection see it. Through the daemon the
+/// After an operator command wrote a config file, the session it concerns (`which`, or the
+/// latest) records the change: `CommandRun{name, args}`, the entries that make its fold match
+/// `after` (config, capability states, policy epoch citing the command, plan seal), then
+/// `CommandDone`, so the running session and every projection see it. Through the daemon the
 /// session is then reopened under the new plan. Prints what was appended, or why nothing was.
 pub async fn record_change(ctx: &Ctx, after: &Planned, which: Option<&str>, name: &str, args: Vec<String>) -> Result<(), Fail> {
     let dir = ctx.session_dir(after);
@@ -168,7 +168,7 @@ pub async fn record_change(ctx: &Ctx, after: &Planned, which: Option<&str>, name
         return Ok(());
     }
     let run = w.append(EntryKind::CommandRun { name: name.to_string(), args, key: None }).await.map_err(err)?;
-    // Built again now that the command has its id: the policy epoch cites it as its authority (04).
+    // Built again now that the command has its id: the policy epoch cites it as its authority.
     let kinds = plan_entries(&st, after, run, &command);
     let lines: Vec<String> = kinds.iter().filter_map(render).collect();
     for k in kinds {

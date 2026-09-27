@@ -1,4 +1,4 @@
-//! Planning (02): seam bindings, exclusive bundles, requirement checks, states, fixes, ceilings. Pure.
+//! Planning: seam bindings, exclusive bundles, requirement checks, states, fixes, ceilings. Pure.
 
 use super::*;
 
@@ -41,7 +41,7 @@ pub enum Because {
         origin: String,
     },
     /// Off by an engineer default (`caps.<id>.enabled = false` at the Default/Bundle layer): the
-    /// operator enables it (05: `○ Unlocked  enable: aho enable <id>`).
+    /// operator enables it (`○ Unlocked  enable: aho enable <id>`).
     OptIn {
         origin: String,
     },
@@ -246,7 +246,7 @@ pub fn plan(
             && !m.provides.iter().any(|s| seams.get(s.0) == Some(&name))
             && !m.provides.iter().any(|s| ADDITIVE_SEAMS.contains(&s.0))
         {
-            // A world is one exclusive bundle chosen by `seams.world` (07), not by its member seams.
+            // A world is one exclusive bundle chosen by `seams.world`, not by its member seams.
             let (seam, chosen) = if m.exclusive {
                 ("world", seams.get(m.provides[0].0).map(|w| w.trim_start_matches("world-")).unwrap_or("none").to_string())
             } else {
@@ -259,7 +259,7 @@ pub fn plan(
                     missing.push(miss);
                 }
             }
-            // The preset is a per-call ceiling enforced by the decision chain (04); plan only flags
+            // The preset is a per-call ceiling enforced by the decision chain; plan only flags
             // capabilities whose tools would need more, so the tree can say "calls needing X will ask/deny".
             let because = because_bound.get(name).cloned().unwrap_or(Because::CompositionDefault);
             if missing.is_empty() {
@@ -313,7 +313,7 @@ pub fn plan(
             } else if skill.is_some() && loadout.get(&key) != Some(&Value::Bool(true)) {
                 CapState::Unlocked
             } else {
-                // Switched on: Active only while what it follows is Active (05: Locked names the fix).
+                // Switched on: Active only while what it follows is Active (Locked names the fix).
                 let active = |name: &str| matches!(states.get(name), Some(CapState::Active));
                 let parents: Vec<&str> = rows.iter().map(|r| r.id.name).filter(|name| follows(d, name)).collect();
                 let mut missing: Vec<String> = parents.iter().filter(|p| !active(p)).map(|p| format!("(follows {p})")).collect();
@@ -356,10 +356,9 @@ fn check(r: &Requirement, seams: &BTreeMap<&str, &str>, states: &BTreeMap<&str, 
     match r {
         Requirement::Seam(s) => match seams.get(s.0) {
             Some(p) if matches!(states.get(p), Some(CapState::Active)) => ok(()),
-            Some(p) => Some(Missing {
-                requirement: format!("Seam({}) — provider `{p}` is not active", s.0),
-                fix: Some(format!("aho explain {p}")),
-            }),
+            Some(p) => {
+                Some(Missing { requirement: format!("Seam({}): provider `{p}` is not active", s.0), fix: Some(format!("aho explain {p}")) })
+            }
             None => Some(Missing { requirement: format!("Seam({})", s.0), fix: Some(format!("aho add provider <{}-provider>", s.0)) }),
         },
         Requirement::Cap(c) => match states.get(c) {

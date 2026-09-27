@@ -84,7 +84,7 @@ impl Session {
         }
     }
 
-    /// What the session does before each model request.
+    /// The session's work before each model request.
     fn step(&self) {
         let st = self.state();
         for (_, f) in &self.reg.contexts {
@@ -197,7 +197,7 @@ fn seed_claim_complete_round_trips_through_the_log() {
     assert_eq!(v["ready"], json!(["port"]));
 
     let (input, _) = s.ok("task_claim", json!({}), agent(2));
-    assert!(input.contains("# Inputs from completed dependencies") && input.contains("## scan (explore) — confidence medium"), "{input}");
+    assert!(input.contains("# Inputs from completed dependencies") && input.contains("## scan (explore) · confidence medium"), "{input}");
     let (status, _) = s.ok("task_status", json!({}), Principal::Operator);
     assert!(
         status.contains("- scan [explore] completed (medium) by agent:1") && status.contains("- port [code] running agent:2"),

@@ -3,7 +3,7 @@ name = "tool-memory"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "memory_search / memory_save over the memory handle (12)"
+description = "memory_search / memory_save over the memory handle"
 
 [dependencies]
 aho-types.workspace = true

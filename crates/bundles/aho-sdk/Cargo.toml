@@ -3,7 +3,7 @@ name = "aho-sdk"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "aho-sdk-min (spine + rpc) as an embeddable Rust library; the rpc protocol table and the TS/Python SDK generator (00, 01, 08, 09)"
+description = "aho-sdk-min (spine + rpc) as an embeddable Rust library; the rpc protocol table and the TS/Python SDK generator"
 
 [[bin]]
 name = "aho-sdk"

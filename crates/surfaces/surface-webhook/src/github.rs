@@ -8,7 +8,7 @@ pub const SIGNATURE_HEADER: &str = "x-hub-signature-256";
 pub const EVENT_HEADER: &str = "x-github-event";
 pub const DELIVERY_HEADER: &str = "x-github-delivery";
 
-/// Why a signature was refused. The text is safe to return to the caller: it never echoes input.
+/// The reason a signature was refused. The text is safe to return to the caller: it never echoes input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureError {
     Missing,

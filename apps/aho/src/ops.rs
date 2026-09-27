@@ -1,6 +1,6 @@
 //! Operator verbs over plans, logs, and capabilities that do not fit the older groups:
-//! `apply` (03), `doctor` (12), `caps show` (15), `schedule` / `ralph` / `plan-mode` (00, 04,
-//! 10), and `gc` (04, 11, 12). `invariants` (13) lives in `invariants.rs`.
+//! `apply`, `doctor`, `caps show`, `schedule` / `ralph` / `plan-mode`, and `gc`. `invariants`
+//! lives in `invariants.rs`.
 
 use std::path::Path;
 use std::time::Duration;
@@ -59,7 +59,7 @@ pub async fn apply(ctx: &Ctx, file: &Path, session: Option<&str>) -> Result<(), 
     for line in prop.commit()? {
         println!("{line}");
     }
-    // 03: the running session sees the change as entries in its log.
+    // The running session sees the change as entries in its log.
     record_change(ctx, &prop.after, session, "apply", vec![path.display().to_string()]).await
 }
 
@@ -100,7 +100,7 @@ impl Ledger {
 }
 
 /// `aho doctor provider <id>`: ordered checkpoints, logged; lighter tiers record the API
-/// checkpoints as skipped, never passed (12).
+/// checkpoints as skipped, never passed.
 pub async fn doctor_provider(ctx: &Ctx, id: &str, tier: &str, json_out: bool) -> Result<(), Fail> {
     let t = match tier {
         "offline" => Tier::Offline,
@@ -256,7 +256,7 @@ fn human_age(ms: u64) -> String {
 const TLA_URL: &str = "https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar";
 const ELAN_URL: &str = "https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh";
 
-/// `aho doctor formal [--install tla|lean]` — the fix the formal providers name (13).
+/// `aho doctor formal [--install tla|lean]`: the fix the formal providers name.
 pub fn doctor_formal(ctx: &Ctx, install: Option<&str>) -> Result<(), Fail> {
     let inputs = ctx.inputs(&[], false)?;
     let p = ctx.load(&inputs)?;
@@ -327,7 +327,7 @@ pub fn doctor_formal(ctx: &Ctx, install: Option<&str>) -> Result<(), Fail> {
     }
 }
 
-/// `aho doctor embed [--install]` (12): the selected embedder, and for MiniLM whether its pinned
+/// `aho doctor embed [--install]`: the selected embedder, and for MiniLM whether its pinned
 /// artifacts and ONNX Runtime check out. `--install` is the only embedding path that downloads.
 pub async fn doctor_embed(ctx: &Ctx, install: bool) -> Result<(), Fail> {
     let inputs = ctx.inputs(&[], false)?;
@@ -563,8 +563,8 @@ pub async fn ralph_stop(ctx: &Ctx, id: Option<&str>, reason: Option<&str>, sessi
     Ok(())
 }
 
-/// `/plan` from the CLI: the live session's ceiling narrows — the daemon's copy when it holds the
-/// session (`session.call plan-mode.enter`), else a session this process resumes.
+/// `/plan` from the CLI: the live session's ceiling narrows, in the daemon's copy when it holds
+/// the session (`session.call plan-mode.enter`), else in a session this process resumes.
 pub async fn plan_mode_on(ctx: &Ctx, reason: Option<&str>, session: Option<&str>) -> Result<(), Fail> {
     let inputs = ctx.inputs(&[], false)?;
     let p = ctx.load(&inputs)?;

@@ -1,7 +1,7 @@
-//! Lexical path handling shared by the shell classifier and the fs protected-path check (12).
+//! Lexical path handling shared by the shell classifier and the fs protected-path check.
 //! Nothing here touches the filesystem: `~`, `$HOME` and `..` are resolved as text.
 
-/// Where the call runs: the workspace root and the operator's home, both normalized absolute.
+/// The workspace root and the operator's home, both normalized absolute.
 #[derive(Clone, Debug)]
 pub(crate) struct Places {
     pub workspace: Option<String>,
@@ -69,7 +69,7 @@ const SINKS: &[&str] = &["/dev/null", "/dev/stdout", "/dev/stderr", "/dev/stdin"
 const TEMP_ROOTS: &[&str] = &["/tmp", "/var/tmp", "/var/folders"];
 const PROTECTED_COMPONENTS: &[&str] = &[".git", ".aho"];
 
-/// What a (lexically resolved) path is, from most to least dangerous.
+/// Kinds of (lexically resolved) path, from most to least dangerous.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Zone {
     Root,

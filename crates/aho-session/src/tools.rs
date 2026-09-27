@@ -1,6 +1,6 @@
 //! Tool calls: lookup, review, approvals, execution, results, spill.
-//! Split out of the session driver (file-size ratchet, doc 12); child modules share the root's
-//! private state and items crossing modules are `pub(crate)`.
+//! Split out of the session driver for the file-size ratchet; child modules share the root's
+//! private state, and items crossing modules are `pub(crate)`.
 
 use super::*;
 
@@ -168,7 +168,7 @@ impl Session {
         )
     }
 
-    /// Approval flow; both entries sit inside the open turn (04). A refusal is the call's result.
+    /// Approval flow; both entries sit inside the open turn. A refusal is the call's result.
     pub(crate) async fn ask(
         &self,
         decl: &ToolDecl,
@@ -196,7 +196,7 @@ impl Session {
         args: &Value,
         outcome: &ChainOutcome,
     ) -> Result<Option<ApprovalOutcome>, SessionError> {
-        // Class-aware card: carries the smallest preset/allow cut that would pass this call (05).
+        // Class-aware card: carries the smallest preset/allow cut that would pass this call.
         let policy = lk(&self.policy).clone();
         let mut card = aho_policy::ApprovalCard::new(decl, args, outcome, &policy);
         if card.tool != name {
@@ -240,7 +240,7 @@ impl Session {
         }
     }
 
-    /// PTC (10): one tool call made by a running `run_code` program — the same lookup, decision
+    /// PTC: one tool call made by a running `run_code` program, with the same lookup, decision
     /// chain, approvals and pre/post hooks as a model call, under the parent call's principal.
     /// Not logged as `Tool/Call` (the model never made it; `derive_messages` would show it): the
     /// program's tool records `Ptc/Call` + `Ptc/Result`. Approvals name the parent call. Post-hook
@@ -436,7 +436,7 @@ impl Session {
         Ok(())
     }
 
-    /// Spill, don't truncate (10): head + [...] + tail + notice with the locator.
+    /// Spill, don't truncate: head + [...] + tail + notice with the locator.
     #[allow(clippy::disallowed_methods, reason = "authority: session-spill")]
     pub(crate) fn spill(&self, tool: &str, content: Vec<ContentBlock>, max_inline: Option<usize>) -> (Vec<ContentBlock>, Option<Hash>) {
         let limit = match max_inline {
@@ -562,7 +562,7 @@ pub(crate) trait LateCheck {
     fn last_request_after_call(&self, call: &CallId) -> bool;
 }
 impl LateCheck for State {
-    /// A result is late when a request boundary happened after its call (16).
+    /// A result is late when a request boundary happened after its call.
     fn last_request_after_call(&self, call: &CallId) -> bool {
         let call_pos = self.items.iter().position(|(_, it)| matches!(it, aho_log::Item::Assistant { content } if content.iter().any(|b| matches!(b, ContentBlock::ToolUse { id, .. } if id == call))));
         match call_pos {
@@ -593,7 +593,7 @@ pub(crate) fn split_outcome(o: ExecOutcome) -> (ToolOutcome, Value, Vec<ContentB
 /// Log entries a tool may ask the session to append after its result (`value.events`).
 /// Accepted shapes: `{"ns", "name", "body"}` → `Custom`; `{"kind": <EntryKind JSON>}` for the
 /// whitelisted record kinds below. Core kinds (policy, approvals, turns, config) are never
-/// accepted from a tool: authority does not flow through tool output (04).
+/// accepted from a tool: authority does not flow through tool output.
 pub fn tool_events(value: &Value) -> Vec<EntryKind> {
     let Some(arr) = value.get("events").and_then(|v| v.as_array()) else { return vec![] };
     arr.iter()

@@ -1,4 +1,4 @@
-//! `world = namespace` (07): a rootless Linux sandbox per session. All tool I/O happens after
+//! `world = namespace`: a rootless Linux sandbox per session. All tool I/O happens after
 //! entering the sandbox's private user, mount, network, IPC and UTS namespaces; each command
 //! gets its own PID namespace (it is PID 2) and dies with it. The sandbox's only NIC is plugged
 //! into the session's aho-net network; the workspace is the sandbox's private copy of the
@@ -32,11 +32,11 @@ pub const ENFORCED_BY: &str = "Linux user+pid+mount+net namespaces; aho-net only
 pub const WORKSPACE: &str = "/workspace";
 /// The sandbox's NIC name on the session network: `sandbox.aho`, the default `aho net map` target.
 pub const NIC: &str = "sandbox";
-/// Where the helper is looked up, and how to install it.
+/// The helper's name on PATH; [`INSTALL_HELPER`] installs it.
 pub const HELPER: &str = "aho-ns-helper";
 pub const INSTALL_HELPER: &str = "cargo install --locked --path crates/providers/world-ns --bin aho-ns-helper";
 
-/// `world.ns.*`: what the operator chooses. Where the sandbox lives follows from the session.
+/// `world.ns.*`: what the operator chooses. The sandbox's location follows from the session.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NsSettings {
     /// Trusted, unpacked Linux recipe. Never the host root.
@@ -108,7 +108,7 @@ impl NsConfig {
     }
 }
 
-/// Where session `id`'s sandbox lives.
+/// The directory of session `id`'s sandbox.
 pub fn sandbox_dir(sessions_dir: &Path, id: SessionId) -> PathBuf {
     sessions_dir.join(format!("{:x}.ns", id.0))
 }
@@ -230,7 +230,7 @@ impl NamespaceWorld {
     }
 }
 
-/// What is known about the sandbox in `dir` without starting anything.
+/// The state of the sandbox in `dir`, read without starting anything.
 pub fn inspect(dir: &Path) -> NsStatus {
     #[cfg(target_os = "linux")]
     let (exists, keeper, nic) = linux::inspect(dir);

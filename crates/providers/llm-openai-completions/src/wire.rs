@@ -8,7 +8,7 @@ use aho_types::{CallId, ContentBlock, Message, Role, StopReason, Timestamp, Usag
 use regex::Regex;
 use serde_json::{Map, json};
 
-/// Which dialect a route speaks on top of the common protocol.
+/// The dialect a route speaks on top of the common protocol.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Flavor {
     /// api.openai.com: `max_completion_tokens`, `prompt_cache_key`.
@@ -20,7 +20,7 @@ pub enum Flavor {
 
 /// The JSON body for `POST {base_url}/chat/completions`.
 ///
-/// Late results (16, `LateResults::ToolMessage`) need no rewriting: a second `ToolResult` for
+/// Late results (`LateResults::ToolMessage`) need no rewriting: a second `ToolResult` for
 /// an id becomes a second `tool` message carrying the original `tool_call_id`.
 pub fn encode_request(req: &Request, flavor: Flavor) -> Value {
     let mut messages: Vec<Value> = Vec::with_capacity(req.messages.len() + 1);

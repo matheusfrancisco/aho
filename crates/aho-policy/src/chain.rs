@@ -1,5 +1,5 @@
-//! `04` — the decision chain. Ordered, bypass-immune; steps 1–5 are never lifted by a preset,
-//! a mode, an allow rule or a hook.
+//! The decision chain. Ordered, bypass-immune; no preset, mode, allow rule or hook lifts
+//! steps 1–5.
 //!
 //! ```text
 //! 1. deny rules   2. ask rules   3. tool.check   4. guards (deny-only)   5. safety checks
@@ -93,7 +93,7 @@ fn rule_reason(r: &Rule) -> DecisionReason {
     DecisionReason::Rule { origin: r.origin.clone(), rule: r.to_string() }
 }
 
-/// `04` — ordered, bypass-immune. Steps 1–5 cannot be lifted by any later step.
+/// Ordered, bypass-immune. No later step can lift steps 1–5.
 pub fn decide(call: &CallUnderReview<'_>) -> ChainOutcome {
     let policy = call.policy;
     let class = call.decl.class;
@@ -123,12 +123,12 @@ pub fn decide(call: &CallUnderReview<'_>) -> ChainOutcome {
     }
     let spec_blocked = spec_blocks(policy, class, call.args, &places);
     let within_ceiling = allowed.contains(class) && !spec_blocked;
-    // 5. safety checks — lexical, never lifted
+    // 5. safety checks: lexical, never lifted
     match classify(call.args, &places, class != Consequence::ReadOnly) {
         Some((SafetyKind::Catastrophic, _)) => return ChainOutcome::Deny(DecisionReason::SafetyCheck(SafetyKind::Catastrophic)),
         Some((SafetyKind::ProtectedPath, _)) => return ChainOutcome::Deny(DecisionReason::SafetyCheck(SafetyKind::ProtectedPath)),
         Some((SafetyKind::Confirm, _)) => {
-            // A justification refines inside the ceiling; it never widens (12).
+            // A justification refines inside the ceiling; it never widens.
             let justified = call.args.get("justification").and_then(Value::as_str).is_some_and(shell::justification_ok);
             return if justified && within_ceiling {
                 ChainOutcome::Allow(DecisionReason::SafetyCheck(SafetyKind::Confirm))
@@ -170,7 +170,7 @@ pub fn decide(call: &CallUnderReview<'_>) -> ChainOutcome {
     }
 }
 
-/// `14`: under spec mode a `WorkspaceWrite` call must name only paths under `<workspace>/spec/`.
+/// Under spec mode a `WorkspaceWrite` call must name only paths under `<workspace>/spec/`.
 /// A write that names no path cannot be checked and is refused.
 fn spec_blocks(policy: &SandboxPolicy, class: Consequence, args: &Value, places: &Places) -> bool {
     if !policy.writes_limited_to_spec() || class != Consequence::WorkspaceWrite {

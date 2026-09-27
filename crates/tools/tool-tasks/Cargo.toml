@@ -3,7 +3,7 @@ name = "tool-tasks"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Swarm task-graph tools: task_seed / expand / claim / complete / checkpoint / status / control (12)"
+description = "Swarm task-graph tools: task_seed / expand / claim / complete / checkpoint / status / control"
 
 [dependencies]
 aho-types.workspace = true

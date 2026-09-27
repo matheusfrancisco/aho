@@ -53,7 +53,7 @@ fn list_proc() -> Result<Vec<Proc>, String> {
         let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<i32>().ok()) else { continue };
         // A process may exit between readdir and read; skip it.
         let Ok(stat) = std::fs::read_to_string(entry.path().join("stat")) else { continue };
-        // `pid (comm) state ppid pgrp session …` — comm may contain spaces and parens.
+        // `pid (comm) state ppid pgrp session …`; comm may contain spaces and parens.
         let Some(rest) = stat.rfind(')').map(|i| &stat[i + 1..]) else { continue };
         let f: Vec<&str> = rest.split_whitespace().collect();
         if let (Some(ppid), Some(pgid), Some(sid)) = (f.get(1), f.get(2), f.get(3))
@@ -177,7 +177,7 @@ fn alive(pids: &BTreeSet<i32>) -> bool {
     pids.iter().any(|p| kill(Pid::from_raw(*p), None).is_ok())
 }
 
-/// ESRCH (the target is already gone) is what a kill wants, not an error.
+/// ESRCH (the target is already gone) counts as success for a kill.
 fn gone_is_fine(r: nix::Result<()>) -> nix::Result<()> {
     match r {
         Err(nix::errno::Errno::ESRCH) => Ok(()),

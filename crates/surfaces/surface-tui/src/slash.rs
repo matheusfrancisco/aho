@@ -1,13 +1,12 @@
-//! Slash commands (`05`, `06`): a line typed as `/name args…` in a surface's prompt box runs a
+//! Slash commands: a line typed as `/name args…` in a surface's prompt box runs a
 //! command the app registered instead of reaching the model. One [`Commands`] registry serves
 //! every surface (this TUI, and the web UI through `surface-web`), so a command means the same
 //! thing wherever it is typed. `/help` lists the registered commands; an unknown name is refused
 //! with that list and nothing is sent to the model. A line starting with `//` is a prompt that
 //! begins with `/`.
 //!
-//! Every run is logged by the operator as the pair `Command/Run{name, args}` /
-//! `Command/Done{kind}` (`06`, `10` "commands are paired log entries"); `/help` and refusals are
-//! answered without touching the log.
+//! The operator logs every run as the pair `Command/Run{name, args}` / `Command/Done{kind}`;
+//! `/help` and refusals are answered without touching the log.
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -44,7 +43,7 @@ impl fmt::Debug for Commands {
     }
 }
 
-/// What a `/…` line came to.
+/// The outcome of a `/…` line.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Reply {
     /// The command ran (or `/help` answered); show this to the operator.
@@ -109,12 +108,12 @@ impl Commands {
         self.by_name.keys().map(String::as_str)
     }
 
-    /// One line per command, `/help` first: `/name usage — help`.
+    /// One line per command, `/help` first: `/name usage: help`.
     pub fn help_text(&self) -> String {
-        let mut lines = vec![format!("/{HELP} — list these commands")];
+        let mut lines = vec![format!("/{HELP}: list these commands")];
         for (name, c) in &self.by_name {
             let usage = if c.usage.is_empty() { String::new() } else { format!(" {}", c.usage) };
-            lines.push(format!("/{name}{usage} — {}", c.help));
+            lines.push(format!("/{name}{usage}: {}", c.help));
         }
         lines.join("\n")
     }

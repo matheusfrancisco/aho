@@ -3,7 +3,7 @@ name = "aho-formal"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Formal seam: TLA+/Lean check, trace validation, prove, mutate; trace_of; the literate System Spec (13, 14)"
+description = "Formal seam: TLA+/Lean check, trace validation, prove, mutate; trace_of; the literate System Spec"
 
 [dependencies]
 aho-types.workspace = true

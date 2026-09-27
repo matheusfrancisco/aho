@@ -1,4 +1,4 @@
-//! The terminal loop: one interactive owner (12). Session events, approval cards, key presses
+//! The terminal loop: one interactive owner. Session events, approval cards, key presses
 //! and finished background actions are the only inputs; every draw is [`draw`] over the fold.
 
 use std::collections::VecDeque;
@@ -46,7 +46,7 @@ pub fn ui_from_session(session: &Session, planned: &Planned) -> Result<UiState, 
     Ok(ui)
 }
 
-/// What a rewind to `checkpoint` in `mode` would do. Nothing is applied; the current workspace is
+/// The effect of a rewind to `checkpoint` in `mode`. Nothing is applied; the current workspace is
 /// hashed into the shadow store to diff against the target tree.
 pub async fn rewind_plan(session: &Session, checkpoint: CheckpointId, mode: RewindMode) -> Result<RewindPlan, String> {
     let state = session.fold().map_err(|e| e.to_string())?;
@@ -184,7 +184,7 @@ pub async fn run(
     Ok(())
 }
 
-/// What the terminal does with a `/name args…` line: the reply goes to the status line and nothing
+/// Handles a `/name args…` line: the reply goes to the status line and nothing
 /// is sent to the model.
 pub(crate) fn run_command(ui: &mut UiState, commands: &Commands, session: &Arc<Session>, name: &str, args: &str) {
     ui.notice = Some(commands.dispatch(session, name, args).text().to_string());

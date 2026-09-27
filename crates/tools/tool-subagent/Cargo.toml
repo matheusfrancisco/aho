@@ -3,7 +3,7 @@ name = "tool-subagent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "subagent, subagent_fork, send_message, interrupt_agent, list_agents over the subagent seam; lifecycle entries in the parent log (04, 10, 12, 16)"
+description = "subagent, subagent_fork, send_message, interrupt_agent, list_agents over the subagent seam; lifecycle entries in the parent log"
 
 [dependencies]
 aho-types.workspace = true

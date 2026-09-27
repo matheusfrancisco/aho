@@ -11,7 +11,7 @@ pub const TLC_INT_MIN: i64 = i32::MIN as i64;
 
 /// JSON → TLA+ expression. Objects become records (keys must be identifiers; `null` fields are
 /// dropped), arrays become tuples. Fails on floats, out-of-range integers, empty or ill-keyed
-/// objects — values TLA+ cannot hold without a silent change of meaning.
+/// objects: values TLA+ cannot hold without a silent change of meaning.
 pub fn to_tla(v: &Value) -> Result<String, String> {
     match v {
         Value::Null => Err("null has no TLA+ counterpart".into()),

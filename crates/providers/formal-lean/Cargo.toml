@@ -3,7 +3,7 @@ name = "formal-lean"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Lean 4 provider for the Formal seam: lake build goals, Charon + Aeneas translation, definition mutants (13)"
+description = "Lean 4 provider for the Formal seam: lake build goals, Charon + Aeneas translation, definition mutants"
 
 [dependencies]
 aho-types.workspace = true

@@ -1,4 +1,4 @@
-//! `11`: checkpoint trees in a shadow bare git repository.
+//! Checkpoint trees in a shadow bare git repository.
 //!
 //! `~/.aho/shadow/<blake3(root) 16 hex>.git` (SHA-256 object format, so a tree id *is* a 32-byte
 //! `Hash`), driven with `git --git-dir=<shadow> --work-tree=<root>`. The user's own `.git` is

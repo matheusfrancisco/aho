@@ -3,7 +3,7 @@ name = "aho-term"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Terminals seam: PTY sessions a world provides, rendered to a screen snapshot plus a transcript read with cursors (00, 07, 15)"
+description = "Terminals seam: PTY sessions a world provides, rendered to a screen snapshot plus a transcript read with cursors"
 
 [dependencies]
 aho-types.workspace = true

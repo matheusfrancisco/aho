@@ -1,4 +1,4 @@
-//! Stores: in-memory and JSONL. Both are append-only; a fork is a head move (06).
+//! Stores: in-memory and JSONL. Both are append-only; a fork is a head move.
 
 use super::*;
 

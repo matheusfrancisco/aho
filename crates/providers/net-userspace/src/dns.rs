@@ -1,4 +1,4 @@
-//! The network's only resolver (07): `<name>.aho` answers from this network's NICs, everything
+//! The network's only resolver: `<name>.aho` answers from this network's NICs, everything
 //! else is checked against the egress policy, forwarded to the operator's upstream resolvers, and
 //! validated record by record before any address reaches the guest. This is the only place that
 //! creates domain → IP authority (`Policy::observe`); a denial is `REFUSED`, which the runtime
@@ -174,8 +174,8 @@ fn same_question(response: &Message, request: &Message) -> bool {
 
 /// Keep only records owned by the question or its CNAME chain; every alias must pass the alias
 /// check and every address the resolved-address check. Addresses that survive are granted to this
-/// guest for (at most) their TTL. Authority/additional sections are dropped: their addresses were
-/// never validated.
+/// guest for (at most) their TTL. Drop authority/additional sections: their addresses were never
+/// validated.
 fn validate(request: &Message, upstream: Message, name: &str, guest: &str, policy: &Arc<Mutex<Policy>>) -> Message {
     let Ok(mut policy) = policy.lock() else {
         return header_reply(request, ResponseCode::ServFail);

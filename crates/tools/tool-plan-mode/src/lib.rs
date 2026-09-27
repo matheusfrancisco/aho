@@ -1,11 +1,11 @@
-//! `04`/`10` — plan mode: preset `read-only` plus a prompt section; enforcement is the lattice.
+//! Plan mode: preset `read-only` plus a prompt section; enforcement is the lattice.
 //!
-//! * `enter_plan_mode {reason?}` — narrows the live session policy to `allowed ∩ {ReadOnly,
+//! * `enter_plan_mode {reason?}`: narrows the live session policy to `allowed ∩ {ReadOnly,
 //!   TalksToHuman}` through the session ceiling (`aho_control::SessionCeiling`, logged as a
 //!   `Policy/Epoch` by `System("plan-mode")`). Narrowing is a meet, so it needs no approval, and
 //!   children spawned meanwhile inherit it (their policy derives from the session's). The policy
 //!   in force before is recorded in `plan/Entered.restore`: that is what leaving restores.
-//! * `exit_plan_mode {plan}` — presents the plan to the operator. The ceiling raises the card on
+//! * `exit_plan_mode {plan}`: presents the plan to the operator. The ceiling raises the card on
 //!   the session's approval channel itself and widens back only on the operator's `AllowedOnce`
 //!   (`Policy/Epoch{by: Operator, approval_ref}`); the tool never decides it was approved. A
 //!   rejection, a cancel, or no approval channel leaves the session read-only and says so.
@@ -20,7 +20,7 @@
 //! `TalksToHuman` (it asks the operator). Entries are `Custom{ns: "plan"}` ([`fold`]).
 //!
 //! Needs the session to seed [`aho_control::CEILING_SERVICE`]; without it this capability does
-//! not build (a plan mode that cannot narrow the policy would only pretend).
+//! not build (without the ceiling, plan mode could not narrow the policy).
 
 #![forbid(unsafe_code)]
 
@@ -40,7 +40,7 @@ use serde_json::{Map, json};
 
 pub use fold::{Event, NS, PlanError, PlanMode, fold_plan, load, project};
 
-/// What runs in plan mode: reading, and asking the operator.
+/// The classes plan mode allows: reading, and asking the operator.
 pub const PLAN_CUT: ConsequenceSet = ConsequenceSet::EMPTY.with(Consequence::ReadOnly).with(Consequence::TalksToHuman);
 /// The principal of the narrowing epoch: `System("plan-mode")`.
 pub const MODE: &str = "plan-mode";
@@ -48,7 +48,7 @@ pub const MODE: &str = "plan-mode";
 pub fn schema_enter(_: &BoundWorld) -> RootSchema {
     RootSchema(json!({
         "type": "object",
-        "properties": {"reason": {"type": "string", "description": "Why you want to plan first; shown to the operator."}}
+        "properties": {"reason": {"type": "string", "description": "Your reason to plan first; shown to the operator."}}
     }))
 }
 
@@ -192,7 +192,7 @@ declare_capability!(
     requires = [],
     tools = TOOLS,
     entry_kinds = ["plan/Entered", "plan/Reviewed"],
-    doc = "enter_plan_mode / exit_plan_mode: narrow the session to read-only; only an operator-approved plan widens it back (04, 10)."
+    doc = "enter_plan_mode / exit_plan_mode: narrow the session to read-only; only an operator-approved plan widens it back."
 );
 
 /// The dynamic prompt section: logged only when it changes, so it costs nothing while it holds.
@@ -201,8 +201,8 @@ pub fn context_text(m: &PlanMode) -> Option<String> {
         let why = m.reason.as_deref().map(|r| format!(": {r}")).unwrap_or_default();
         Some(format!(
             "Plan mode is on (entered by {}{why}). You may read, search and ask the operator questions; calls that would change the \
-             workspace or the world are refused. Explore, then call exit_plan_mode with a concrete plan — steps, files, risks, how you \
-             will check the result. The operator approves it before anything changes; if they reject it, revise it and ask again.",
+             workspace or the world are refused. Explore, then call exit_plan_mode with a concrete plan (steps, files, risks, how you \
+             will check the result). The operator approves it before anything changes; if they reject it, revise it and ask again.",
             m.entered_by.as_ref().map(|a| a.to_string()).unwrap_or_else(|| "?".into())
         ))
     } else if m.times_entered > 0 {

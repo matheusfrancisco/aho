@@ -46,7 +46,7 @@ impl VmManager {
             } else {
                 storage::save(&path, &config.lease)?;
             }
-            // Which project's sessions own this state: `aho gc` judges only its own.
+            // Record the project whose sessions own this state: `aho gc` judges only its own.
             if let Some(dir) = &config.sessions_dir {
                 storage::save(&session.join("owner.json"), dir)?;
             }

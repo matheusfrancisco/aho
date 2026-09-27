@@ -24,7 +24,7 @@ fn log(kinds: Vec<EntryKind>) -> Vec<Entry> {
 #[test]
 fn parses_sections_claims_blocks_and_actions() {
     let d = doc();
-    assert_eq!(d.title, "Orders — System Spec");
+    assert_eq!(d.title, "Orders: System Spec");
     let order: Vec<SpecSection> = d.sections.iter().map(|s| s.which).collect();
     assert_eq!(order, SpecSection::ALL.to_vec());
     assert_eq!(d.actions, ["Charge", "Refund"]);
@@ -146,10 +146,10 @@ fn coverage_lists_unformalized_claims_and_vacuous_invariants() {
     let cov = section(&out, "## 9 Coverage", "## 10 History");
     assert!(cov.contains(GENERATED_NOTE));
     let no_formal = block(&cov, "**Claims with no formal block**");
-    assert!(no_formal.contains("`inv.order.audited` — every charge is visible in the audit log"), "{cov}");
+    assert!(no_formal.contains("`inv.order.audited`: every charge is visible in the audit log"), "{cov}");
     assert!(!no_formal.contains("inv.order.total"));
     let vacuous = block(&cov, "**Formal blocks that caught no mutant (Vacuous)**");
-    assert!(vacuous.contains("`inv.order.no-double-charge` — ⚠ Vacuous: caught none of 2 mutants"), "{cov}");
+    assert!(vacuous.contains("`inv.order.no-double-charge`: ⚠ Vacuous, caught none of 2 mutants"), "{cov}");
     assert!(block(&cov, "**Formal blocks with no recorded mutant**").contains("`inv.order.total`"));
     assert!(cov.contains("| `inv.order.no-double-charge` | safety | tla | ⚠ Vacuous | 0/2 |"), "{cov}");
     assert!(block(&cov, "**Actions without an invariant**").contains("none."), "Charge is covered, Refund is named by actions:");
@@ -236,7 +236,7 @@ fn history_shows_supersessions_goalpost_moves_and_withdrawals() {
     ]);
     let out = render_ledger(&d, &Ledger::from_entries(&entries));
     let hist = section(&out, "## 10 History", "\u{0}");
-    assert!(hist.contains("`inv.order.logged` superseded by `inv.order.audited` — the old claim allowed a lost write. Old statement: “charges are logged”; last verdict: Fail."), "{hist}");
+    assert!(hist.contains("`inv.order.logged` superseded by `inv.order.audited`: the old claim allowed a lost write. Old statement: “charges are logged”; last verdict: Fail."), "{hist}");
     assert!(hist.contains("`inv.order.total` goalpost moved"), "{hist}");
     assert!(hist.contains("“total is a sum” → “total is a sum of positive lines”"));
     assert!(hist.contains("`inv.gone` is in the log but no longer in §6"), "{hist}");

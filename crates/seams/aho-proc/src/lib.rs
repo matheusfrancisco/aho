@@ -1,10 +1,10 @@
-//! `07`/`12`/`16` — processes and the operations table behind every tool call.
+//! Processes and the operations table behind every tool call.
 //!
 //! * `Subprocess` / `Child` are the seam a world provides (`world-host`, `world-ns`, …).
 //! * `OpTable` is the operations manager the session owns: one row per started tool call, a
 //!   bounded output ring with cursors, `AHO_PROGRESS` / `AHO_CHECKPOINT` markers, `wait`, and
 //!   `cancel` that fires the op's token and kills an attached child's whole process group.
-//! * Child receipts (12, "crash-honest receipts"): every child attached to a live op is announced
+//! * Crash-honest child receipts: every child attached to a live op is announced
 //!   through [`OpTable::on_attach`]; the session appends it as `Child/Spawned` ([`spawned`]) so
 //!   `aho gc` can reap it by `(pid, start_time)` once the owner that started it is gone.
 
@@ -201,7 +201,7 @@ impl OutputBuffer {
     }
 }
 
-// ───────────────────────────── child receipts (12) ─────────────────────────────
+// ───────────────────────────── child receipts ─────────────────────────────
 
 /// Namespace and name of a child receipt: `Custom{ns: "Child", name: "Spawned"}`.
 pub const CHILD_NS: &str = "Child";
@@ -258,9 +258,9 @@ pub fn child_receipt(e: &Entry) -> Option<ChildReceipt> {
     Some(ChildReceipt { child: ProcessIdentity { pid, start_time }, kind, label })
 }
 
-// ───────────────────────────── operations (16) ─────────────────────────────
+// ───────────────────────────── operations ─────────────────────────────
 
-/// Marker lines a job may print on stdout; `job_wait` returns on them (12).
+/// Marker lines a job may print on stdout; `job_wait` returns on them.
 pub const PROGRESS_MARKER: &str = "AHO_PROGRESS ";
 pub const CHECKPOINT_MARKER: &str = "AHO_CHECKPOINT";
 
@@ -276,7 +276,7 @@ pub struct OpInfo {
     pub identity: Option<ProcessIdentity>,
 }
 
-/// What `OpTable::wait` resolved on.
+/// The event `OpTable::wait` resolved on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum OpWait {
     /// Payload after `AHO_PROGRESS ` (usually JSON).
@@ -320,7 +320,7 @@ struct Ops {
     on_attach: Option<AttachHook>,
 }
 
-/// The session's operations manager (16). Cheap to clone; all clones share one table.
+/// The session's operations manager. Cheap to clone; all clones share one table.
 #[derive(Clone, Default)]
 pub struct OpTable(Arc<Mutex<Ops>>);
 
@@ -370,7 +370,7 @@ impl OpTable {
         self.lock().by_call.get(call).copied()
     }
 
-    /// `(rerunnable, external_effect)` as registered — what resume folds on (16).
+    /// `(rerunnable, external_effect)` as registered: what resume folds on.
     pub fn resume_bits(&self, op: OpId) -> Option<(bool, bool)> {
         self.lock().ops.get(&op).map(|e| (e.rerunnable, e.external_effect))
     }
@@ -527,7 +527,7 @@ impl OpTable {
         })
     }
 
-    /// Ops without a terminal status, with their age in ms (the heartbeat lists these, 16).
+    /// Ops without a terminal status, with their age in ms (the heartbeat lists these).
     pub fn running(&self) -> Vec<(OpId, CallId, u64)> {
         self.lock()
             .ops

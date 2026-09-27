@@ -145,7 +145,7 @@ fn verify_catches_a_tampered_log() {
     assert_eq!(out.status.code(), Some(2), "{}\n{}", text(&out.stdout), text(&out.stderr));
 }
 
-/// 07: `aho shell -- <cmd>` runs one operator command in the session's world and logs it. It
+/// `aho shell -- <cmd>` runs one operator command in the session's world and logs it. It
 /// used to lock the session policy twice in one expression and hang forever.
 #[test]
 fn an_operator_command_runs_in_the_session_world_and_is_logged() {
@@ -177,7 +177,7 @@ fn an_operator_command_runs_in_the_session_world_and_is_logged() {
     assert!(log.contains(r#""tool":"shell""#) && log.contains("echo operator-ran"), "the command is a logged Tool/Call");
 }
 
-/// 12: while `aho serve` runs, it owns the project's sessions — `aho run` is its client, and a
+/// While `aho serve` runs, it owns the project's sessions: `aho run` is its client, and a
 /// second process may not open a session the daemon holds. `--stop` winds it down.
 #[test]
 fn a_running_daemon_serves_aho_run_and_keeps_its_sessions_to_itself() {

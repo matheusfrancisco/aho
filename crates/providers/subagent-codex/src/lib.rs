@@ -1,4 +1,4 @@
-//! `08`/`10`/`12` — Codex as a subagent provider: observe, don't wrap (12).
+//! Codex as a subagent provider: observe, don't wrap.
 //!
 //! Each child is the real `codex` binary, untouched and signed in with the user's own
 //! credentials, running its interactive TUI in a session of aho's own tmux server (see
@@ -45,7 +45,7 @@ pub const INSTALL: &str = "brew install tmux codex";
 /// A rollout modified this long before launch is not a candidate (clock/filesystem slack).
 pub const LOCATE_SLACK_MS: u64 = 2_000;
 
-/// How to launch and read Codex.
+/// Launch and transcript settings for Codex.
 #[derive(Clone, Debug)]
 pub struct Codex {
     /// `codex` on PATH, or a path.
@@ -188,7 +188,7 @@ impl Config for CodexConfig {
                 "subagent.codex.home",
                 Ty::String,
                 None,
-                "Codex's home (holds sessions/YYYY/MM/DD/rollout-*.jsonl); default: $CODEX_HOME, else ~/.codex. When set it is also passed to the child as CODEX_HOME.",
+                "Codex's home (holds sessions/YYYY/MM/DD/rollout-*.jsonl); default: $CODEX_HOME, else ~/.codex. If set, it is also passed to the child as CODEX_HOME.",
             ),
         ];
         keys.extend(Settings::keys(PREFIX, "Codex"));

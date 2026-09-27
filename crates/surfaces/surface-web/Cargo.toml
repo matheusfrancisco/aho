@@ -3,7 +3,7 @@ name = "surface-web"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "axum + embedded SPA, HTTPS only, RPC gateway + WS mux, panels by slot (08)"
+description = "axum + embedded SPA, HTTPS only, RPC gateway + WS mux, panels by slot"
 
 [dependencies]
 aho-types.workspace = true
@@ -18,7 +18,7 @@ aho-inspect.workspace = true
 aho-llm.workspace = true
 aho-proc.workspace = true
 aho-fs.workspace = true
-# The slash-command registry (`Commands`) is defined once, in the terminal surface, and shared.
+# The terminal surface defines the slash-command registry (`Commands`) once; this crate reuses it.
 surface-tui = { path = "../surface-tui" }
 serde.workspace = true
 serde_json.workspace = true

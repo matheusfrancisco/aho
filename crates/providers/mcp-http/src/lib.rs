@@ -1,4 +1,4 @@
-//! `10` — MCP servers over Streamable HTTP (spec revision `2025-06-18`, `basic/transports`).
+//! MCP servers over Streamable HTTP (spec revision `2025-06-18`, `basic/transports`).
 //!
 //! Configuration shares `mcp.servers` with `mcp-stdio`; a row with `url` is an HTTP server
 //! (`Loadout::table("mcp.servers")`):
@@ -25,17 +25,17 @@
 //! session restarts (the registry is fixed per session).
 //!
 //! The destination is checked against the operator's egress list (`egress.allow` /
-//! `egress.deny`, `07`) before connecting and on every redirect hop. Like stdio servers, HTTP
-//! servers are reached from the host, not through the bound world (`07`): the declared class is
+//! `egress.deny`) before connecting and on every redirect hop. Like stdio servers, HTTP
+//! servers are reached from the host, not through the bound world: the declared class is
 //! what policy sees. Authentication is a bearer token or headers from `cred:<name>`; the OAuth
 //! authorization flow is not implemented.
 //!
-//! Provides: `McpHandle` and `"mcp.status"` — merged with what `mcp-stdio` provided, so
+//! Provides: `McpHandle` and `"mcp.status"`, merged with what `mcp-stdio` provided so
 //! `tool-mcp-resources` reaches servers of both kinds and the status service has one row per
-//! configured server — plus [`SERVERS_SERVICE`] (`Arc<Vec<HttpServer>>`, live generations and
+//! configured server; plus [`SERVERS_SERVICE`] (`Arc<Vec<HttpServer>>`, live generations and
 //! notification-stream state). Merging needs this capability to build after `mcp-stdio`: it
-//! declares the `mcp` handle in `Deps` (resolved optionally), so the plan's dependency order —
-//! which `Composition::start` builds in — puts it after stdio.
+//! declares the `mcp` handle in `Deps` (resolved optionally), so the plan's dependency order
+//! (which `Composition::start` builds in) puts it after stdio.
 
 #![forbid(unsafe_code)]
 
@@ -309,7 +309,7 @@ impl Config for McpHttpConfig {
                 "mcp.handshake_timeout_ms",
                 Ty::Int,
                 Some(json!(DEFAULT_HANDSHAKE_MS)),
-                "How long a server may take to answer `initialize`.",
+                "Time limit for a server to answer `initialize`.",
             ),
         ];
         keys.extend(aho_egress::config_keys());
@@ -569,5 +569,5 @@ declare_capability!(
     requires = [],
     tools = &[],
     provides_handles = [HandleKind::Custom("mcp")],
-    doc = "MCP servers over Streamable HTTP: `mcp.servers.<name>.url`, bearer/headers from `cred:<name>`; tools `mcp__<server>__<tool>` under the server's class; unclassified servers quarantined; extends mcp-stdio's directory (10)."
+    doc = "MCP servers over Streamable HTTP: `mcp.servers.<name>.url`, bearer/headers from `cred:<name>`; tools `mcp__<server>__<tool>` under the server's class; unclassified servers quarantined; extends mcp-stdio's directory."
 );

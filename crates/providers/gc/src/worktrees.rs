@@ -1,4 +1,4 @@
-//! Worktrees (07: `workspace.layout = worktree` works in `.aho/worktrees/<name>` on branch
+//! Worktrees (`workspace.layout = worktree` works in `.aho/worktrees/<name>` on branch
 //! `aho/<name>`, a real `git worktree`). A session names its worktree in its bootstrap
 //! (`Config/Resolved` of `workspace.layout` and `workspace.worktree`). A worktree is an orphan
 //! when every log naming it is closed longer than the retention, or when no log names it and it

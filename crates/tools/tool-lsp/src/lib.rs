@@ -1,5 +1,4 @@
-//! `00`/`01` — `lsp_*` tools: code navigation through language servers running in the bound
-//! world.
+//! `lsp_*` tools: code navigation through language servers running in the bound world.
 //!
 //! * `lsp_definition`, `lsp_references`, `lsp_hover`, `lsp_rename_preview` take a position as
 //!   `path` + `line` + `column` (1-based; column counts characters), `path` + `symbol`, or a
@@ -150,7 +149,7 @@ declare_capability!(
     doc = "Language-server navigation (definition, references, hover, diagnostics, symbols, rename preview); servers run in the bound world, one per language and workspace root."
 );
 
-const POSITION_DOC: &str = "Give `path` + `line` (+ `column`), `path` + `symbol`, or just `symbol` (searched workspace-wide). Lines and columns are 1-based; columns count characters.";
+const POSITION_DOC: &str = "Give `path` + `line` (+ `column`), `path` + `symbol`, or `symbol` alone (searched workspace-wide). Lines and columns are 1-based; columns count characters.";
 
 fn position_props() -> Value {
     json!({
@@ -158,7 +157,7 @@ fn position_props() -> Value {
         "line": {"type": "integer", "minimum": 1, "description": "1-based line."},
         "column": {"type": "integer", "minimum": 1, "description": "1-based character column; default: the symbol's column on that line, else the first non-blank."},
         "symbol": {"type": "string", "description": "A symbol name (`add`, `Pool::new`); with `path` it is looked up in that file, alone in the whole workspace."},
-        "language": {"type": "string", "description": "Which configured language to search when only `symbol` is given and several are configured."}
+        "language": {"type": "string", "description": "The configured language to search when only `symbol` is given and several are configured."}
     })
 }
 
@@ -195,7 +194,7 @@ fn schema_symbols(_: &BoundWorld) -> RootSchema {
         "properties": {
             "path": {"type": "string", "description": "Outline of this file."},
             "query": {"type": "string", "description": "Workspace symbol search (without `path`), or a name filter for the outline (with `path`)."},
-            "language": {"type": "string", "description": "Which configured language to search when several are configured."}
+            "language": {"type": "string", "description": "The configured language to search when several are configured."}
         },
         "additionalProperties": false
     }))

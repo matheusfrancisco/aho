@@ -1,7 +1,7 @@
-//! What `aho serve` hosts next to each session (12): the boot from the project's config as it is
+//! Everything `aho serve` hosts next to each session: the boot from the project's config as it is
 //! when the session opens, the schedule and workflow drivers (stopped when the daemon closes the
 //! session or execs a reload, hosted again when that exec fails), and the methods clients reach
-//! through `session.call` — `caps.*` (05), `session.fold`, `session.rewind` (08), `plan-mode.enter`.
+//! through `session.call`: `caps.*`, `session.fold`, `session.rewind`, `plan-mode.enter`.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;

@@ -165,7 +165,7 @@ async fn a_reload_runs_before_exec_and_a_failed_exec_restarts_the_host() {
     let sessions = r.dir.path().join("sessions");
     let socket = r.dir.path().join("d.sock");
     // Marked executable for others but not for its owner (us): exec fails with EACCES, which,
-    // unlike ENOEXEC, `execvp` does not retry through `/bin/sh` — this test process stays.
+    // unlike ENOEXEC, `execvp` does not retry through `/bin/sh`, so this test process stays.
     let broken = r.dir.path().join("broken-aho");
     std::fs::write(&broken, "not a program\n").unwrap();
     std::fs::set_permissions(&broken, std::fs::Permissions::from_mode(0o601)).unwrap();

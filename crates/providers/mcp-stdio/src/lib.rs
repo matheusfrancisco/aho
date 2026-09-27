@@ -1,4 +1,4 @@
-//! `10` — MCP servers over stdio (JSON-RPC 2.0, newline-delimited).
+//! MCP servers over stdio (JSON-RPC 2.0, newline-delimited).
 //!
 //! Configuration, one table per server (`Loadout::table("mcp.servers")`):
 //!
@@ -207,7 +207,7 @@ impl Config for McpConfig {
                 "mcp.handshake_timeout_ms",
                 Ty::Int,
                 Some(json!(DEFAULT_HANDSHAKE_MS)),
-                "How long a server may take to answer `initialize`.",
+                "Time limit for a server to answer `initialize`.",
             ),
         ]
     }
@@ -365,7 +365,7 @@ declare_capability!(
     requires = [Requirement::Seam(aho_proc::SEAM)],
     tools = &[],
     provides_handles = [HandleKind::Custom("mcp")],
-    doc = "MCP servers over stdio: `mcp.servers.<name>`; tools `mcp__<server>__<tool>` under the server's class; unclassified servers quarantined (10)."
+    doc = "MCP servers over stdio: `mcp.servers.<name>`; tools `mcp__<server>__<tool>` under the server's class; unclassified servers quarantined."
 );
 
 #[cfg(test)]

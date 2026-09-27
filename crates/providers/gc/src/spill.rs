@@ -1,4 +1,4 @@
-//! Spill files (10: "spill, don't truncate"): `<session.dir>/<id>.spill/<blake3>.txt`, named by
+//! Spill files: `<session.dir>/<id>.spill/<blake3>.txt`, named by
 //! the `Tool/Result.spill_ref` that points at them. Files are content-addressed and a child
 //! session writes into its parent's directory, so a file is referenced when any log names its
 //! hash. The directory of a session whose owner still runs is skipped whole: the session writes

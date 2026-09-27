@@ -3,7 +3,7 @@ name = "surface-print"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "one-shot print / --json; wrapper contract: quiet, JSON on stdout, stderr empty unless real (08, 12)"
+description = "one-shot print / --json; wrapper contract: quiet, JSON on stdout, stderr empty unless real"
 
 [dependencies]
 aho-types.workspace = true

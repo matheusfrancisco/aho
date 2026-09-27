@@ -371,7 +371,7 @@ fn a_verify_gate_cannot_pass_while_a_covering_invariant_fails_or_is_stale() {
     assert!(g.apply(&forged).is_err());
     assert!(fold_tasks(Some(&serde_json::to_value(&g).unwrap()), "Completed", &forged.body().unwrap()).is_err(), "and so is its replay");
 
-    // Unknown and Vacuous do not block (docs 09, 13 name Fail and Stale); the list is recorded
+    // Unknown and Vacuous do not block (only Fail and Stale do); the list is recorded
     let fine = vec![seen("inv.parse.total", InvariantStatus::Pass), seen("inv.parse.utf8", InvariantStatus::Unknown)];
     let ev = g.complete(a(3), &gate, gate_art(&["k"]), fine.clone()).unwrap();
     assert!(matches!(&ev[0], Event::Completed { invariants, .. } if *invariants == fine));

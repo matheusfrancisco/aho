@@ -1,4 +1,4 @@
-//! Crash-honest receipts (12): what the parent log says about each child this provider started,
+//! Crash-honest receipts: what the parent log says about each child this provider started,
 //! folded back into state when a session boots over an existing log.
 //!
 //! * `Receipt` without `Attached`: the child was *launching* when aho stopped. Whether the CLI
@@ -24,7 +24,7 @@ pub struct Recovered {
     pub cwd: PathBuf,
     pub tmux_session: String,
     pub cli_session: Option<String>,
-    /// When the receipt was written (ms since the epoch).
+    /// Receipt write time (ms since the epoch).
     pub launched_ms: u64,
     /// tmux `session_created` + pane pid, from `Launched`: the session's identity.
     pub created: Option<u64>,

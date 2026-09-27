@@ -1,4 +1,4 @@
-//! `04`/`10` — the approval channel. One-shot outcomes; a dropped or failing answerer
+//! The approval channel. One-shot outcomes; a dropped or failing answerer
 //! normalizes to `Unavailable` (fail closed); `never` short-circuits in the service, not in a
 //! listener. The harness appends `Approval/Requested` before calling [`Approval::request`] and
 //! `Approval/Decided` after, both inside the open turn.
@@ -77,7 +77,7 @@ impl Approval for NeverApproval {
     }
 }
 
-/// What the answering surface (TUI, web, remote client) receives: the card and the one-shot
+/// Sent to the answering surface (TUI, web, remote client): the card and the one-shot
 /// reply slot. Dropping the slot without sending is `Unavailable`.
 pub type ApprovalRequest = (ApprovalCard, oneshot::Sender<Decided>);
 
@@ -122,7 +122,7 @@ pub struct Question {
     /// `(label, description)`.
     pub options: Vec<(String, Option<String>)>,
     pub multi: bool,
-    /// e.g. `plan-review` with a named approve option (10).
+    /// e.g. `plan-review` with a named approve option.
     pub intent: Option<String>,
 }
 

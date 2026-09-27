@@ -1,4 +1,4 @@
-//! `05`: the slash commands `aho tui` and `aho web` answer in their prompt box (`/help` is built
+//! The slash commands `aho tui` and `aho web` answer in their prompt box (`/help` is built
 //! into the registry). Each is the in-session twin of a CLI verb.
 
 use std::sync::Arc;

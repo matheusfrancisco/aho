@@ -1,4 +1,4 @@
-//! aho-cap tests (split out for the file-size ratchet, doc 12).
+//! aho-cap tests (split out for the file-size ratchet).
 
 use crate::*;
 use aho_config::{ResolveInputs, Schema, resolve};
@@ -215,7 +215,7 @@ fn engineer_opt_in_is_unlocked_while_an_operator_off_is_disabled() {
     let engineer = resolve(&i, &s, false).unwrap();
     let p = plan(&ms, &engineer, &Env::empty(Os::Linux), &policy(&[Consequence::ReadOnly]), vec![]).unwrap();
     let row = p.row("tool-read").unwrap();
-    assert_eq!(row.state, CapState::Unlocked, "05: `○ Unlocked  enable: aho enable tool-read`");
+    assert_eq!(row.state, CapState::Unlocked, "renders `○ Unlocked  enable: aho enable tool-read`");
     assert!(matches!(&row.because, Because::OptIn { origin } if origin.contains("product")), "{:?}", row.because);
 
     i.sets = vec![("caps.tool-read.enabled".into(), "false".into())];

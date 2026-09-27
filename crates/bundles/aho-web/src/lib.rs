@@ -1,4 +1,4 @@
-//! `08` — the headless product plus the browser and terminal surfaces. Both render the same
+//! The headless product plus the browser and terminal surfaces. Both render the same
 //! tree / inventory / approval JSON the CLI prints.
 
 #![forbid(unsafe_code)]

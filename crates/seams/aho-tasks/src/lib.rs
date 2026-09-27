@@ -1,9 +1,9 @@
-//! `12` — the swarm task graph as a pure engine over log events.
+//! The swarm task graph as a pure engine over log events.
 //!
 //! * Nodes are `Task/*` log kinds (`EntryKind::Custom{ns: "Task", name, body}`); the projection is
-//!   [`Graph`], folded by [`fold_tasks`] — the `CustomFold` a capability registers with
-//!   `Registrar::entry_kind(NS, fold_tasks)`. Every transition is validated in the fold; a bad
-//!   event fails replay loudly.
+//!   [`Graph`], folded by [`fold_tasks`] (the `CustomFold` a capability registers with
+//!   `Registrar::entry_kind(NS, fold_tasks)`). The fold validates each transition; a bad event
+//!   fails replay loudly.
 //! * Engine methods ([`Graph::seed`], [`Graph::expand`], [`Graph::dispatch`], [`Graph::complete`],
 //!   [`Graph::inject_from_gate`], [`Graph::control`], …) never mutate: they return the events to
 //!   append, staged on a clone through the same [`Graph::apply`] the fold uses.

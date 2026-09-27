@@ -49,7 +49,7 @@ fn the_oldest_fresh_own_rollout_for_this_directory_wins() {
     // Nothing written since launch → not found yet.
     let later = LocateCtx { cwd: &ws, cli_session: None, launched_ms: Timestamp::now().0 + 60_000, claimed: &[] };
     assert_eq!(codex.locate(&later), None);
-    // A missing sessions directory is simply "not yet".
+    // A missing sessions directory means "not yet".
     let empty = Codex { binary: "codex".into(), home: dir.path().join("nowhere"), export_home: false };
     assert_eq!(empty.locate(&ctx), None);
 }

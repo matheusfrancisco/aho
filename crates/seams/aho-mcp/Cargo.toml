@@ -3,7 +3,7 @@ name = "aho-mcp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "MCP seam: servers, lossless-or-hashed names, two-phase tool generations, resources (10)"
+description = "MCP seam: servers, lossless-or-hashed names, two-phase tool generations, resources"
 
 [dependencies]
 aho-types.workspace = true

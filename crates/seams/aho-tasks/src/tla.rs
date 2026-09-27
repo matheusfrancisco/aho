@@ -1,6 +1,6 @@
-//! `Task/*` events as the records `formal/Tasks.tla`'s `TraceStep(e)` reads (13: "every session
-//! log is a behavior"). `aho_formal::trace_for("Tasks", …)` adds the entry fields (`id`, `parent`,
-//! `by`, `at`) and sends every `Task/*` entry through [`tla_record`].
+//! `Task/*` events as the records `formal/Tasks.tla`'s `TraceStep(e)` reads; each session log is a
+//! behavior. `aho_formal::trace_for("Tasks", …)` adds the entry fields (`id`, `parent`, `by`, `at`)
+//! and sends every `Task/*` entry through [`tla_record`].
 //!
 //! Conventions the spec relies on: `task` is the node the event names; agents are `AgentId + 1`
 //! (the spec's 0 is "nobody", and a session's own model is agent 0); whoever is not an agent is 0;

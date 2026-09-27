@@ -1,6 +1,6 @@
-//! `02` — the Fs seam. Definition crate: trait + handle newtypes + `Snapshot`, plus the pure
+//! The Fs seam. Definition crate: trait + handle newtypes + `Snapshot`, plus the pure
 //! helpers every provider shares (lexical path fence, content versions, unified-diff hunks).
-//! No I/O here; providers are `world-host`, `world-ns`, `world-vm`, or yours (15).
+//! No I/O here; providers are `world-host`, `world-ns`, `world-vm`, or yours.
 
 #![forbid(unsafe_code)]
 
@@ -16,7 +16,7 @@ pub const SNAPSHOT_SEAM: SeamId = SeamId("snapshot");
 /// Result cap for `glob` / `grep`; providers return at most this many, sorted.
 pub const MAX_HITS: usize = 500;
 
-/// Lines of context around each change in an `AppliedDiff` hunk (10).
+/// Lines of context around each change in an `AppliedDiff` hunk.
 pub const DIFF_CONTEXT: usize = 3;
 
 // ───────────────────────────── versions ─────────────────────────────
@@ -74,7 +74,7 @@ pub struct Stat {
     pub version: Option<FileVersion>,
 }
 
-/// One hunk per change with three lines of context (10). `created` for a new file.
+/// One hunk per change with three lines of context. `created` for a new file.
 #[derive(Clone, Debug, PartialEq)]
 pub struct AppliedDiff {
     pub path: String,
@@ -133,7 +133,7 @@ impl FsError {
     }
 }
 
-/// Message voice (12): what happened, what we did, how to change it.
+/// Message voice: what happened, what we did, how to change it.
 impl fmt::Display for FsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -222,7 +222,7 @@ pub struct FsRead(pub Arc<dyn Fs>);
 /// Write side of a world's fs. Handle kind `FsWrite` (ceiling: `WorkspaceWrite`).
 #[derive(Clone)]
 pub struct FsWrite(pub Arc<dyn Fs>);
-/// Host-only variants exist so a daemon provider's manifest can be printed honestly (07).
+/// Host-only variants exist so a daemon provider's manifest can be printed honestly.
 #[derive(Clone)]
 pub struct HostFsRead(pub Arc<dyn Fs>);
 #[derive(Clone)]
@@ -241,7 +241,7 @@ impl Handle for HostFsWrite {
     const KIND: HandleKind = HandleKind::HostFsWrite;
 }
 
-// ───────────────────────────── snapshots (11) ─────────────────────────────
+// ───────────────────────────── snapshots ─────────────────────────────
 
 /// Content-addressed workspace trees. Optional per world; absent → `checkpoint` is Locked.
 pub trait Snapshot: Send + Sync {
@@ -249,7 +249,7 @@ pub trait Snapshot: Send + Sync {
     fn tree(&self) -> BoxFuture<'_, Result<Hash, FsError>>;
     /// Make the workspace equal `tree`, minimally; ignored paths are left alone.
     fn restore(&self, tree: Hash) -> BoxFuture<'_, Result<RestoreDelta, FsError>>;
-    /// What `restore(b)` would change starting from `a`.
+    /// The changes `restore(b)` would make starting from `a`.
     fn diff(&self, a: Hash, b: Hash) -> BoxFuture<'_, Result<RestoreDelta, FsError>>;
 }
 
@@ -309,7 +309,7 @@ enum Op {
 }
 
 /// Cells of the LCS table we are willing to fill; beyond this the changed middle is shown as one
-/// replace hunk (still exact, just not minimal).
+/// replace hunk (still exact, not minimal).
 const LCS_BUDGET: usize = 1_000_000;
 
 /// Unified-diff hunks (`@@ -a,b +c,d @@` + ` `/`-`/`+` lines) turning `old` into `new`.

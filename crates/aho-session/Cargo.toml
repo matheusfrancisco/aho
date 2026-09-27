@@ -3,7 +3,7 @@ name = "aho-session"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The loop: pure next-step core + tokio driver; async tools, approvals, spill, compaction, checkpoints, rewind, resume; the Session API (01, 16)."
+description = "The loop: pure next-step core + tokio driver; async tools, approvals, spill, compaction, checkpoints, rewind, resume; the Session API."
 
 [dependencies]
 aho-types.workspace = true

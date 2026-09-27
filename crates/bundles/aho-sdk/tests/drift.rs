@@ -1,5 +1,5 @@
 //! The committed SDK sources (`aho/sdk/`) are exactly what the generator renders from the protocol
-//! table (08: "drift is a CI diff, not a bug report"). Regenerate with `cargo run -p aho-sdk -- gen`.
+//! table, so drift fails CI. Regenerate with `cargo run -p aho-sdk -- gen`.
 
 use aho_sdk::codegen;
 use aho_sdk::protocol::PROTOCOL;

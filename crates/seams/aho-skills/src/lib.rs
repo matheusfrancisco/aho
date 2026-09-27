@@ -1,6 +1,6 @@
-//! `10` — skills, commands, and agent definitions are one `Kind::Template` manifest.
+//! Skills, commands, and agent definitions are one `Kind::Template` manifest.
 //!
-//! * [`parse`] reads a `SKILL.md` through `Untrusted` (`04`): policy-shaped frontmatter keys
+//! * [`parse`] reads a `SKILL.md` through `Untrusted`: policy-shaped frontmatter keys
 //!   ([`DROPPED_KEYS`]) are dropped and reported, never honored; legacy camelCase keys
 //!   (`allowedTools`, `whenToUse`, …) are rejected loudly with the kebab-case spelling to use.
 //! * [`catalog_snapshot`] is the digest-deduped `<available_skills>` context (`form: Catalog`).
@@ -38,7 +38,7 @@ pub const SERVICE: &str = "skills";
 /// Service holding every discovered skill and its state: `Arc<Vec<SkillStatus>>`.
 pub const STATUS_SERVICE: &str = "skills.status";
 /// Frontmatter keys that would steer policy or run commands. Matched case-insensitively,
-/// dropped with their whole block, and reported (`ResourceKeysDropped`, `04`).
+/// dropped with their whole block, and reported (`ResourceKeysDropped`).
 pub const DROPPED_KEYS: &[&str] = &["sandbox", "allow", "policy", "permissions", "hooks"];
 /// Longest accepted skill name (Agent Skills limit).
 pub const MAX_NAME: usize = 64;
@@ -128,7 +128,7 @@ impl fmt::Display for SkillError {
 
 impl std::error::Error for SkillError {}
 
-/// Where a discovered skill stands. Discovered skills start `Unlocked`; the operator enables them.
+/// A discovered skill's standing. Discovered skills start `Unlocked`; the operator enables them.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SkillState {
     Active,

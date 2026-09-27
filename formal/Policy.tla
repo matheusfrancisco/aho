@@ -1,9 +1,9 @@
 ------------------------------- MODULE Policy -------------------------------
 (***************************************************************************)
-(* The authority lattice across epochs (docs 04, 13). `narrow` is a meet   *)
-(* (SandboxPolicy::narrow); `allowed` grows only through                  *)
+(* The authority lattice across epochs. `narrow` is a meet                 *)
+(* (SandboxPolicy::narrow); `allowed` grows only through                   *)
 (* widen_by_approval, an Operator citing an AllowedOnce decision, which    *)
-(* opens the next epoch. The fold enforces the log side                   *)
+(* opens the next epoch. The fold enforces the log side                    *)
 (* (policy.widen_requires_operator_approval, policy.epoch_monotone); the   *)
 (* first epoch of a session (from epoch 0) is the bootstrap and may set    *)
 (* any allowed set.                                                        *)

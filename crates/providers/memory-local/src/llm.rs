@@ -1,5 +1,5 @@
 //! Model-backed [`Judge`] (listwise rerank) and [`Extractor`] over an `llm:<route>` service.
-//! Plain requests with no tools — the extraction "agent" runs under policy `Nothing`.
+//! Plain requests with no tools: the extraction "agent" runs under policy `Nothing`.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;

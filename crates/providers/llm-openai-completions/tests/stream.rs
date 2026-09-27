@@ -78,7 +78,7 @@ async fn tool_call_stream_accumulates_split_argument_deltas() {
         tool_events,
         vec![
             &StreamEvent::ToolUseStart { id: read.clone(), name: "read".into() },
-            // the first call is complete as soon as the second one opens (16: start on block end)
+            // the first call is complete as soon as the second one opens (start on block end)
             &StreamEvent::ToolUseEnd { id: read, name: "read".into(), args: json!({"path": "src/main.rs"}) },
             &StreamEvent::ToolUseStart { id: bash.clone(), name: "bash".into() },
             &StreamEvent::ToolUseEnd { id: bash, name: "bash".into(), args: json!({"command": "cargo test"}) },

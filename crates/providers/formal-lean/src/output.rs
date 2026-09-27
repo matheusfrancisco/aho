@@ -2,8 +2,8 @@
 //!
 //! Lake prefixes messages as `error: ./Aho/Fold.lean:12:2: unsolved goals`; plain `lean`
 //! prints `Aho/Fold.lean:12:2: error: unsolved goals`. Both are read. An `unsolved goals`
-//! message is followed by one block per goal — optional `case name`, hypotheses
-//! (`x y : Nat`, continuation lines indented), then `⊢ target` — separated by blank lines.
+//! message is followed by one block per goal, separated by blank lines: optional `case name`,
+//! hypotheses (`x y : Nat`, continuation lines indented), then `⊢ target`.
 
 use aho_formal::{Diagnostic, Goal};
 

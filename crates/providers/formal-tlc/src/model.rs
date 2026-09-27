@@ -95,7 +95,7 @@ pub fn defines(src: &str, name: &str) -> bool {
     })
 }
 
-/// The trace module of `local://aho-formal-trace-contract.md`: the log as a tuple constant and
+/// The trace module: the log as a tuple constant and
 /// a spec that consumes one record per step through the target's `TraceStep(e)`.
 pub fn trace_module(spec_module: &str, trace: &[Value]) -> Result<String, FormalError> {
     let mut records = Vec::with_capacity(trace.len());

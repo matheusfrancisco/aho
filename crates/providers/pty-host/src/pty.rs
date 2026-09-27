@@ -16,11 +16,11 @@ use tokio::sync::watch;
 use crate::transcript::Transcript;
 use crate::{TRANSCRIPT_CAP, tree};
 
-/// How long one `write` may wait for the program to take its input.
+/// Time one `write` may wait for the program to take its input.
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
-/// After the tree is killed, how long `close` waits for the leader to be reaped.
+/// Time `close` waits for the leader to be reaped after the tree is killed.
 pub const CLOSE_GRACE: Duration = Duration::from_secs(3);
-/// What programs see as `$TERM`: the emulator speaks the xterm subset vt100 implements.
+/// The `$TERM` programs see: the emulator speaks the xterm subset vt100 implements.
 pub const TERM: &str = "xterm-256color";
 
 fn lk<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {

@@ -1,19 +1,19 @@
-//! `00`/`07`/`10` — `run_code`: programmatic tool calling (PTC). The model submits a Python or
+//! `run_code`: programmatic tool calling (PTC). The model submits a Python or
 //! Node program; it runs through the bound world's `Subprocess` handle (never `std::process`) in
 //! the workspace, with a time limit and an output cap, and may call aho tools with the injected
 //! helper (`aho.call("read", {"path": "x"})`, see `prelude`).
 //!
-//! Nested calls never bypass the session: each goes through the `aho.tool_call` service — the
+//! Nested calls never bypass the session. Each goes through the `aho.tool_call` service: the
 //! session's own lookup, decision chain (rules, tool checks, guards, safety checks, preset),
-//! approvals and pre/post hooks — and is recorded as `Ptc/Call` + `Ptc/Result` after the
-//! program's result (10: "PTC sub-dispatch bounding is log-copy only": the log keeps at most
-//! `LOG_COPY_BYTES` of each value; the program received all of it). If the session does not
+//! approvals and pre/post hooks. The log records each as `Ptc/Call` + `Ptc/Result` after the
+//! program's result. PTC sub-dispatch bounding is log-copy only: the log keeps at most
+//! `LOG_COPY_BYTES` of each value; the program received all of it. If the session does not
 //! provide the service, the program still runs and each `aho.call` fails with `PTC_UNAVAILABLE`.
 //!
-//! Classes (07 line 103): `run_code` is a `Subprocess` consumer, so its class is `SpawnsProcess`
+//! Classes: `run_code` is a `Subprocess` consumer, so its class is `SpawnsProcess`
 //! (the ceiling of its handles). Under a world that does not confine (`host`, policy only) the
 //! program runs as your user and can write anywhere you can: it is *also* `HostWrite`. That class
-//! is not reachable through a tool's handles, so it is made visible instead of hidden: the tool's
+//! is not reachable through a tool's handles, so the tool surfaces it: its
 //! own check treats the call as needing `HostWrite` whenever the world does not confine (Ask when
 //! the preset lacks it and an approver exists, else Deny), and every result lists the effective
 //! classes.
@@ -36,7 +36,7 @@ use serde_json::json;
 use crate::frames::{Event, Frames};
 
 /// Session service: nested tool dispatch for PTC. The session seeds an empty slot before the
-/// composition starts and fills it once it exists (see the crate report, "Core changes needed").
+/// composition starts and fills it once it exists.
 pub const TOOL_CALL_SERVICE: &str = "aho.tool_call";
 /// `(parent call's view, cancel token, tool, args) → outcome`, through the session's decision chain.
 pub type NestedToolCall = Arc<dyn Fn(ExecView, CancelToken, String, Value) -> BoxFuture<'static, ExecOutcome> + Send + Sync>;
@@ -56,7 +56,7 @@ const TICK: Duration = Duration::from_millis(50);
 
 pub struct RunCodeDeps {
     pub proc: SubprocessHandle,
-    /// Seeded by the session (16): `job_kill` and cancellation reach the program's process group.
+    /// Seeded by the session: `job_kill` and cancellation reach the program's process group.
     pub ops: Option<OperationsHandle>,
     pub nested: Option<ToolCallSlot>,
 }
@@ -180,14 +180,14 @@ pub fn effective_classes(world: &BoundWorld) -> ConsequenceSet {
     if world.confines { base } else { base.with(Consequence::HostWrite) }
 }
 
-/// `04` step 3: under a non-confining world the program is also `HostWrite` (07); a preset
+/// Decision-chain step 3: under a non-confining world the program is also `HostWrite`; a preset
 /// without it asks (when an approver exists) or denies, as the chain treats any class above the preset.
 pub fn check_run_code(_: &Value, view: &PolicyView) -> Option<Decision> {
     if view.world.confines || view.allowed.contains(Consequence::HostWrite) {
         return None;
     }
     let why = format!(
-        "`run_code` runs your program as your user in world `{}` (enforced by: {}), so it can write anywhere you can: besides SpawnsProcess it is HostWrite (07), and the current policy does not allow HostWrite.",
+        "`run_code` runs your program as your user in world `{}` (enforced by: {}), so it can write anywhere you can: besides SpawnsProcess it is HostWrite, and the current policy does not allow HostWrite.",
         view.world.name, view.world.enforced_by
     );
     if view.allowed.contains(Consequence::TalksToHuman) {

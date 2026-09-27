@@ -1,4 +1,4 @@
-//! `08` — the long-lived surfaces over one session: the terminal UI, the web UI (HTTPS, or plain
+//! The long-lived surfaces over one session: the terminal UI, the web UI (HTTPS, or plain
 //! HTTP on loopback for development), the GitHub webhook listener, and the Agent Client Protocol
 //! server. `aho cert` writes the local TLS pair the web and webhook surfaces serve with.
 
@@ -13,7 +13,7 @@ use crate::boot::stop_drivers;
 use crate::ctx::{Ctx, Fail, err, hex};
 use crate::session::open;
 
-/// Where `aho cert` writes, and where `aho web` / `aho webhook` look when no pair is passed.
+/// The directory `aho cert` writes, and `aho web` / `aho webhook` read when no pair is passed.
 fn tls_dir(home: &Path) -> PathBuf {
     home.join(".aho").join("tls")
 }
@@ -36,7 +36,7 @@ pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, width: u16, h
     let inputs = ctx.inputs(&[], false)?;
     let p = ctx.load(&inputs)?;
     if headless {
-        // 12 "visual debug": the normalized screen of the session as it is now; nothing runs.
+        // "Visual debug": the normalized screen of the session as it is now; nothing runs.
         // The drivers are hosted for the boot so the schedule/workflow tools are not logged Broken.
         let o = open(ctx, &p, &inputs.home, session, false, true).await?;
         let frame = surface_tui::headless(&o.session, &p, width, height).map_err(err);
@@ -162,7 +162,7 @@ pub async fn webhook(ctx: &Ctx, session: Option<&str>, insecure_loopback: bool) 
         opts.transport = Some(surface_webhook::Transport::Tls { cert, key });
     }
     let which = session.map(str::to_string).or_else(|| opts.session.clone());
-    // Headless: no one answers cards here, so calls that would ask are refused (04).
+    // Headless: no one answers cards here, so calls that would ask are refused.
     let o = open(ctx, &p, &inputs.home, which.as_deref(), false, true).await?;
     resumed_note(o.id, o.resumed);
     let sink = Arc::new(surface_webhook::SessionSink::new(o.session.clone()));

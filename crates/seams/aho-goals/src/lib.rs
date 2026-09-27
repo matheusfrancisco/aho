@@ -1,4 +1,4 @@
-//! `10`/`12` — goals. Transitions are validated in the fold; a bad event fails replay loudly.
+//! Goals. The fold validates each transition; a bad event fails replay loudly.
 //!
 //! * Phases `active | paused | blocked | complete`; ops `create | edit | pause | resume | complete |
 //!   block | clear`. Every op bumps `revision` and preserves `created_at` / `rounds_started`; `edit`
@@ -8,7 +8,7 @@
 //! * An agent may complete or block only what it drives (it created it, or a round was queued for
 //!   it); edit, pause, resume and clear only goals it created. Operators may do anything.
 //! * Events are `EntryKind::Custom{ns: "Goal", name, body}`: `Goal/Changed{op, goal, by}` carries
-//!   the full snapshot after the op, and [`fold_goals`] recomputes it from the previous state — any
+//!   the full snapshot after the op, and [`fold_goals`] recomputes it from the previous state; any
 //!   mismatch (illegal phase change, skipped revision, tampered counter) is an `Err`.
 //!   `Goal/Round{id, revision, round, driver}` records a queued continuation round.
 //! * Round driver [`Goals::next_round`]: while active and armed, queue round n+1 with
@@ -66,8 +66,8 @@ pub struct BlockReason {
     pub message: String,
 }
 
-/// Who acted. Bodies carry it because a custom fold never sees the entry principal.
-/// Serialized as `operator`, `engineer`, `agent:<n>`, `system:<name>`.
+/// The actor behind an event. Bodies carry it because a custom fold never sees the entry
+/// principal. Serialized as `operator`, `engineer`, `agent:<n>`, `system:<name>`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Actor {
     Operator,
@@ -177,7 +177,7 @@ pub struct Goal {
     pub updated_at: Timestamp,
     pub rounds_started: u32,
     pub max_rounds: u32,
-    /// Who created it: a user (operator/engineer) goal, an agent goal or a system goal.
+    /// The creator, which makes it a user (operator/engineer), agent or system goal.
     pub owner: Actor,
     /// The agent continuation rounds run for; the creator when an agent created it.
     #[serde(default, with = "agent_str::opt", skip_serializing_if = "Option::is_none")]
@@ -192,7 +192,7 @@ impl Goal {
     pub fn summary(&self) -> String {
         let state = if self.cleared { "cleared".to_string() } else { self.phase.to_string() };
         let mut s = format!(
-            "{} · {state} · round {}/{} · revision {} · owner {} — {}\nObjective: {}",
+            "{} · {state} · round {}/{} · revision {} · owner {} · {}\nObjective: {}",
             self.id, self.rounds_started, self.max_rounds, self.revision, self.owner, self.title, self.objective
         );
         if let Some(b) = &self.blocked_reason {
@@ -339,8 +339,8 @@ fn derive_title(objective: &str) -> String {
     format!("{}…", cut.trim_end())
 }
 
-/// Who may do what: users anything; the system pause/block; an agent complete/block what it
-/// drives, and edit/pause/resume/clear only what it created.
+/// Permissions: users may do anything; the system may pause/block; an agent may complete/block
+/// what it drives, and edit/pause/resume/clear only what it created.
 fn authorize(g: &Goal, op: &Op, by: &Actor) -> Result<(), GoalError> {
     let ok = match by {
         Actor::Operator | Actor::Engineer => true,
@@ -504,7 +504,7 @@ impl Event {
         serde_json::from_value(serde_json::json!({ "name": name, "body": body }))
             .map_err(|e| GoalError::BadEvent(format!("malformed Goal/{name}: {e}")))
     }
-    /// `{ "ns": "Goal", "name": .., "body": .. }` — the shape tools return under `value.events`.
+    /// `{ "ns": "Goal", "name": .., "body": .. }`: the shape tools return under `value.events`.
     pub fn to_json(&self) -> Result<Value, GoalError> {
         Ok(serde_json::json!({ "ns": NS, "name": self.name(), "body": self.body()? }))
     }
@@ -513,7 +513,7 @@ impl Event {
     }
 }
 
-/// What the round driver decided.
+/// The round driver's decision.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RoundPlan {
     /// No goal is active.
@@ -666,8 +666,8 @@ impl Goals {
             let events = vec![Event::Round { id: g.id.clone(), revision: g.revision, round, driver }];
             self.stage(&events)?;
             let prompt = format!(
-                "Goal round {round}/{max} for {id} (revision {rev}).\nObjective: {obj}\nKeep working toward the objective. When it is \
-                 actually achieved, call update_goal with id {id} and action complete. If the same concrete condition blocks you \
+                "Goal round {round}/{max} for {id} (revision {rev}).\nObjective: {obj}\nKeep working toward the objective. Once it is \
+                 achieved, call update_goal with id {id} and action complete. If the same concrete condition blocks you \
                  across rounds, call update_goal with action block and name that condition in reason.",
                 max = g.max_rounds,
                 id = g.id,

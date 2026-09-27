@@ -91,7 +91,7 @@ fn opt_in_capabilities_wait_for_the_operator_and_an_operator_layer_turns_them_on
     let p = planned(&f, &[]);
     for id in ["tool-terminal", "hooks-claude-code"] {
         let row = p.plan.row(id).unwrap();
-        assert_eq!(row.state, CapState::Unlocked, "05: {id} ships `○ Unlocked  enable: aho enable {id}`");
+        assert_eq!(row.state, CapState::Unlocked, "{id} ships `○ Unlocked  enable: aho enable {id}`");
         assert!(matches!(row.because, aho_cap::Because::OptIn { .. }), "{id}: {:?}", row.because);
     }
     let on = planned(&f, &[("caps.tool-terminal.enabled", "true"), ("caps.hooks-claude-code.enabled", "true")]);
@@ -101,7 +101,7 @@ fn opt_in_capabilities_wait_for_the_operator_and_an_operator_layer_turns_them_on
     assert!(matches!(state(&acp, "subagent-inproc"), CapState::Unlocked), "switching the seam unbinds in-process subagents");
 }
 
-/// What an embedder seeds (apps/aho `boot.rs`): the root subagent runtime and the drivers. With
+/// An embedder's seed (apps/aho `boot.rs`): the root subagent runtime and the drivers. With
 /// them, a real session over the scripted spine builds every active capability: nothing Broken.
 #[tokio::test]
 async fn scripted_spine_boots_a_session_with_every_active_capability_built() {

@@ -3,7 +3,7 @@ name = "aho-inspect"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Projections over the plan and the log: tree, inventory, explain, why, status, orphans, catch-up, invariants, config catalog (05, 12, 13)."
+description = "Projections over the plan and the log: tree, inventory, explain, why, status, orphans, catch-up, invariants, config catalog."
 
 [dependencies]
 aho-types.workspace = true

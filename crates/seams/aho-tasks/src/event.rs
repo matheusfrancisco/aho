@@ -208,7 +208,7 @@ impl Event {
             .map_err(|e| TaskError::BadEvent(format!("malformed Task/{name}: {e}")))
     }
 
-    /// `{ "ns": "Task", "name": .., "body": .. }` — the shape tools return under `value.events`.
+    /// `{ "ns": "Task", "name": .., "body": .. }`: the shape tools return under `value.events`.
     pub fn to_json(&self) -> Result<Value, TaskError> {
         Ok(serde_json::json!({ "ns": NS, "name": self.name(), "body": self.body()? }))
     }

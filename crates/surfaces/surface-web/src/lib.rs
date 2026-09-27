@@ -1,4 +1,4 @@
-//! `08` — the web surface: axum behind HTTPS, `POST /api/<ns>/<method>` + the `/api/mux`
+//! The web surface: axum behind HTTPS, `POST /api/<ns>/<method>` + the `/api/mux`
 //! WebSocket, and a small embedded single-page UI (plain HTML/JS/CSS compiled in, no build step).
 //!
 //! Transport choice: the operator supplies the TLS pair (`aho cert` writes a local CA + leaf);
@@ -9,7 +9,7 @@
 //! Auth: a random process token, printed at startup, is accepted as `Authorization: Bearer` or
 //! exchanged once (`/auth?token=…` or `POST /api/auth/exchange`) for an HttpOnly, SameSite=Strict
 //! cookie. Every request passes the Host/Origin fence first (DNS rebinding, cross-site calls).
-//! The token holder is the operator: it was shown only on the operator's terminal.
+//! The token holder is the operator: only the operator's terminal showed it.
 //!
 //! Slash commands: `POST /api/session/command {"line": "/name args…"}` runs a command from the
 //! app's [`surface_tui::Commands`] registry (the same one the TUI dispatches), behind the same

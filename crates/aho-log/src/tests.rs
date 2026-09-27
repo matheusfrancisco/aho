@@ -1,4 +1,4 @@
-//! Log tests (split out for the file-size ratchet, doc 12).
+//! Log tests (split out for the file-size ratchet).
 
 mod core_tests {
     use crate::*;

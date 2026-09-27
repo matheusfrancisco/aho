@@ -1,4 +1,4 @@
-//! `Custom{ns: "Selfdev", …}` entries and their fold (06, 12 "Self-dev reload").
+//! `Custom{ns: "Selfdev", …}` entries and their fold.
 //!
 //! Folded state (one JSON object):
 //! * `published`: sorted hashes; `smoke`: `{hash: {ok, detail}}` (latest per hash);
@@ -6,7 +6,7 @@
 //! * `pending`: `{hash, channels, previous}` between `Activated` and `Handoff`, else `null`;
 //! * `running`: the hash of the last `Handoff{ok}`; `restored`: the `previous` map the last
 //!   `Handoff{rolled_back}` put back;
-//! * `restore`: what a rollback would restore now — the pending activation's `previous`, or after
+//! * `restore`: what a rollback would restore now: the pending activation's `previous`, or after
 //!   `Handoff{ok}` the channels as they were before that build went live; `null` after a rollback.
 
 use aho_types::Value;

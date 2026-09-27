@@ -3,7 +3,7 @@ name = "tool-session"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "session_search / session_trace / event_get / event_list: the agent queries its own session log, redacted (00, 06, 11)"
+description = "session_search / session_trace / event_get / event_list: the agent queries its own session log, redacted"
 
 [dependencies]
 aho-types.workspace = true

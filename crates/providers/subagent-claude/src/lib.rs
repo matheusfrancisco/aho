@@ -1,4 +1,4 @@
-//! `08`/`10`/`12` — Claude Code as a subagent provider: observe, don't wrap (12).
+//! Claude Code as a subagent provider: observe, don't wrap.
 //!
 //! Each child is the real `claude` binary, untouched and signed in with the user's own
 //! credentials, running interactively in a session of aho's own tmux server (see
@@ -55,12 +55,12 @@ pub fn uuid_from(seed: &Hash) -> String {
     format!("{}-{}-{}-{}-{}", &h[0..8], &h[8..12], &h[12..16], &h[16..20], &h[20..32])
 }
 
-/// How to launch and read Claude Code.
+/// Launch and transcript settings for Claude Code.
 #[derive(Clone, Debug)]
 pub struct ClaudeCode {
     /// `claude` on PATH, or a path.
     pub binary: String,
-    /// Where Claude Code keeps `projects/`.
+    /// Directory holding Claude Code's `projects/`.
     pub config_dir: PathBuf,
     /// Passed to the child as `CLAUDE_CONFIG_DIR` (set when configured or inherited).
     pub export_config_dir: bool,
@@ -152,7 +152,7 @@ impl Config for ClaudeConfig {
                 "subagent.claude.config_dir",
                 Ty::String,
                 None,
-                "Claude Code's config directory (holds projects/<cwd>/<session>.jsonl); default: $CLAUDE_CONFIG_DIR, else ~/.claude. When set it is also passed to the child as CLAUDE_CONFIG_DIR.",
+                "Claude Code's config directory (holds projects/<cwd>/<session>.jsonl); default: $CLAUDE_CONFIG_DIR, else ~/.claude. If set, it is also passed to the child as CLAUDE_CONFIG_DIR.",
             ),
         ];
         keys.extend(Settings::keys(PREFIX, "Claude Code"));

@@ -1,5 +1,5 @@
-//! The two-scan rule's memory (12: "an identity must be missing on two consecutive scans before
-//! anything is marked gone"): the owner identities the last scan found gone, in a small JSON file.
+//! The two-scan rule's memory (an identity must be missing on two consecutive scans before
+//! anything is marked gone): the owner identities the last scan found gone, in a small JSON file.
 
 use std::path::Path;
 

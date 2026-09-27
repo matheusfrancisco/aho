@@ -1,4 +1,4 @@
-//! HTTPS termination: the same policy and code as surface-web's `tls` module (08). The operator
+//! HTTPS termination: the same policy and code as surface-web's `tls` module. The operator
 //! supplies the PEM pair (`aho cert` writes one); handshakes run off the accept loop so one slow
 //! or plain-HTTP client cannot stall the listener.
 

@@ -3,7 +3,7 @@ name = "aho-acp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ACP v1 (Agent Client Protocol, schema 1.23.0): protocol types, JSON-RPC 2.0 message model, newline framing, and a bidirectional peer over any byte stream (08, 01)"
+description = "ACP v1 (Agent Client Protocol, schema 1.23.0): protocol types, JSON-RPC 2.0 message model, newline framing, and a bidirectional peer over any byte stream"
 
 [dependencies]
 serde.workspace = true

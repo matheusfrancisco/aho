@@ -1,4 +1,4 @@
-//! `12` "Self-dev reload" + "Releases": aho rebuilding and reloading itself.
+//! Self-dev reload and releases: aho rebuilding and reloading itself.
 //!
 //! publish an immutable build → smoke-boot it → `Selfdev/Activated{pending}` → flip the
 //! `current`/`canary` symlinks → the caller's handoff reloads the daemon → `Selfdev/Handoff{ok}`,
@@ -85,7 +85,7 @@ pub fn expand_home(path: &str, home: Option<&std::ffi::OsStr>) -> Result<PathBuf
     }
 }
 
-/// What the `aho selfdev` command looks up (`Registry::service("selfdev")`).
+/// The service the `aho selfdev` command looks up (`Registry::service("selfdev")`).
 #[derive(Clone, Debug)]
 pub struct SelfdevService {
     pub builds: Arc<Builds>,

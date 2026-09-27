@@ -3,7 +3,7 @@ name = "mcp-http"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "MCP client over Streamable HTTP (POST JSON or SSE, Mcp-Session-Id, GET notification stream); registers `mcp__<server>__<tool>` (10)"
+description = "MCP client over Streamable HTTP (POST JSON or SSE, Mcp-Session-Id, GET notification stream); registers `mcp__<server>__<tool>`"
 
 [dependencies]
 aho-types.workspace = true

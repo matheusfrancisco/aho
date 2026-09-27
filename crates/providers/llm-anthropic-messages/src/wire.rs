@@ -18,7 +18,7 @@ const MAX_BREAKPOINTS: usize = 4;
 ///
 /// * System sections become text blocks; a section with `cache_break` carries
 ///   `cache_control: {type: ephemeral}` (the last four, if more are marked).
-/// * `tool_result` blocks must directly follow their `tool_use`, so late results (16) are first
+/// * `tool_result` blocks must directly follow their `tool_use`, so late results are first
 ///   rewritten by `normalize_late_results(.., AsUserBlock)`; consecutive same-role messages are
 ///   merged and `tool_result` blocks lead their user message.
 /// * Thinking blocks are not sent back: without their signature the API rejects them.

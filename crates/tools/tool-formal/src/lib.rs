@@ -1,11 +1,11 @@
-//! `13`/`14` — the model-facing formal tools:
+//! The model-facing formal tools:
 //!
 //! | tool | does | logs (via `value.events`) |
 //! |---|---|---|
 //! | `spec_check` | model-check a TLA+ spec (TLC; `Bounded(n)` or the whole instance) | `InvariantChecked` when `invariant` is given |
 //! | `spec_trace` | validate a recorded log / trace against a TLA+ spec | `InvariantChecked{Trace}` when `invariant` is given |
 //! | `lean_build` | `lake build` a module; unproved goals come back as goals | `InvariantChecked{Proof}` when `invariant` is given |
-//! | `lean_translate` | Aeneas: Rust crate → Lean module bound to a translation hash | — |
+//! | `lean_translate` | Aeneas: Rust crate → Lean module bound to a translation hash | none |
 //! | `invariant_add` | ask the engineer to approve a claim (approval card) | `InvariantRegistered` on approval |
 //! | `invariant_mutate` | check mutants; none caught ⇒ `Vacuous` | `InvariantMutated` per mutant (+ `InvariantChecked{Vacuous}`) |
 //!
@@ -13,7 +13,7 @@
 //! an id is checked against what SPEC.md says right now (its blocks are materialized into a
 //! scratch dir).
 //!
-//! Every `InvariantChecked` is bound to the code it checked (13): `code_hash` is the workspace tree
+//! Every `InvariantChecked` is bound to the code it checked: `code_hash` is the workspace tree
 //! (`Snapshot::tree`) when the check started, the quantity `Workspace/Checkpoint` records, so a
 //! verdict reads `Stale` once a later checkpoint has other code (`aho_inspect::current_invariants`,
 //! `aho_formal::status`). A world without snapshots makes no checkpoints; its verdicts carry
@@ -58,7 +58,7 @@ impl Config for FormalToolConfig {
                 "formal.tools.spec_doc",
                 Ty::String,
                 Some(json!("spec/SPEC.md")),
-                "The literate System Spec (14), relative to the workspace; invariant ids resolve here.",
+                "The literate System Spec, relative to the workspace; invariant ids resolve here.",
             ),
             ConfigKey::new(
                 "formal.tools.budget_ms",
@@ -227,7 +227,7 @@ declare_capability!(
     requires = [Requirement::AnyOf(&[Requirement::Seam(TLA_SEAM), Requirement::Seam(LEAN_SEAM)])],
     tools = TOOLS,
     unlock = Fix::cli("aho doctor formal --install tla"),
-    doc = "spec_check / spec_trace / lean_build / lean_translate / invariant_add / invariant_mutate (13, 14)."
+    doc = "spec_check / spec_trace / lean_build / lean_translate / invariant_add / invariant_mutate."
 );
 
 // ───────────────────────────── schemas ─────────────────────────────
@@ -404,7 +404,7 @@ fn kind_of_path(p: &Path) -> Option<FormalKind> {
 }
 
 /// A spec to run, with what the verdict is bound to. Shared with the operator's `aho invariants`
-/// verbs so both resolve specs and models the same way (13).
+/// verbs so both resolve specs and models the same way.
 pub struct Target {
     pub spec: SpecRef,
     pub cfg_file: Option<PathBuf>,
@@ -567,7 +567,7 @@ impl Inner {
         check_config(&self.read, tool, args, t, self.cfg.budget_ms).await
     }
 
-    /// The code a check starts on: the workspace tree, as `Workspace/Checkpoint` records it (13).
+    /// The code a check starts on: the workspace tree, as `Workspace/Checkpoint` records it.
     /// `Hash::ZERO` (code unknown, so Stale at the first checkpoint) without snapshots or when the
     /// tree cannot be read.
     async fn code(&self) -> Hash {
@@ -737,7 +737,7 @@ impl Inner {
                     events.push(event(EntryKind::Note { text: format!("{id} supersedes {old}: {}", why.unwrap_or("no reason given")) }));
                 }
                 let summary = format!(
-                    "The engineer approved `{id}`; it is registered ({}). Next: give it a formal block, check it, and run invariant_mutate — it counts only once a mutant is caught.",
+                    "The engineer approved `{id}`; it is registered ({}). Next: give it a formal block, check it, and run invariant_mutate; it counts only once a mutant is caught.",
                     kind_name(kind)
                 );
                 Ok(ExecOutcome::Done {
@@ -804,8 +804,8 @@ impl Inner {
                 "survived"
             };
             let why = match (&m.violated, &m.verdict) {
-                (Some(v), _) => format!(" — {v}"),
-                (None, Verdict::Unknown { reason }) => format!(" — {reason}"),
+                (Some(v), _) => format!("; {v}"),
+                (None, Verdict::Unknown { reason }) => format!("; {reason}"),
                 _ => String::new(),
             };
             lines.push(format!("- {} [{mark}]: {}{why}", m.name, m.description));
@@ -817,7 +817,7 @@ impl Inner {
             )
         } else if caught == 0 {
             format!(
-                "⚠ Vacuous: {} caught none of {} mutants — the invariant does not constrain what the actions allow. Propose a stronger statement, or a mutant it should catch.",
+                "⚠ Vacuous: {} caught none of {} mutants; the invariant does not constrain what the actions allow. Propose a stronger statement, or a mutant it should catch.",
                 t.spec.module,
                 r.mutants.len()
             )
@@ -868,9 +868,9 @@ fn read_records(text: &str, module: &str) -> Result<Vec<Value>, String> {
 fn describe_mode(requested: CheckMode, established: CheckMode) -> String {
     match (requested, established) {
         (CheckMode::Bounded(0), CheckMode::Bounded(d)) => {
-            format!("every reachable state of this finite instance (depth {d}) — evidence, not proof")
+            format!("every reachable state of this finite instance (depth {d}); evidence, not proof")
         }
-        (_, CheckMode::Bounded(n)) => format!("every behavior of up to {n} steps of this finite instance — evidence, not proof"),
+        (_, CheckMode::Bounded(n)) => format!("every behavior of up to {n} steps of this finite instance; evidence, not proof"),
         (_, CheckMode::Inductive) => "all states (inductive invariant)".into(),
         (_, CheckMode::Proof) => "a proof of every theorem".into(),
         (_, CheckMode::Trace) => "the recorded behavior".into(),

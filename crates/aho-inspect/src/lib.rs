@@ -1,4 +1,4 @@
-//! `05` — every operator screen is a projection. Nothing here inspects a live struct: each
+//! Every operator screen is a projection. Nothing here inspects a live struct: each
 //! function takes a `Plan`, a folded `State`, a `Loadout`, or log entries, and returns data that
 //! CLI, TUI, web, and the agent's `aho_why` tool render identically (all rows are `Serialize`).
 
@@ -22,7 +22,7 @@ pub use session::{
 };
 pub use tree::{Card, Missing, Setting, TreeNode, Why, govern, inventory, inventory_in, render_inventory, render_tree, tree, why, why_in};
 
-/// `●` Active `○` Unlocked `◌` Locked `✕` Broken `⊘` Disabled — the same in every surface.
+/// `●` Active `○` Unlocked `◌` Locked `✕` Broken `⊘` Disabled, the same in every surface.
 pub fn glyph(s: &CapState) -> char {
     match s {
         CapState::Active => '●',
@@ -59,7 +59,7 @@ pub(crate) fn suggest_preset(over: ConsequenceSet) -> &'static str {
     }
 }
 
-/// How much damage a class can do, for "loudest first" orderings.
+/// The damage a class can do, for "loudest first" orderings.
 pub(crate) fn blast(c: Consequence) -> u8 {
     match c {
         Consequence::ReadOnly => 0,

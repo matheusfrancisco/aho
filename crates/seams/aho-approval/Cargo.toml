@@ -3,7 +3,7 @@ name = "aho-approval"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Approval channel seam: one-shot outcomes, turn-enclosed (04, 10)"
+description = "Approval channel seam: one-shot outcomes, turn-enclosed"
 
 [dependencies]
 aho-types.workspace = true

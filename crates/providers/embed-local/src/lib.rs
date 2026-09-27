@@ -1,4 +1,4 @@
-//! `12` — local embeddings: explicit lexical hashing or optional real ONNX MiniLM.
+//! Local embeddings: explicit lexical hashing or optional real ONNX MiniLM.
 //!
 //! The default **`hash-ngram-384`** is a deterministic feature-hashed TF-IDF embedder.
 //! Features are word unigrams plus character 3-grams of each boundary-padded word
@@ -7,7 +7,7 @@
 //! statistics, so a text maps to the same vector forever and stored vectors stay comparable.
 //! Each feature is hashed (FNV-1a + murmur finalizer) to one of 384 buckets with a hash-derived
 //! sign, and the result is L2-normalized. Lexical, not semantic: paraphrases sharing no
-//! words or word pieces score low — BM25 fusion in the memory capability covers exact terms.
+//! words or word pieces score low; BM25 fusion in the memory capability covers exact terms.
 //!
 //! Feature `minilm` adds pinned `all-MiniLM-L6-v2` ONNX inference. Select it with
 //! `embed.local.model`, configure `model_dir` and `runtime_library`, and provision artifacts
@@ -53,7 +53,7 @@ pub const ENFORCED_BY: &str = "selected hash-ngram-384 or verified all-MiniLM-L6
 /// Share of each word's character 3-grams relative to the word itself (≈ equal energy for
 /// a six-letter word: 6 × 0.4² ≈ 1).
 const TRIGRAM_WEIGHT: f32 = 0.4;
-/// Fixed IDF prior for function words; they still count, just barely.
+/// Fixed IDF prior for function words; they still count, barely.
 const STOPWORD_WEIGHT: f32 = 0.1;
 
 const STOPWORDS: &[&str] = &[
@@ -393,7 +393,7 @@ declare_capability!(
     tools = &[],
     provides_handles = [HandleKind::Embed],
     enforced_by = ENFORCED_BY,
-    doc = "Explicit hash-ngram-384 lexical or optional all-MiniLM-L6-v2 ONNX semantic embeddings; bounded LRU, idle unloading, identity isolation, no model fallback (12)."
+    doc = "Explicit hash-ngram-384 lexical or optional all-MiniLM-L6-v2 ONNX semantic embeddings; bounded LRU, idle unloading, identity isolation, no model fallback."
 );
 
 #[cfg(test)]

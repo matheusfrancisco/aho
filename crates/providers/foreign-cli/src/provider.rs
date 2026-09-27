@@ -64,20 +64,20 @@ pub struct Launch {
 pub struct LocateCtx<'a> {
     pub cwd: &'a Path,
     pub cli_session: Option<&'a str>,
-    /// When the child was launched (ms since the epoch); older transcripts are not it.
+    /// Launch time (ms since the epoch); older transcripts are not it.
     pub launched_ms: u64,
     /// Transcripts other children already own.
     pub claimed: &'a [PathBuf],
 }
 
-/// Where a child stands.
+/// A child's lifecycle state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     /// Started in tmux; its transcript has not appeared yet.
     Launching,
     /// Its transcript is being tailed.
     Live,
-    /// After a crash it was launching: whether it runs is unknown (12: blocked + uncertain).
+    /// After a crash it was launching: whether it runs is unknown (blocked + uncertain).
     Uncertain,
     /// Exited, closed, or gone.
     Closed,
@@ -301,7 +301,7 @@ fn check_policy(product: &str, policy: &SandboxPolicy) -> Result<bool, SubagentE
 
 impl<C: Cli> ForeignProvider<C> {
     /// Builds the provider over the parent log and folds back every child an earlier process
-    /// started (12: crash-honest receipts). Recovered children start being tailed on the first
+    /// started (crash-honest receipts). Recovered children start being tailed on the first
     /// async call or at `SessionStart` ([`ForeignProvider::resume`]).
     pub fn new(cli: C, settings: Settings, log: Arc<dyn LogStore>) -> Result<ForeignProvider<C>, String> {
         let tmux = Tmux::new(which(&settings.tmux).unwrap_or_else(|| PathBuf::from(&settings.tmux)), settings.socket.clone());

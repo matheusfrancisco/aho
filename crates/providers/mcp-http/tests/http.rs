@@ -224,7 +224,7 @@ async fn an_expired_session_is_renewed_once_and_the_request_retried_once() {
     assert!(mock.st.rpc("notifications/initialized").iter().any(|s| s.session.as_deref() == Some("s-2")));
     assert_eq!(fx.session_id().as_deref(), Some("s-2"));
 
-    // A server that forgets every session: one renewal attempt, then an error — no loop.
+    // A server that forgets every session: one renewal attempt, then an error (no loop).
     mock.st.amnesia.store(true, std::sync::atomic::Ordering::SeqCst);
     let (code, reason) = err(call(&reg, "mcp__fx__echo", json!({"text": "x"})).await);
     assert_eq!(code, "MCP_TRANSPORT");

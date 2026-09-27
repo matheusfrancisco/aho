@@ -1,4 +1,4 @@
-//! `03` — engineer side (a `Composition` value) meets operator side (layers) in one `load`.
+//! Engineer side (a `Composition` value) meets operator side (layers) in one `load`.
 //! The result is the loadout + plan that become log entries `0..k` and `PlanSealed`.
 //!
 //! I/O lives at the edges: [`Inputs::from_process`] / [`Inputs::capture_files`] read the

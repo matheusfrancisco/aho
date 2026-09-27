@@ -3,7 +3,7 @@ name = "world-host"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Host world: fs + processes + shadow-git snapshots on the host; optional git worktree; enforced by: policy only (07, 11)"
+description = "Host world: fs + processes + shadow-git snapshots on the host; optional git worktree; enforced by: policy only"
 
 [dependencies]
 aho-types.workspace = true

@@ -1,4 +1,4 @@
-//! `00`/`07`/`15` — PTY terminals, the `Terminals` seam a world provides next to `Subprocess`
+//! PTY terminals, the `Terminals` seam a world provides next to `Subprocess`
 //! (`pty-host` under `world = host`; a confining world ships its own provider).
 //!
 //! A terminal is one process tree on a pseudo-terminal. Its output is read two ways:
@@ -6,8 +6,8 @@
 //! * the **transcript**: the output as plain text lines, addressed by absolute offsets and read with
 //!   a cursor, so a reader gets exactly what scrolled by since its last read (the "scrollback delta").
 //!
-//! `close` kills the whole tree — the session leader, every process group in its session, and
-//! descendants that left it — because a hung-up shell does not take its background jobs with it.
+//! `close` kills the whole tree (the session leader, every process group in its session, and
+//! descendants that left it) because a hung-up shell does not take its background jobs with it.
 
 #![forbid(unsafe_code)]
 
@@ -70,7 +70,7 @@ pub struct OpenSpec {
     pub size: Size,
 }
 
-/// What the emulator shows now.
+/// The emulator's current display.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Screen {
     /// Visible rows joined by `\n`, trailing blanks and blank bottom rows trimmed.
@@ -108,7 +108,7 @@ pub struct Snapshot {
     pub exit: Option<Exit>,
 }
 
-/// What `close` did.
+/// The outcome of `close`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Closed {
     /// Pids that were signalled (leader first).

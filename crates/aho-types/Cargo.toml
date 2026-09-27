@@ -3,7 +3,7 @@ name = "aho-types"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Leaf DTO crate: ids, messages, content blocks, tool specs, principals. Depends on nothing (12: layer guard)."
+description = "Leaf DTO crate: ids, messages, content blocks, tool specs, principals. Depends on nothing (enforced by the layer guard)."
 
 [dependencies]
 serde.workspace = true

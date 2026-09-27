@@ -75,7 +75,7 @@ field_reassign_with_default = "allow"
 unwrap_used = "warn"
 expect_used = "warn"
 
-# Keep a full workspace build small: line tables are enough for backtraces; hot deps optimized (12).
+# Keep a full workspace build small: line tables are enough for backtraces; hot deps optimized.
 [profile.dev]
 debug = "line-tables-only"
 incremental = false

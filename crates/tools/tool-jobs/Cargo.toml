@@ -3,7 +3,7 @@ name = "tool-jobs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "job_list/output/wait/kill over the session's operations table; PROGRESS/CHECKPOINT markers (12, 16)"
+description = "job_list/output/wait/kill over the session's operations table; PROGRESS/CHECKPOINT markers"
 
 [dependencies]
 aho-types.workspace = true

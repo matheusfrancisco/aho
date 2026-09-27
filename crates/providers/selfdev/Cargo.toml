@@ -3,7 +3,7 @@ name = "selfdev"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Self-dev reload: immutable builds, smoke boot, channel symlinks, logged activation with fold-backed rollback (12)"
+description = "Self-dev reload: immutable builds, smoke boot, channel symlinks, logged activation with fold-backed rollback"
 
 [dependencies]
 aho-types.workspace = true

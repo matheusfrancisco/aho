@@ -3,11 +3,11 @@
 //! `Fired` the occurrence it covers and the instant it was decided. The fold recomputes
 //! `next_due` and the skipped count from the spec; a mismatch fails replay loudly.
 //!
-//! * `Created{schedule}` — by a tool (`value.events`) or an operator command.
-//! * `Fired{id, n, due, at, skipped}` — by the driver, appended *after* the fired turn ended; the
+//! * `Created{schedule}`: by a tool (`value.events`) or an operator command.
+//! * `Fired{id, n, due, at, skipped}`: by the driver, appended *after* the fired turn ended; the
 //!   turn's prompt is keyed `schedule:<id>:<n>`, so a restart between the two re-sends a key the
 //!   session already admitted and nothing runs twice.
-//! * `Cancelled{id, by, at}` — agents cancel what agents created; the operator anything.
+//! * `Cancelled{id, by, at}`: agents cancel what agents created; the operator anything.
 
 use std::fmt;
 
@@ -168,7 +168,7 @@ impl Event {
         serde_json::from_value(serde_json::json!({ "name": name, "body": body }))
             .map_err(|e| ScheduleError::BadEvent(format!("malformed schedule/{name}: {e}")))
     }
-    /// `{ "ns": "schedule", "name", "body" }` — the shape tools return under `value.events`.
+    /// `{ "ns": "schedule", "name", "body" }`: the shape tools return under `value.events`.
     pub fn to_json(&self) -> Result<Value, ScheduleError> {
         Ok(serde_json::json!({ "ns": NS, "name": self.name(), "body": self.body()? }))
     }
@@ -369,7 +369,7 @@ impl Schedules {
         }))
     }
 
-    /// When the driver must look again: the earliest `next_due` of an active schedule.
+    /// The driver's next look: the earliest `next_due` of an active schedule.
     pub fn next_wake(&self) -> Option<Timestamp> {
         self.active().filter_map(|s| s.next_due).min()
     }
@@ -380,7 +380,7 @@ impl Schedules {
 pub fn fire_text(s: &Schedule, n: u64, due: Timestamp, now: Timestamp, skipped: u64) -> String {
     let label = if s.label.is_empty() { String::new() } else { format!(" \"{}\"", s.label) };
     let mut head = format!(
-        "[Scheduled prompt {}{label} — {}, occurrence {n}, due {}; created by {} at {}.",
+        "[Scheduled prompt {}{label}: {}, occurrence {n}, due {}; created by {} at {}.",
         s.id,
         s.spec.describe(),
         format_utc(due),

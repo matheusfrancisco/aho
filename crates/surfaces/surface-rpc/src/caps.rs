@@ -1,4 +1,4 @@
-//! `05` — the one verb set. `aho` (clap), the TUI panel, the web panel, and SDK clients all call
+//! The one verb set. `aho` (clap), the TUI panel, the web panel, and SDK clients all call
 //! these; there is no CLI-only or UI-only operation. Every state change is plan → diff → apply:
 //! [`propose`] computes the diff against the file the change would land in, [`Proposal::commit`]
 //! writes it (toml_edit, comments kept).
@@ -52,7 +52,7 @@ impl From<ComposeError> for CapsError {
     }
 }
 
-/// What the verbs plan against: the linked composition and the operator's captured inputs.
+/// The verbs' planning input: the linked composition and the operator's captured inputs.
 #[derive(Clone)]
 pub struct CapsContext {
     pub composition: Composition,
@@ -169,7 +169,7 @@ pub struct Proposal {
     pub secret: BTreeSet<String>,
 }
 
-/// Plans `changes` as if written to the most specific existing layer file (05: `./aho.toml` if
+/// Plans `changes` as if written to the most specific existing layer file (`./aho.toml` if
 /// present, else `~/.aho/config.toml`). Nothing is written.
 pub fn propose(comp: &Composition, inputs: &Inputs, changes: Vec<(String, Value)>) -> Result<Proposal, CapsError> {
     propose_in(comp, inputs, aho_compose::apply_target(&inputs.project, &inputs.home), changes)
@@ -393,7 +393,7 @@ pub fn explain_at(entries: &[Entry], subject: &str, at: EntryId) -> Result<AtEnt
 }
 
 pub fn render_at(a: &AtEntry) -> String {
-    let mut out = format!("at entry {} — {}\n", a.at.0, a.subject);
+    let mut out = format!("at entry {}: {}\n", a.at.0, a.subject);
     if let Some(s) = &a.cap_state {
         out.push_str(&format!("  state    {} {}\n", aho_inspect::glyph(s), aho_inspect::state_name(s)));
     }

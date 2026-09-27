@@ -1,6 +1,6 @@
 //! The operator's path into a running network: `<state_dir>/control.sock`, one JSON request
 //! line and one JSON reply line per connection. The socket lives in the private (0700) state
-//! directory, so only the owning user reaches it — the same trust as the daemon socket. When no
+//! directory, so only the owning user reaches it: the same trust as the daemon socket. If no
 //! process runs the network, `aho net` opens the state directory itself instead.
 
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};

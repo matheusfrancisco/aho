@@ -3,7 +3,7 @@ name = "gc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "`aho gc [--dry-run]`: orphans by owner session and age — unreachable snapshot trees, worktrees of gone/closed sessions, unreferenced spill files, children of dead identities (04, 11, 12)"
+description = "`aho gc [--dry-run]`: orphans by owner session and age (unreachable snapshot trees, worktrees of gone/closed sessions, unreferenced spill files, children of dead identities)"
 
 [dependencies]
 world-ns = { path = "../world-ns" }

@@ -1,5 +1,5 @@
-//! `11`: checkpoint trees in a shadow bare git repository **on the remote host** ("trees hashed
-//! remotely; only the hash crosses the wire").
+//! Checkpoint trees in a shadow bare git repository **on the remote host**: trees are hashed
+//! remotely and only the hash crosses the wire.
 //!
 //! Same semantics as `world-host`'s `ShadowGit`: `<shadow_dir>/<blake3(root) 16 hex>.git`
 //! (SHA-256 object format, so a tree id *is* a 32-byte `Hash`), driven with

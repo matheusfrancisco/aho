@@ -3,7 +3,7 @@ name = "subagent-claude"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Claude Code as a subagent: the real `claude` in tmux with the user's own credentials, observed through its JSONL transcript (08, 10, 12)"
+description = "Claude Code as a subagent: the real `claude` in tmux with the user's own credentials, observed through its JSONL transcript"
 
 [dependencies]
 aho-types.workspace = true

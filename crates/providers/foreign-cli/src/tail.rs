@@ -1,4 +1,4 @@
-//! Byte-offset tail of an append-only JSONL transcript (12: learn state from *its* transcript).
+//! Byte-offset tail of an append-only JSONL transcript (state comes from *its* transcript).
 //!
 //! * The committed offset is always a line boundary: a line is handed out only once its `\n` is
 //!   on disk, and the offset moves past it. A partial last line waits, buffered, for the rest.
@@ -19,7 +19,7 @@ pub const READ_CHUNK: u64 = 4 << 20;
 /// `(device, inode)` of a file on unix; `None` elsewhere.
 pub type FileIdent = Option<(u64, u64)>;
 
-/// Why the tail restarted from byte 0.
+/// The reason the tail restarted from byte 0.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Reset {
     /// The file is shorter than what was already read.
@@ -42,7 +42,7 @@ impl Reset {
     }
 }
 
-/// One complete line. `end` is the offset just past its `\n`.
+/// One complete line. `end` is the offset right after its `\n`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Line {
     pub end: u64,

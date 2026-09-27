@@ -3,7 +3,7 @@ name = "tool-display"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "screen_capture / pointer / mouse / keyboard on the session desktop over the Desktop seam (00, 07)"
+description = "screen_capture / pointer / mouse / keyboard on the session desktop over the Desktop seam"
 
 [dependencies]
 aho-types.workspace = true

@@ -3,7 +3,7 @@ name = "aho-egress"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Egress seam: the bound world's network as a bounded HTTP fetch, plus the operator's host allow/deny list (07)"
+description = "Egress seam: the bound world's network as a bounded HTTP fetch, plus the operator's host allow/deny list"
 
 [dependencies]
 aho-types.workspace = true

@@ -1,4 +1,4 @@
-//! Verbs that open a session log (01, 06, 11, 12): run, session list/show/verify, checkpoints,
+//! Verbs that open a session log: run, session list/show/verify, checkpoints,
 //! rewind, shell, status, rpc.
 
 use std::collections::BTreeMap;
@@ -155,7 +155,7 @@ fn read_line_blocking() -> Option<String> {
 }
 
 pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
-    // 12: while `aho serve` runs, it owns this project's sessions and `aho run` is its client.
+    // While `aho serve` runs, it owns this project's sessions and `aho run` is its client.
     // Settings for this invocation only (a script, --set, a pinned plan) need a plan of their
     // own, so those runs stay in this process.
     let g = &ctx.global;
@@ -313,7 +313,7 @@ pub fn list(ctx: &Ctx, json: bool) -> Result<(), Fail> {
     Ok(())
 }
 
-/// `aho session query`: one read of the index, never a directory scan (06).
+/// `aho session query`: one read of the index, never a directory scan.
 pub fn query(ctx: &Ctx, text: &str, json: bool) -> Result<(), Fail> {
     let p = ctx.load(&ctx.inputs(&[], false)?)?;
     let q = aho_inspect::parse_session_query(text).map_err(|e| err(format!("{e}; nothing was searched")))?;
@@ -360,7 +360,7 @@ pub fn show(ctx: &Ctx, id: &str) -> Result<(), Fail> {
     Ok(())
 }
 
-/// How the route the session used renders late results (replay must use the same rule).
+/// The late-results rule of the route the session used (replay must use the same rule).
 fn late_policy(state: &State) -> LateResults {
     let provider = state.config.get("model.provider").and_then(|s| s.value.as_str()).unwrap_or("openai").to_string();
     let protocol = state.config.get(&format!("provider.{provider}.protocol")).and_then(|s| s.value.as_str()).map(str::to_string);
@@ -464,7 +464,7 @@ pub async fn verify(ctx: &Ctx, id: Option<&str>, formal: bool) -> Result<(), Fai
     if failures > 0 { Err(Fail::Plan(format!("session verify found {failures} problem(s)"))) } else { Ok(()) }
 }
 
-/// `aho session branches` (11): one line per leaf of the log tree, the current head marked.
+/// `aho session branches`: one line per leaf of the log tree, the current head marked.
 pub fn branches(ctx: &Ctx, id: Option<&str>) -> Result<(), Fail> {
     use aho_log::LogStore;
     let p = ctx.load(&ctx.inputs(&[], false)?)?;
@@ -617,7 +617,7 @@ pub async fn shell(ctx: &Ctx, session: Option<&str>, cmd: &[String]) -> Result<(
     let inputs = ctx.inputs(&[], false)?;
     let p = ctx.load(&inputs)?;
     if cmd.is_empty() && p.plan.world.name == "ssh" {
-        // The remote root does not exist here: the argv cds there itself, so it runs from any cwd (07).
+        // The remote root does not exist here: the argv cds there itself, so it runs from any cwd.
         let cfg = <world_ssh::SshConfig as aho_cap::Config>::from_loadout(&p.loadout).map_err(|e| err(format!("{e:?}")))?;
         let world = world_ssh::SshWorld::connect(cfg).map_err(|e| err(format!("{e:?}")))?;
         let argv = aho_sandbox::Sandbox::operator_shell(&*world.sandbox());
@@ -687,7 +687,7 @@ pub fn status(ctx: &Ctx, loud: bool, session: Option<&str>, json: bool) -> Resul
     }
     print!("{}", aho_inspect::render_status(&st));
     match &sess {
-        Some((id, (s, why))) => println!("session {id}: {s:?} — {why}"),
+        Some((id, (s, why))) => println!("session {id}: {s:?} ({why})"),
         None => println!("no session yet; start one with `aho run`"),
     }
     if loud {
@@ -716,7 +716,7 @@ pub fn status(ctx: &Ctx, loud: bool, session: Option<&str>, json: bool) -> Resul
 }
 
 pub async fn rpc(ctx: &Ctx, socket: Option<&std::path::Path>, session: Option<&str>) -> Result<(), Fail> {
-    // 12: while `aho serve` runs it owns the project's sessions, and `aho rpc` speaks the same
+    // While `aho serve` runs it owns the project's sessions, and `aho rpc` speaks the same
     // protocol as the daemon's client. Settings for this invocation only need a plan of their
     // own, so those servers stay in this process (as `aho run` does).
     let g = &ctx.global;

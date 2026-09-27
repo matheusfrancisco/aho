@@ -1,11 +1,11 @@
-//! `10` — Claude Code `hooks.json` compatibility as one `Kind::Hook` capability.
+//! Claude Code `hooks.json` compatibility as one `Kind::Hook` capability.
 //!
 //! Reads `<project>/.claude/settings.json`, `<project>/.claude/settings.local.json`, and every
 //! file in `hooks.claude_code.files` (a bootstrap snapshot: edits take effect on restart). Each
 //! `type: "command"` hook runs as `sh -c <command>` in the project with the Claude Code JSON
 //! payload on stdin (`session_id, cwd, hook_event_name, tool_name, tool_input, tool_use_id,
 //! tool_response`), `${CLAUDE_PROJECT_DIR}` substituted in the command text and set in the
-//! environment, and `AHO_HOOKS_DISABLED=1` set for the child — the recursion guard: an aho
+//! environment, and `AHO_HOOKS_DISABLED=1` set for the child as the recursion guard: an aho
 //! started with it (config key `hooks.disabled`) runs no hooks. Hooks matching one event run in
 //! parallel; identical commands run once.
 //!
@@ -14,11 +14,11 @@
 //! | `PreToolUse` | `Registrar::pre_execute` | the call is denied with the reason |
 //! | `PostToolUse` | `Registrar::post_execute` | the result is blocked; the reason is feedback |
 //! | `UserPromptSubmit` | `HookEvent::PreStep` (first step of each turn) | the turn stops |
-//! | `SessionStart` | `HookEvent::SessionStart` | — (stdout becomes context) |
-//! | `SessionEnd` | `HookEvent::SessionEnd` | — |
+//! | `SessionStart` | `HookEvent::SessionStart` | none (stdout becomes context) |
+//! | `SessionEnd` | `HookEvent::SessionEnd` | none |
 //! | `Stop` | `HookEvent::TurnStopping` | the turn continues with the reason |
 //! | `SubagentStop` | `HookEvent::SubagentStop` | the subagent continues with the reason |
-//! | `PreCompact` | `HookEvent::PreCompact` | — |
+//! | `PreCompact` | `HookEvent::PreCompact` | none |
 //!
 //! Output: exit 0 = pass (stdout JSON is read when it starts with `{`); exit 2 = block, stderr is
 //! the reason; JSON `decision: "block"` + `reason`, `continue: false` + `stopReason`,
@@ -155,7 +155,7 @@ impl Config for HooksConfig {
                 "hooks.claude_code.on_error",
                 Ty::String,
                 Some(json!("deny")),
-                "When a hook fails (cannot start, times out, bad exit, bad JSON): deny (fail closed) or allow. A hook's own `on_error` wins.",
+                "If a hook fails (cannot start, times out, bad exit, bad JSON): deny (fail closed) or allow. A hook's own `on_error` wins.",
             ),
             ConfigKey::new(
                 "hooks.claude_code.timeout_s",
@@ -205,7 +205,7 @@ impl Config for HooksConfig {
 
 // ───────────────────────────── interpreting one run ─────────────────────────────
 
-/// What one hook run said, before combining.
+/// One hook run's verdict, before combining.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Interp {
     pub block: Option<String>,
@@ -673,5 +673,5 @@ declare_capability!(
     provides = [SeamId("hooks")],
     requires = [Requirement::Binary("sh")],
     tools = &[],
-    doc = "Claude Code hooks (`.claude/settings.json`, hooks.json): exit 2 blocks, JSON decisions honored, `updatedInput` refused, fail-closed (10)."
+    doc = "Claude Code hooks (`.claude/settings.json`, hooks.json): exit 2 blocks, JSON decisions honored, `updatedInput` refused, fail-closed."
 );

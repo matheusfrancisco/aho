@@ -1,9 +1,9 @@
 //! `workflow/*` entries and their fold (the ralph loop state machine).
 //!
-//! * `Started{workflow}` — the whole loop at iteration 0; one `running` loop at a time.
-//! * `Iteration{id, n, promise_found, at}` — by the driver after loop-fed turn `n` ended;
+//! * `Started{workflow}`: the whole loop at iteration 0; one `running` loop at a time.
+//! * `Iteration{id, n, promise_found, at}`: by the driver after loop-fed turn `n` ended;
 //!   `n` is exactly the next one and never past `max_iterations`.
-//! * `Finished{id, outcome, by, at, reason}` — `completed` only after an iteration found the
+//! * `Finished{id, outcome, by, at, reason}`: `completed` only after an iteration found the
 //!   promise, `exhausted` only when the budget is spent without it, `failed` when a fed turn
 //!   aborted (driver), `stopped` by `ralph_stop` or the operator. Agents stop only agent loops.
 
@@ -204,7 +204,7 @@ pub fn promise_in(text: &str, promise: &str) -> bool {
     false
 }
 
-/// What the loop driver should do now.
+/// The loop driver's next action.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LoopPlan {
     /// No loop is running.
@@ -218,8 +218,8 @@ pub enum LoopPlan {
 /// The fed prompt: the task verbatim, then the loop's own line.
 pub fn feed_text(w: &Workflow, n: u32) -> String {
     format!(
-        "{prompt}\n\n[Ralph loop {id}: iteration {n} of {max}. This same prompt comes back after every turn until you finish. When the \
-         task is completely and verifiably done, end your reply with <promise>{promise}</promise> — only then; writing it early does \
+        "{prompt}\n\n[Ralph loop {id}: iteration {n} of {max}. This same prompt comes back after every turn until you finish. Once the \
+         task is complete and verified, end your reply with <promise>{promise}</promise>, and only then: writing it early does \
          not make the work done. ralph_stop ends the loop without finishing.]",
         prompt = w.prompt,
         id = w.id,
@@ -391,8 +391,8 @@ impl Workflows {
         Ok(plan)
     }
 
-    /// Records loop-fed turn `n` of `id`: whether its final text carried the promise, and — when
-    /// the turn aborted without it — the loop fails rather than burn its budget on a broken model.
+    /// Records loop-fed turn `n` of `id`: whether its final text carried the promise. A turn that
+    /// aborted without it fails the loop instead of burning its budget on a broken model.
     pub fn after_turn(&self, id: &str, n: u32, end: &TurnEnd, at: Timestamp) -> Result<Vec<Event>, WorkflowError> {
         let w = self.get(id).ok_or_else(|| WorkflowError::Unknown(id.to_string()))?;
         let found = promise_in(&end.final_text, &w.promise);

@@ -2,11 +2,11 @@
 //!
 //! A spawn is one `ssh -T` session running [`LAUNCHER`] (perl, present wherever git is): it
 //! `chdir`s, forks the command into a new process group with stdout+stderr on a private pipe,
-//! and reports on the ssh stderr channel with `AHO-SSH` control lines — `P <pgid>` once the
+//! and reports on the ssh stderr channel with `AHO-SSH` control lines: `P <pgid>` once the
 //! command is running, `E <what> <errno> <text>` if it could not start, `X <code> <signal>` when
 //! the leader exits (exact status: `128+signal` and the signal number). The command's output is
 //! copied to the ssh stdout until the leader exits plus a short drain window, so a backgrounded
-//! grandchild holding the pipe cannot hold the caller (07). Kills and timeouts run [`KILLER`]
+//! grandchild holding the pipe cannot hold the caller. Kills and timeouts run [`KILLER`]
 //! over the same master: SIGTERM to the group, a 2 s grace, then SIGKILL.
 
 use std::sync::atomic::{AtomicBool, Ordering};

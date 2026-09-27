@@ -1,17 +1,17 @@
-//! `07` — egress: the bound world's network, as one bounded HTTP exchange per call.
+//! Egress: the bound world's network, as one bounded HTTP exchange per call.
 //!
 //! * [`Egress`] / [`EgressHandle`] (`HandleKind::Egress(Route::Sandbox)`): the only network a tool
-//!   may hold (02: tools never hold `Egress(Route::Host)`). Under `world = host` the world provides
+//!   may hold (tools never hold `Egress(Route::Host)`). Under `world = host` the world provides
 //!   the host network and [`Egress::enforced_by`] says `policy only`; a sandbox world routes it
 //!   through its own NIC and says what confines it.
-//! * [`HttpRequest`] carries its own bounds — [`Limits`] (body bytes, wall-clock timeout, redirect
-//!   cap) and the operator's [`HostList`] — so every implementation enforces the same contract:
+//! * [`HttpRequest`] carries its own bounds: [`Limits`] (body bytes, wall-clock timeout, redirect
+//!   cap) and the operator's [`HostList`]. Every implementation enforces the same contract:
 //!   the list is checked on every hop (redirects included) before connecting, reading stops at
 //!   `max_body_bytes` with `truncated = true`, more than `max_redirects` hops is an error, the whole
 //!   exchange runs under `timeout_ms`, and `secret` headers are dropped when a redirect leaves the
 //!   original host.
-//! * [`HostList`] is the egress allow/deny list (`egress.allow`, `egress.deny`). Doc 07: under
-//!   `host` it is enforced for `web_fetch`/MCP only — `bash` can `curl` anything.
+//! * [`HostList`] is the egress allow/deny list (`egress.allow`, `egress.deny`). Under `host` it
+//!   is enforced for `web_fetch`/MCP only; `bash` can `curl` anything.
 //!
 //! This crate performs no I/O.
 
@@ -210,7 +210,7 @@ impl std::error::Error for EgressError {}
 /// The bound world's network. Implementations enforce every field of [`HttpRequest`].
 pub trait Egress: Send + Sync {
     fn fetch(&self, req: HttpRequest) -> BoxFuture<'_, Result<HttpResponse, EgressError>>;
-    /// What confines this network: `policy only` on the host, the sandbox's mechanism otherwise.
+    /// The mechanism confining this network: `policy only` on the host, the sandbox's otherwise.
     fn enforced_by(&self) -> &str;
 }
 

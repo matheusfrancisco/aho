@@ -3,7 +3,7 @@ name = "formal-tlc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "TLC provider for the TLA+ Formal seam: model checking, trace validation, mutation (13)"
+description = "TLC provider for the TLA+ Formal seam: model checking, trace validation, mutation"
 
 [dependencies]
 aho-types.workspace = true

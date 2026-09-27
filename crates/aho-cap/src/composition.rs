@@ -1,4 +1,4 @@
-//! Composition (03): a product as a Rust value; builds Active rows and checks manifest drift.
+//! Composition: a product as a Rust value; builds Active rows and checks manifest drift.
 
 use super::*;
 
@@ -6,7 +6,7 @@ use super::*;
 
 pub type BuildFn = fn(&mut Resolver, &Loadout) -> Result<(), BuildError>;
 
-/// A product is a Rust value, not a YAML stack (03).
+/// A product is a Rust value, not a YAML stack.
 #[derive(Clone)]
 pub struct Composition {
     pub name: &'static str,
@@ -134,10 +134,10 @@ pub fn core_keys() -> Vec<ConfigKey> {
         ConfigKey::new("model.provider", Ty::String, Some(json!("openai")), "Default model provider (an llm adapter route)."),
         ConfigKey::new("model.name", Ty::String, Some(json!("gpt-4.1-mini")), "Default model id."),
         ConfigKey::new("model.max_tokens", Ty::Int, Some(json!(8192)), "Max output tokens per request."),
-        ConfigKey::new("session.dir", Ty::String, Some(json!(".aho/sessions")), "Where session logs live."),
+        ConfigKey::new("session.dir", Ty::String, Some(json!(".aho/sessions")), "Session log directory."),
         ConfigKey::new("session.max_turns", Ty::Int, Some(json!(200)), "Hard cap on steps per turn."),
-        ConfigKey::new("tools.grace_ms", Ty::Int, Some(json!(1000)), "Async tool grace window before the next turn (16)."),
-        ConfigKey::new("tools.heartbeat_s", Ty::Int, Some(json!(600)), "Heartbeat when only tool calls are pending (16)."),
+        ConfigKey::new("tools.grace_ms", Ty::Int, Some(json!(1000)), "Async tool grace window before the next turn."),
+        ConfigKey::new("tools.heartbeat_s", Ty::Int, Some(json!(600)), "Heartbeat when only tool calls are pending."),
         ConfigKey::new("tools.max_parallel", Ty::Int, Some(json!(10)), "Bounded pool for concurrency-safe tool calls."),
         ConfigKey::new("tools.spill_budget", Ty::Int, Some(json!(200000)), "Per-message aggregate result budget (chars)."),
         ConfigKey::new("compaction.threshold", Ty::Float, Some(json!(0.8)), "Compact when context exceeds this ratio of the window."),

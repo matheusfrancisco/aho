@@ -1,4 +1,4 @@
-//! `04`: the live ceiling session modes narrow; only an operator approval widens it
+//! The live ceiling session modes narrow; only an operator approval widens it
 //! (`aho_control::SessionCeiling`). Held weakly: the registry lives inside the session.
 
 use std::sync::{OnceLock, Weak};
@@ -59,7 +59,7 @@ impl Session {
 
     /// Applies an authenticated operator's preset between turns. Unlike a mode's meet, this
     /// may widen authority or leave spec mode; `authority` is the operator's `Command/Run`
-    /// entry the epoch cites (04: a widening needs an operator reference).
+    /// entry the epoch cites (a widening needs an operator reference).
     pub fn set_preset(&self, operator: &Operator, name: &str, authority: EntryId) -> Result<PolicyView, SessionError> {
         let preset = aho_policy::preset(name)
             .ok_or_else(|| SessionError::NotFound(format!("unknown preset `{name}`; use read-only, workspace, dev, lab, full, or spec")))?;
@@ -133,7 +133,7 @@ impl Session {
             return same(ApprovalOutcome::Unavailable);
         };
         let d = self.approval.request(card).await.normalized();
-        // the turn may have ended meanwhile: the loop already cancelled this request (04)
+        // the turn may have ended meanwhile: the loop already cancelled this request
         if !self.fold().map(|s| s.pending_approvals.contains_key(&req.id)).unwrap_or(false) {
             return same(ApprovalOutcome::Cancelled);
         }

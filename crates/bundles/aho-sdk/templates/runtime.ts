@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { VERSION_MAX, VERSION_MIN } from "./protocol.ts";
 import type { Event, Hello, HelloOk, ServerFrame } from "./protocol.ts";
 
-/** How to start the server: `[command, ...globals, ...args, "rpc", ...session]`, the argv of `aho rpc`. */
+/** Server launch options: `[command, ...globals, ...args, "rpc", ...session]`, the argv of `aho rpc`. */
 export interface SpawnOptions {
   /** Program to run; default `aho` (looked up on PATH). */
   command?: string;
@@ -25,7 +25,7 @@ export interface SpawnOptions {
   clientInstance?: string;
   hasLocalHistory?: boolean;
   allowTakeover?: boolean;
-  /** Where the server's stderr goes; default `inherit`. */
+  /** Destination of the server's stderr; default `inherit`. */
   stderr?: "inherit" | "ignore";
 }
 

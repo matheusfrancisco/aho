@@ -1,4 +1,4 @@
-//! `01` + `16` — one loop. `core::next` is the pure "when do we call the model" rule set; this
+//! One loop. `core::next` is the pure "when do we call the model" rule set; this
 //! module is the tokio driver that executes it: requests, async-first tool calls with a grace
 //! window and heartbeat, the decision chain + approvals, spill, compaction, checkpoints,
 //! rewind, resume, and the `Session` API every surface drives.
@@ -119,7 +119,7 @@ impl From<LogError> for SessionError {
     }
 }
 
-/// Input queued while a turn runs (soft interrupts, 12).
+/// Input queued while a turn runs (soft interrupts).
 #[derive(Clone, Debug)]
 pub struct Input {
     pub by: Principal,
@@ -169,11 +169,11 @@ pub struct Session {
     ptc_seq: std::sync::atomic::AtomicU64,
 }
 
-/// Service `aho.tool_call` (PTC, 10): `(parent call's view, cancel, tool, args) → outcome`, one
+/// Service `aho.tool_call` (PTC): `(parent call's view, cancel, tool, args) → outcome`, one
 /// nested call through this session's lookup, decision chain, approvals and pre/post hooks.
 pub type NestedToolCall = Arc<dyn Fn(ExecView, CancelToken, String, Value) -> BoxFuture<'static, ExecOutcome> + Send + Sync>;
 
-/// What `Session::boot` needs; everything comes from `aho-compose` + the surface.
+/// Inputs to `Session::boot`; everything comes from `aho-compose` + the surface.
 pub struct Boot<'a> {
     pub id: SessionId,
     pub composition: &'a Composition,
@@ -204,27 +204,27 @@ impl Session {
             aho_cap::HandleKind::Operations,
             (aho_cap::CapabilityId { name: "aho-session", major: 0 }, Arc::new(OperationsHandle(ops.clone()))),
         );
-        // Tools that ask (invariant_add, task_control, …) go through a wrapper that logs the pair (04).
+        // Tools that ask (invariant_add, task_control, …) go through a wrapper that logs the pair.
         let logged: Arc<dyn Approval> = Arc::new(LoggedApproval { inner: b.approval.clone(), log: b.log.clone() });
         seed.handles.insert(
             aho_cap::HandleKind::Approval,
             (aho_cap::CapabilityId { name: "aho-session", major: 0 }, Arc::new(aho_approval::ApprovalHandle(logged))),
         );
-        // Read-only projections the inspect tools serve to the agent (05: same data as the operator).
+        // Read-only projections the inspect tools serve to the agent (the same data the operator sees).
         seed.services.insert("aho.plan".into(), Arc::new(Arc::new(b.plan.clone())));
         seed.services.insert("aho.manifests".into(), Arc::new(Arc::new(b.composition.manifests())));
-        // The session's own log, read-only by type use (`session_search`/`session_trace`, 00): tools read what the
+        // The session's own log, read-only by type use (`session_search`/`session_trace`): tools read what the
         // model already saw plus what the fold derives; appends still go through `value.events` (`tool_events`).
         seed.services.insert("aho.log".into(), Arc::new(b.log.clone()));
         seed.services.insert("aho.session_id".into(), Arc::new(b.id));
         seed.services.insert("aho.session_dir".into(), Arc::new(b.spill_dir.parent().unwrap_or(std::path::Path::new(".")).to_path_buf()));
         seed.services.insert("aho.workspace".into(), Arc::new(b.workspace.clone()));
         seed.services.insert("aho.home".into(), Arc::new(b.home.clone()));
-        // PTC (10): `run_code` programs call tools back through this session. Capabilities build
+        // PTC: `run_code` programs call tools back through this session. Capabilities build
         // before the session exists, so the slot is seeded empty and filled once it does.
         let nested: Arc<std::sync::OnceLock<NestedToolCall>> = Arc::default();
         seed.services.insert("aho.tool_call".into(), Arc::new(nested.clone()));
-        // `04`: session modes (plan mode) narrow the live policy and ask the operator to widen it back.
+        // Session modes (plan mode) narrow the live policy and ask the operator to widen it back.
         let me: Arc<std::sync::OnceLock<std::sync::Weak<Session>>> = Arc::default();
         seed.services
             .insert(aho_control::CEILING_SERVICE.into(), Arc::new(aho_control::CeilingHandle(Arc::new(ceiling::Ceiling(me.clone())))));
@@ -270,9 +270,9 @@ impl Session {
 
         let state = fold_head(&*b.log, &reg.entry_kinds)?;
         let world = b.plan.world.clone();
-        // Commands and paths resolve against the bound world's own root (07): under a confining
+        // Commands and paths resolve against the bound world's own root: under a confining
         // world that is the sandbox's `/workspace` or the remote directory, not the host project,
-        // and the safety checks (04 step 5) must judge them there.
+        // and the decision chain's safety checks (step 5) must judge them there.
         let workspace = match reg.handle::<aho_fs::FsRead>() {
             Some(fs) if world.confines => fs.0.root(),
             _ => b.workspace.clone(),
@@ -347,7 +347,7 @@ impl Session {
                 process: Some(aho_log::ProcessIdentity { pid: std::process::id(), start_time: Timestamp::now() }),
             },
         )?;
-        // 12, crash-honest receipts: every child a tool ties to a live op is recorded under this
+        // Crash-honest receipts: every child a tool ties to a live op is recorded under this
         // boot's Session/Meta as `Child/Spawned`, so `aho gc` can reap it once this process is gone.
         let receipts = Arc::downgrade(&s);
         s.ops.on_attach(Arc::new(move |info: &aho_proc::OpInfo| {
@@ -386,7 +386,7 @@ impl Session {
     }
 
     /// For paths that cannot return an error (compaction, hooks): a failed append is reported to
-    /// every surface instead of being dropped — the log is the only store (06).
+    /// every surface instead of being dropped: the log is the only store.
     fn append_reported(&self, by: Principal, kind: EntryKind) {
         if let Err(e) = self.append(by, kind) {
             let _ =
@@ -430,7 +430,7 @@ impl Session {
     }
 
     /// A prompt authored by someone other than the operator: a driver (`System("schedule")`,
-    /// `System("workflow")`) or a surface acting for an external source. The log records who spoke (04).
+    /// `System("workflow")`) or a surface acting for an external source. The log records who spoke.
     pub async fn prompt_as(
         self: &Arc<Self>,
         by: Principal,
@@ -439,7 +439,7 @@ impl Session {
     ) -> Result<Transition, SessionError> {
         let _guard = self.running.try_lock().map_err(|_| SessionError::Busy)?;
         if let Some(k) = &client_key {
-            // inbox dedup by caller-supplied id, also across resume (16)
+            // inbox dedup by caller-supplied id, also across resume
             let seen =
                 self.log.read_from(None).iter().any(|e| matches!(&e.kind, EntryKind::UserMessage { client_key: Some(c), .. } if c == k));
             if seen {
@@ -481,7 +481,7 @@ impl Session {
         self.append(Principal::system("loop"), EntryKind::StepEnd { step: StepId(0), transition: transition.clone() })?;
         self.run_hooks(HookEvent::TurnEnd, serde_json::json!({ "turn": turn.0 })).await;
         self.checkpoint(CheckpointCause::TurnEnd).await;
-        // An approval a tool is still waiting on cannot outlive the turn (04): cancel it first.
+        // An approval a tool is still waiting on cannot outlive the turn: cancel it first.
         for req in self.fold()?.pending_approvals.keys().copied().collect::<Vec<_>>() {
             self.append(
                 Principal::system("loop"),
@@ -500,13 +500,13 @@ impl Session {
         let mut queued: Vec<Input> = Vec::new();
         let mut overflow_retries = 0u32;
 
-        // results that landed between turns are recorded first (late results, 16)
+        // results that landed between turns are recorded first (late results)
         while let Ok(f) = results.try_recv() {
             self.record_result(f).await?;
         }
 
         // `abort()` fires this token: tool ops watch it, and the loop stops between steps, mid-request
-        // and while waiting — an aborted turn never calls the model again (12).
+        // and while waiting; an aborted turn never calls the model again.
         let token = lk(&self.turn_cancel).clone();
         const ABORTED: &str = "the operator aborted the turn";
         loop {
@@ -682,7 +682,7 @@ impl Session {
     }
 
     /// After an abort, cancelled ops settle with synthetic `Cancelled` results; recording them here
-    /// closes every call the aborted turn issued (12). Bounded: a tool that ignores cancellation stays
+    /// closes every call the aborted turn issued. Bounded: a tool that ignores cancellation stays
     /// open and its result lands late, at the next turn boundary.
     async fn settle_after_abort(&self, results: &mut mpsc::UnboundedReceiver<Finished>) -> Result<(), SessionError> {
         const SETTLE: Duration = Duration::from_secs(2);
@@ -727,7 +727,7 @@ impl Session {
         )
     }
 
-    /// Dynamic contexts are logged as `Snapshot` user messages only when their text changes (10).
+    /// Dynamic contexts are logged as `Snapshot` user messages only when their text changes.
     fn log_contexts(&self) -> Result<(), SessionError> {
         let state = self.fold()?;
         let mut items: Vec<(String, String)> = vec![("policy".into(), self.policy_context())];
@@ -791,7 +791,7 @@ impl Session {
     }
 
     /// Streams one response. Calls the chain allows without asking and marks `Safe` start while
-    /// the model is still streaming (10: streaming start); their results are held until logged.
+    /// the model is still streaming; their results are held until logged.
     async fn request(self: &Arc<Self>, turn: TurnId) -> Result<(aho_llm::Response, BTreeMap<CallId, Started>), LlmError> {
         let (req, header) = self.build_request().map_err(|e| LlmError::Fatal(e.to_string()))?;
         self.append(Principal::system("loop"), header).map_err(|e| LlmError::Fatal(e.to_string()))?;
@@ -832,7 +832,7 @@ fn fold_head(log: &dyn LogStore, folds: &CustomFolds) -> Result<State, LogError>
     }
 }
 
-/// Runtime canary (03): the tool list sent to the model equals what the registry holds.
+/// Runtime canary: the tool list sent to the model equals what the registry holds.
 pub fn canary(visible: &[String], reg: &Registry) -> Result<(), SessionError> {
     let mut expected: Vec<String> = reg.tools.iter().map(|(_, d, _)| d.name.to_string()).collect();
     expected.extend(reg.dynamic_tools.iter().map(|(_, s, _)| s.name.clone()));
@@ -846,7 +846,7 @@ pub fn canary(visible: &[String], reg: &Registry) -> Result<(), SessionError> {
     }
 }
 
-/// Replay equality (01): every `RequestHeader.request_hash` equals the hash re-derived from the log prefix before it.
+/// Replay equality: every `RequestHeader.request_hash` equals the hash re-derived from the log prefix before it.
 pub fn verify_replay(entries: &[Entry], folds: &CustomFolds, late: LateResults) -> Result<usize, String> {
     let mut checked = 0;
     for (k, e) in entries.iter().enumerate() {
@@ -870,5 +870,5 @@ pub fn verify_replay(entries: &[Entry], folds: &CustomFolds, late: LateResults) 
 
 pub const IDENTITY: &str = "You are a coding agent running in aho, a modular harness. You act only through the tools you are given; every call is checked against the session policy and logged.";
 
-/// Doc 16, the model-facing contract for async tool calls.
+/// The model-facing contract for async tool calls.
 pub const ASYNC_PREAMBLE: &str = "You work in turns. Each turn re-sends the whole conversation, so prefer going wide within a turn: when the next commands do not depend on each other's output, issue them as separate tool calls in the same turn.\n\nTool calls are asynchronous: each starts the moment you issue it and runs in the background, so many run at once. As each finishes, its result is appended and wakes a new turn; results that land together arrive together, and a call still running shows a placeholder until its own result arrives. If you need a result before continuing and have nothing independent to do, end your turn or call job_wait.\n\nEnding a turn with no tool calls while calls are running means you sleep until one finishes; ending a turn with nothing running ends the task, so do that only when the task is complete.";

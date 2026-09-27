@@ -3,7 +3,7 @@ name = "tool-formal"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "spec_check / spec_trace / lean_build / lean_translate / invariant_add / invariant_mutate; spec mode (13, 14)"
+description = "spec_check / spec_trace / lean_build / lean_translate / invariant_add / invariant_mutate; spec mode"
 
 [dependencies]
 aho-types.workspace = true

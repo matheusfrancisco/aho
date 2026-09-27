@@ -1,8 +1,8 @@
-//! The egress allow/deny list (07) and the conservative URL reading it is checked against.
+//! The egress allow/deny list and the conservative URL reading it is checked against.
 //!
 //! Patterns are host globs: `*` matches any run of characters (dots included), `?` one
 //! character; matching is case-insensitive against the host alone (no scheme, no port).
-//! `*.example.com` does not match `example.com` — list both. Deny wins; an empty allow list
+//! `*.example.com` does not match `example.com`, so list both. Deny wins; an empty allow list
 //! admits every host not denied.
 //!
 //! [`parse_url`] refuses anything a WHATWG parser (what the HTTP client uses) could read as a
@@ -25,13 +25,13 @@ pub fn config_keys() -> Vec<ConfigKey> {
             ALLOW_KEY,
             Ty::Array,
             Some(json!([])),
-            "Host globs web_fetch/web_search/MCP-over-HTTP may reach (`*` any run, `?` one char). Empty: every host not denied. Under `world = host` this is policy only: bash can still reach anything (07).",
+            "Host globs web_fetch/web_search/MCP-over-HTTP may reach (`*` any run, `?` one char). Empty: every host not denied. Under `world = host` this is policy only: bash can still reach anything.",
         ),
         ConfigKey::new(
             DENY_KEY,
             Ty::Array,
             Some(json!([])),
-            "Host globs web_fetch/web_search/MCP-over-HTTP must never reach; wins over egress.allow (07).",
+            "Host globs web_fetch/web_search/MCP-over-HTTP must never reach; wins over egress.allow.",
         ),
     ]
 }

@@ -8,15 +8,15 @@
 //!   the server dropped it: aho re-initializes once (concurrent callers share one renewal) and
 //!   retries the request once.
 //! * A GET opens the server's notification stream (405 = the server has none); it reconnects with
-//!   backoff. `notifications/tools/list_changed` — on any stream — re-lists the tools and swaps the
-//!   server's generation two-phase through the capability's [`ToolTable`] (`10`).
+//!   backoff. `notifications/tools/list_changed` on any stream re-lists the tools and swaps the
+//!   server's generation two-phase through the capability's [`ToolTable`].
 //! * `notifications/progress` for a call reach the tool's progress sink as `AHO_PROGRESS {json}`.
 //!   Server requests are answered: `ping` → `{}`, anything else → `-32601`.
 //! * A timed-out or cancelled request sends `notifications/cancelled`. Dropping the last handle
 //!   sends DELETE with the session id (waiting briefly, never blocking the I/O thread).
 //!
 //! All I/O runs on [`IoRuntime`], the provider's own single-thread tokio runtime, so callers may be
-//! on any executor — or none, at build time.
+//! on any executor, or none at build time.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
@@ -42,11 +42,11 @@ pub const SESSION_HEADER: HeaderName = HeaderName::from_static("mcp-session-id")
 pub const VERSION_HEADER: HeaderName = HeaderName::from_static("mcp-protocol-version");
 const ACCEPT_POST: &str = "application/json, text/event-stream";
 const ACCEPT_GET: &str = "text/event-stream";
-/// How often a waiting request checks its cancellation token.
+/// Interval at which a waiting request checks its cancellation token.
 const POLL: Duration = Duration::from_millis(20);
 /// Upper bound on pages for one paginated list (a looping cursor is a server bug).
 const MAX_PAGES: usize = 1000;
-/// How long dropping the last handle waits for the DELETE.
+/// Time dropping the last handle waits for the DELETE.
 const SHUTDOWN_GRACE: Duration = Duration::from_millis(300);
 /// Largest response aho reads: one JSON body, or the sum of one POST stream's bytes.
 pub const MAX_RESPONSE_BYTES: usize = 32 * 1024 * 1024;
@@ -70,7 +70,7 @@ pub enum Listening {
     Retrying(String),
 }
 
-/// Why [`HttpServer::connect`] failed, and the operator's fix.
+/// The reason [`HttpServer::connect`] failed, and the operator's fix.
 #[derive(Clone, Debug)]
 pub struct ConnectError {
     pub error: McpError,
@@ -274,7 +274,7 @@ impl HttpServer {
         &self.inner.name
     }
 
-    /// What the latest `initialize` answered (a renewed session may differ from the first).
+    /// The latest `initialize` answer (a renewed session may differ from the first).
     pub fn info(&self) -> ServerInfo {
         lock(&self.inner.session).info.clone()
     }
@@ -293,8 +293,8 @@ impl HttpServer {
         self.inner.changes.load(Ordering::SeqCst)
     }
 
-    /// Why the last re-list did not install (fetch failure keeps the old generation; a conflict
-    /// installs none).
+    /// The reason the last re-list did not install (fetch failure keeps the old generation; a
+    /// conflict installs none).
     pub fn relist_error(&self) -> Option<String> {
         lock(&self.inner.relist_error).clone()
     }

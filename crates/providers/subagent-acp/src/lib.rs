@@ -1,6 +1,6 @@
-//! `08`/`10`/`12` — subagents that are external ACP agents: aho is the ACP client (08: "aho as an
-//! ACP server; `subagent-acp` is the client side"), speaking protocol version 1 (schema 1.23.0,
-//! see `aho-acp`), on the `subagent` seam next to `subagent-inproc`.
+//! Subagents that are external ACP agents: aho is the ACP client (`surface-acp` is the server
+//! side), speaking protocol version 1 (schema 1.23.0, see `aho-acp`), on the `subagent` seam next
+//! to `subagent-inproc`.
 //!
 //! * An agent is `caps.subagent-acp.agents.<name>.{command, args, env}` (`env` values may be
 //!   `cred:<name>`); a spawn uses `SpawnRequest.model` as the agent name, else
@@ -13,8 +13,8 @@
 //!   providers share. `Subagent/Started` / `Subagent/Ended` come from `tool-subagent` as for every
 //!   provider.
 //! * Authority stays with the parent's operator: a `session/request_permission` whose claimed
-//!   kind is outside the child policy (parent ⊓ declaration, 04) is refused without asking;
-//!   anything else is put to the parent's Approval handle (logged there, 04). An async child
+//!   kind is outside the child policy (parent ⊓ declaration) is refused without asking;
+//!   anything else is put to the parent's Approval handle (logged there). An async child
 //!   without `bubble` has no approval channel, so its requests are refused. The agent's own
 //!   process enforces nothing aho can check; the operator's card says so.
 //! * `interrupt` sends `session/cancel` and answers every waiting permission request
@@ -229,13 +229,13 @@ impl Config for AcpConfig {
                 "caps.subagent-acp.max_depth",
                 Ty::Int,
                 Some(json!(DEFAULT_MAX_DEPTH)),
-                "Deepest delegation an ACP child may sit at (the root session is 0); a spawn past it is refused (10).",
+                "Deepest delegation an ACP child may sit at (the root session is 0); a spawn past it is refused.",
             ),
             ConfigKey::new(
                 "caps.subagent-acp.handshake_timeout_ms",
                 Ty::Int,
                 Some(json!(DEFAULT_HANDSHAKE_MS)),
-                "How long an agent may take to answer `initialize` and `session/new`.",
+                "Longest an agent may take to answer `initialize` and `session/new`.",
             ),
         ]
     }
@@ -331,7 +331,7 @@ declare_capability!(
 
 // ───────────────────────────── provider ─────────────────────────────
 
-/// What the provider runs with; the capability builds it from config, embedders directly.
+/// The provider's settings; the capability builds them from config, embedders directly.
 #[derive(Clone)]
 pub struct ProviderSettings {
     pub agents: BTreeMap<String, Launch>,
@@ -477,7 +477,7 @@ impl AcpProvider {
                 let mut proc = tokio::process::Command::new(&a.program)
                     .args(&a.args)
                     .envs(a.env.iter().map(|(k, v)| (k.as_str(), v.as_str())))
-                    .env_remove("AHO_READY_FD") // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write (12)
+                    .env_remove("AHO_READY_FD") // the daemon's readiness fd (daemon::ready::READY_FD_ENV) is never a child's to write
                     .current_dir(&cwd)
                     .stdin(std::process::Stdio::piped())
                     .stdout(std::process::Stdio::piped())
@@ -583,7 +583,7 @@ impl AcpProvider {
         }
 
         let id = self.next_id();
-        // 04: an async child cannot reach a human unless bubbled.
+        // An async child cannot reach a human unless bubbled.
         let approval: Arc<dyn Approval> = if !req.is_async || req.bubble { self.parent_approval.clone() } else { Arc::new(NeverApproval) };
         let shared =
             Arc::new(ChildShared::new(req.label.clone(), name.clone(), policy, approval, Mirror::new(self.parent_log.clone(), id)));

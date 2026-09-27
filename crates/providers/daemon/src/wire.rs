@@ -1,4 +1,4 @@
-//! `08` / `12` "Wire envelope": one JSON object per line. Every frame carries `v`; unknown fields
+//! Wire envelope: one JSON object per line. Every frame carries `v`; unknown fields
 //! are skipped; `hello{min, max, client_instance}` → `hello_ok{version, capabilities}`, or an
 //! `error` frame when the version ranges do not overlap. Frame and field names follow the
 //! `surface-rpc` envelope (`ClientFrame{v, id, method, params}`,

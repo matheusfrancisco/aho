@@ -1,7 +1,7 @@
-//! The SDK generator (08 line 35: "generated from the Session API's schema so drift is a CI diff,
-//! not a bug report"). From the [`Protocol`] table it renders the JSON Schema, the TypeScript
-//! client (`sdk/ts/src/*.ts`, node ≥ 22.6 runs it with `--experimental-strip-types`), and the
-//! Python asyncio client (`sdk/python/aho_sdk/*.py`, TypedDicts). Every file carries [`HEADER`];
+//! The SDK generator: SDK drift from the Session API shows up as a CI diff. From the
+//! [`Protocol`] table it renders the JSON Schema, the TypeScript client (`sdk/ts/src/*.ts`,
+//! node ≥ 22.6 runs it with `--experimental-strip-types`), and the Python asyncio client
+//! (`sdk/python/aho_sdk/*.py`, TypedDicts). Every file carries [`HEADER`];
 //! `tests/drift.rs` fails when the committed files differ from a fresh render.
 
 mod jsonschema;
@@ -65,7 +65,7 @@ pub fn write(dir: &Path, files: &[Generated]) -> std::io::Result<Vec<PathBuf>> {
     Ok(wrote)
 }
 
-/// What differs between `dir` and a fresh render: missing or edited files, and stale generated
+/// Differences between `dir` and a fresh render: missing or edited files, and stale generated
 /// files the generator no longer produces. Empty = in sync.
 #[allow(clippy::disallowed_methods, reason = "authority: sdk-codegen-drift")]
 pub fn drift(dir: &Path, files: &[Generated]) -> Vec<String> {

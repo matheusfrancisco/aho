@@ -1,6 +1,6 @@
 //! One external ACP agent as seen from aho, the ACP client: its `session/update`s are mirrored
 //! into the parent log as `Subagent/*` entries, and its `session/request_permission` requests
-//! are decided by the parent's operator through the parent's Approval handle — never by the
+//! are decided by the parent's operator through the parent's Approval handle: never by the
 //! agent, and never wider than the child's policy.
 
 use std::collections::{HashMap, VecDeque};
@@ -20,7 +20,7 @@ use tokio::sync::watch;
 
 use crate::PROVIDER;
 
-/// How many stderr lines of the agent are kept for diagnostics.
+/// Stderr lines of the agent kept for diagnostics.
 pub const STDERR_LINES: usize = 40;
 
 pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -90,7 +90,7 @@ impl Mirror {
     }
 }
 
-/// How long a failure report waits for the agent's stderr to close.
+/// Longest a failure report waits for the agent's stderr to close.
 pub const STDERR_SETTLE: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// The tail of an agent's stderr. A child with no stderr (an in-process agent) starts closed.

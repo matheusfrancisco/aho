@@ -1,4 +1,4 @@
-//! `13` — TLC as the TLA+ backend of the Formal seam: `java -cp tla2tools.jar tlc2.TLC`,
+//! TLC as the TLA+ backend of the Formal seam: `java -cp tla2tools.jar tlc2.TLC`,
 //! with artifacts and processes in the same bound world through `FsWrite` and `Subprocess`.
 //!
 //! * `check` writes a `.cfg` from the `CheckConfig` (and, for `Bounded(n)`, a wrapper module
@@ -88,7 +88,7 @@ impl Config for TlcConfig {
     }
 }
 
-/// The world's filesystem and process spawner: artifacts and TLC share one world (07, 13).
+/// The world's filesystem and process spawner: artifacts and TLC share one world.
 pub struct TlcDeps {
     pub proc: SubprocessHandle,
     pub fs: FsWrite,
@@ -128,7 +128,7 @@ declare_capability!(
     tools = &[],
     unlock = Fix::cli(INSTALL),
     enforced_by = "the bound world (artifact IO uses FsWrite; TLC runs through Subprocess)",
-    doc = "TLC model checker for TLA+ specs: bounded checks, trace validation of session logs, mutation testing (13)."
+    doc = "TLC model checker for TLA+ specs: bounded checks, trace validation of session logs, mutation testing."
 );
 
 /// The TLC backend. Public so tests and `aho doctor` can drive it without a composition.

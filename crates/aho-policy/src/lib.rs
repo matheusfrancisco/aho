@@ -1,10 +1,10 @@
-//! `04` — authority flows one way. Three principals as types; the policy is a meet-only
+//! Authority flows one way. Three principals as types; the policy is a meet-only
 //! lattice with no `widen()`; widening exists only as an `Operator` approval opening an epoch.
 //!
-//! * [`SandboxPolicy`] / [`Preset`] — the lattice and its named cuts.
-//! * [`decide`] — the ordered, bypass-immune decision chain; steps 1–5 are never lifted.
-//! * [`shell`] — the blast-radius classifier behind step 5 for shell commands (12).
-//! * [`render`] / [`render_outcome`] — the one renderer, in message voice (12).
+//! * [`SandboxPolicy`] / [`Preset`]: the lattice and its named cuts.
+//! * [`decide`]: the ordered, bypass-immune decision chain; steps 1–5 are never lifted.
+//! * [`shell`]: the blast-radius classifier behind step 5 for shell commands.
+//! * [`render`] / [`render_outcome`]: the one renderer, in message voice.
 
 #![forbid(unsafe_code)]
 
@@ -91,7 +91,7 @@ pub enum Preset {
     Dev,
     Lab,
     Full,
-    /// `14`: read-only outside `spec/**` plus checkers.
+    /// Read-only outside `spec/**` plus checkers.
     Spec,
     Custom,
 }
@@ -101,8 +101,8 @@ pub fn preset(name: &str) -> Option<Preset> {
     Preset::SWITCHABLE.into_iter().find(|p| p.name() == name.trim())
 }
 
-/// Classes a per-call escalation can grant under a confining world (04 "escalation at the
-/// point of denial"). VMs and desktops go through leases; `TalksToHuman` is the approver itself.
+/// Classes a per-call escalation can grant at the point of denial under a confining world.
+/// VMs and desktops go through leases; `TalksToHuman` is the approver itself.
 pub const ESCALATABLE: ConsequenceSet = ConsequenceSet::EMPTY
     .with(Consequence::WorkspaceWrite)
     .with(Consequence::HostWrite)
@@ -128,7 +128,7 @@ impl Preset {
     }
 
     /// The allowed set this preset grants in `world`. Under a non-confining world (`host`,
-    /// policy only, 07) `dev`/`lab` also allow `HostWrite`: there the tools bind to host
+    /// policy only) `dev`/`lab` also allow `HostWrite`: there the tools bind to host
     /// providers and the class is real. `Custom` has no cut of its own and falls to Nothing.
     pub fn cut(&self, world: &BoundWorld) -> ConsequenceSet {
         use Consequence::*;
@@ -171,7 +171,7 @@ pub struct SandboxPolicy {
     home: String,
     epoch: Epoch,
     preset: Preset,
-    /// `14`: `WorkspaceWrite` is limited to `spec/**`. Survives narrowing and widening; only a
+    /// `WorkspaceWrite` is limited to `spec/**`. Survives narrowing and widening; only a
     /// new policy (leaving spec mode) clears it.
     spec_scope: bool,
     approval: Option<EntryId>,
@@ -273,7 +273,7 @@ pub fn child_policy(parent: &SandboxPolicy, decl_cut: ConsequenceSet, is_async: 
     if is_async && !bubble { p.narrow(ConsequenceSet::ALL.without(Consequence::TalksToHuman)) } else { p }
 }
 
-/// Denial circuit breaker per agent (10): past the limits the harness stops auto-denying and
+/// Denial circuit breaker per agent: past the limits the harness stops auto-denying and
 /// asks a human, or aborts headless.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DenialCounter {

@@ -234,7 +234,7 @@ pub fn prompt_text(blocks: &[ContentBlock]) -> Result<String, RpcError> {
             ContentBlock::Text(t) => parts.push(t.text.clone()),
             ContentBlock::ResourceLink(l) => {
                 let label = l.title.as_deref().unwrap_or(&l.name);
-                let about = l.description.as_deref().map(|d| format!(" — {d}")).unwrap_or_default();
+                let about = l.description.as_deref().map(|d| format!(" ({d})")).unwrap_or_default();
                 parts.push(format!("[resource: {label} <{}>{about}]", l.uri));
             }
             ContentBlock::Resource(r) => match &r.resource {
@@ -260,7 +260,7 @@ pub fn prompt_text(blocks: &[ContentBlock]) -> Result<String, RpcError> {
     Ok(text)
 }
 
-/// How a finished turn reads to the client. A turn the client cancelled is `cancelled` whatever
+/// A finished turn as the client reads it. A turn the client cancelled is `cancelled` whatever
 /// the loop reported (prompt-turn §Cancellation); an aborted turn is a JSON-RPC error, because
 /// ACP has no error stop reason.
 pub fn stop_reason(t: &Transition, cancelled: bool, last: Option<AhoStop>) -> Result<StopReason, String> {
@@ -285,7 +285,7 @@ pub fn stop_reason(t: &Transition, cancelled: bool, last: Option<AhoStop>) -> Re
 /// `mcp.servers.<name>.*` config sets (`--set` syntax: TOML values) for the stdio MCP servers a
 /// client passes to `session/new` / `session/load`. aho speaks MCP over stdio only (the initialize
 /// response says `http: false, sse: false`); without an operator-set `class` the servers start
-/// quarantined like any other (10). Env values land in the session log like any `--set`.
+/// quarantined like any other. Env values land in the session log like any `--set`.
 pub fn mcp_sets(servers: &[McpServer]) -> Result<Vec<(String, String)>, String> {
     let quote = |s: &str| serde_json::to_string(s).unwrap_or_default();
     let mut out = Vec::new();

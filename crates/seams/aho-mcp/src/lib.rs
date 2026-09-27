@@ -1,4 +1,4 @@
-//! `10` — MCP. Tools are `mcp__<server>__<tool>`, normalized lossless-or-hashed; generations
+//! MCP. Tools are `mcp__<server>__<tool>`, normalized lossless-or-hashed; generations
 //! swap two-phase; a server without a declared class loads quarantined.
 //!
 //! * [`normalize`]: `mcp__<server>__<raw>` → `[A-Za-z0-9_-]{≤64}`. If that is lossy (a character
@@ -38,7 +38,7 @@ pub const PROTOCOL_VERSION: &str = "2025-06-18";
 pub const SUPPORTED_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 /// Service holding every configured server's status: `Arc<Vec<ServerStatus>>`.
 pub const STATUS_SERVICE: &str = "mcp.status";
-/// Tool descriptions are untrusted server text (`04`); longer ones are cut here.
+/// Tool descriptions are untrusted server text; longer ones are cut here.
 pub const MAX_DESCRIPTION: usize = 2048;
 
 /// One configured server. `Debug` never prints environment values (they may hold credentials).
@@ -295,7 +295,7 @@ impl Generations {
         self.servers.get(server)
     }
 
-    /// Which server a normalized name belongs to, and its raw tool.
+    /// The server a normalized name belongs to, and its raw tool.
     pub fn resolve(&self, normalized: &str) -> Option<(&str, &RemoteTool)> {
         self.servers.iter().find_map(|(s, g)| g.tools.iter().find(|(n, _)| n == normalized).map(|(_, t)| (s.as_str(), t)))
     }

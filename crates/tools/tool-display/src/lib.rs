@@ -1,4 +1,4 @@
-//! The session desktop as tools (00, 07): `screen_capture`, `pointer`, `mouse`, `keyboard` over
+//! The session desktop as tools: `screen_capture`, `pointer`, `mouse`, `keyboard` over
 //! the bound world's `Desktop` (the sandbox VM's screen under `world = vm`). Coordinates are the
 //! screen's own pixels even when a capture is scaled down. Looking is `ReadOnly`; moving the
 //! pointer or typing is `ControlsDesktop`, which presets below `lab` ask for or deny.
@@ -96,7 +96,7 @@ pub static TOOLS: &[ToolDecl] = &[
     )
     .schema(schema_capture)
     .safe(),
-    ToolDecl::new("pointer", "Where the pointer is on the session desktop, and the screen size.", Consequence::ReadOnly)
+    ToolDecl::new("pointer", "The pointer's position on the session desktop, and the screen size.", Consequence::ReadOnly)
         .schema(schema_none)
         .safe(),
     ToolDecl::new("mouse", "Move the pointer on the session desktop to (x, y), optionally clicking there.", Consequence::ControlsDesktop)

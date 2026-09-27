@@ -1,12 +1,12 @@
-//! Checkpoint trees (11: "a tree is reachable while any log branch references it; `aho gc`
-//! prunes the rest").
+//! Checkpoint trees: a tree is reachable while any log branch references it; `aho gc` prunes the
+//! rest.
 //!
 //! world-host keeps one bare SHA-256 shadow repository per workspace root,
 //! `<workspace.shadow_dir>/<blake3(root)[..16]>.git`, and writes checkpoint trees with
 //! `git write-tree`: no commits, no refs. So git's own reachability protects nothing, and
 //! `git prune` would drop every checkpoint. gc computes reachability itself: the roots are the
 //! trees no other tree names; a root no `Workspace/Checkpoint` references is an orphan, and
-//! reclaiming it deletes the loose objects only orphans reach — never an object reachable from a
+//! reclaiming it deletes the loose objects only orphans reach, never an object reachable from a
 //! referenced tree, from a root that stays, or from the shadow index (the next checkpoint's
 //! `git add` reuses those).
 
@@ -93,7 +93,7 @@ impl Repo {
         seen
     }
 
-    /// What must survive: everything referenced trees and staying roots reach, plus the index.
+    /// Objects that must survive: everything referenced trees and staying roots reach, plus the index.
     fn keep(&self, referenced: &HashSet<String>, staying: &[&String]) -> HashSet<String> {
         let starts = self.trees.keys().filter(|t| referenced.contains(*t)).chain(staying.iter().copied());
         let mut k = self.closure(starts);

@@ -1,4 +1,4 @@
-//! `04` — anything loaded from a workspace or a package is `Untrusted<T>`. A repo-shipped skill
+//! Anything loaded from a workspace or a package is `Untrusted<T>`. A repo-shipped skill
 //! saying `sandbox: full` in its frontmatter is dropped and logged, not honored.
 
 /// Wraps content the operator did not author. There is no accessor: the only way out is a

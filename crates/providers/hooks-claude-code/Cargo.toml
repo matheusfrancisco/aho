@@ -3,7 +3,7 @@ name = "hooks-claude-code"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Claude Code hooks.json compatibility: command hooks on pre/post execute and session events, fail-closed (10)"
+description = "Claude Code hooks.json compatibility: command hooks on pre/post execute and session events, fail-closed"
 
 [dependencies]
 aho-types.workspace = true

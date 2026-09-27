@@ -68,7 +68,7 @@
       "type": "object"
     },
     "ApprovalCard": {
-      "description": "A tool call waiting for a human (05): the same fields every surface renders.",
+      "description": "A tool call waiting for a human: the same fields every surface renders.",
       "properties": {
         "args": {},
         "cap": {
@@ -108,7 +108,7 @@
           "description": "The preset the `preset` answer writes; `null` = no preset admits the call."
         },
         "reason": {
-          "description": "Which link of the decision chain asked (`Rule`, `Preset`, …).",
+          "description": "The decision-chain link that asked (`Rule`, `Preset`, …).",
           "type": "string"
         },
         "suggested_cut": {
@@ -151,7 +151,7 @@
       "type": "object"
     },
     "ApprovalOutcome": {
-      "description": "How an approval request ended.",
+      "description": "The way an approval request ended.",
       "enum": [
         "allowed_once",
         "rejected",
@@ -167,7 +167,7 @@
       "type": "string"
     },
     "CancelReason": {
-      "description": "Why a call or operation was cancelled.",
+      "description": "The reason a call or operation was cancelled.",
       "enum": [
         "aborted",
         "before_dispatch",
@@ -253,7 +253,7 @@
       "title": "CapDeltaOp"
     },
     "CapState": {
-      "description": "A capability's state in the fold (02, 05).",
+      "description": "A capability's state in the fold.",
       "oneOf": [
         {
           "properties": {
@@ -450,7 +450,7 @@
       "type": "object"
     },
     "Card": {
-      "description": "Presentation intent for a tool result (10).",
+      "description": "Presentation intent for a tool result.",
       "oneOf": [
         {
           "properties": {
@@ -606,7 +606,7 @@
       "title": "Card"
     },
     "CheckMode": {
-      "description": "How an invariant was checked (13).",
+      "description": "The method that checked an invariant.",
       "oneOf": [
         {
           "properties": {
@@ -682,7 +682,7 @@
       "type": "object"
     },
     "CheckpointCause": {
-      "description": "Why a workspace checkpoint was taken (11).",
+      "description": "The reason a workspace checkpoint was taken.",
       "oneOf": [
         {
           "properties": {
@@ -736,13 +736,13 @@
       "title": "CheckpointCause"
     },
     "CheckpointId": {
-      "description": "Workspace checkpoint (11).",
+      "description": "Workspace checkpoint.",
       "minimum": 0,
       "title": "CheckpointId",
       "type": "integer"
     },
     "ClientFrame": {
-      "description": "Client → server. Unknown fields are ignored.",
+      "description": "Client → server. Readers ignore unknown fields.",
       "properties": {
         "id": {
           "anyOf": [
@@ -1450,7 +1450,7 @@
       "title": "ClientMessage"
     },
     "Consequence": {
-      "description": "What a tool can do (02); every tool declares one class.",
+      "description": "Consequence class of a tool; every tool declares one.",
       "enum": [
         "read_only",
         "workspace_write",
@@ -1604,7 +1604,7 @@
       "type": "object"
     },
     "Entry": {
-      "description": "One session log entry (06).",
+      "description": "One session log entry.",
       "properties": {
         "at": {
           "$ref": "#/$defs/Timestamp"
@@ -1650,13 +1650,13 @@
       "type": "object"
     },
     "EntryId": {
-      "description": "Log entry id, monotonic per log (06); resubscribe `from` the last one seen.",
+      "description": "Log entry id, monotonic per log; resubscribe `from` the last one seen.",
       "minimum": 0,
       "title": "EntryId",
       "type": "integer"
     },
     "EntryKind": {
-      "description": "What an entry records: closed core kinds plus namespaced `custom` (06).",
+      "description": "An entry's payload: closed core kinds plus namespaced `custom`.",
       "oneOf": [
         {
           "properties": {
@@ -2167,14 +2167,14 @@
               "$ref": "#/$defs/CallId"
             },
             "content": {
-              "description": "What the model saw.",
+              "description": "The content the model saw.",
               "items": {
                 "$ref": "#/$defs/ContentBlock"
               },
               "type": "array"
             },
             "late": {
-              "description": "Arrived after the request boundary it belonged to (16).",
+              "description": "Arrived after the request boundary it belonged to.",
               "type": "boolean"
             },
             "meta": {
@@ -2204,7 +2204,7 @@
               "const": "tool_result"
             },
             "value": {
-              "description": "Canonical, schema-validated value (10); SDK callers read this."
+              "description": "Canonical, schema-validated value; SDK callers read this."
             }
           },
           "required": [
@@ -2868,13 +2868,13 @@
       "title": "EntryKind"
     },
     "Epoch": {
-      "description": "Policy epoch; every widening of the policy starts a new one (04).",
+      "description": "Policy epoch; every widening of the policy starts a new one.",
       "minimum": 0,
       "title": "Epoch",
       "type": "integer"
     },
     "ErrorPayload": {
-      "description": "What happened, what the server did, how to change it.",
+      "description": "Message: what happened, what the server did, how to change it.",
       "properties": {
         "message": {
           "type": "string"
@@ -3000,7 +3000,7 @@
       "type": "object"
     },
     "Form": {
-      "description": "Source label of injected context (10); surfaces read this, never prose.",
+      "description": "Source label of injected context; surfaces read this, never prose.",
       "enum": [
         "prompt",
         "snapshot",
@@ -3012,7 +3012,7 @@
       "type": "string"
     },
     "FormalKind": {
-      "description": "Invariant language (13).",
+      "description": "Invariant language.",
       "enum": [
         "tla",
         "lean"
@@ -3021,7 +3021,7 @@
       "type": "string"
     },
     "GrantScope": {
-      "description": "How long an allow holds.",
+      "description": "The duration an allow holds.",
       "enum": [
         "once",
         "session",
@@ -3043,7 +3043,7 @@
           "type": "boolean"
         },
         "client_instance": {
-          "description": "Stable per client install; the owner of a session is a client instance (12).",
+          "description": "Stable per client install; the owner of a session is a client instance.",
           "type": "string"
         },
         "has_local_history": {
@@ -3123,7 +3123,7 @@
       "type": "object"
     },
     "InvariantState": {
-      "description": "An invariant's latest verdict (13).",
+      "description": "An invariant's latest verdict.",
       "properties": {
         "code_hash": {
           "$ref": "#/$defs/Hash"
@@ -3140,7 +3140,7 @@
       "type": "object"
     },
     "Layer": {
-      "description": "Config layer, lowest rank first (03).",
+      "description": "Config layer, lowest rank first.",
       "oneOf": [
         {
           "properties": {
@@ -3246,19 +3246,19 @@
       "title": "Layer"
     },
     "LeaseId": {
-      "description": "Lease on a leased resource (04).",
+      "description": "Lease on a leased resource.",
       "minimum": 0,
       "title": "LeaseId",
       "type": "integer"
     },
     "OpId": {
-      "description": "Operation behind a tool call (16).",
+      "description": "Operation behind a tool call.",
       "minimum": 0,
       "title": "OpId",
       "type": "integer"
     },
     "OpKind": {
-      "description": "What an operation waits on (16).",
+      "description": "The resource an operation waits on.",
       "enum": [
         "process",
         "io",
@@ -3270,7 +3270,7 @@
       "type": "string"
     },
     "OpStatus": {
-      "description": "How an operation ended; `uncertain` = the process died mid-dispatch and it may or may not have happened (16).",
+      "description": "The final status of an operation; `uncertain` = the process died mid-dispatch and it may or may not have happened.",
       "oneOf": [
         {
           "properties": {
@@ -3336,7 +3336,7 @@
       "title": "OpStatus"
     },
     "Origin": {
-      "description": "Where a config value came from.",
+      "description": "The origin of a config value.",
       "properties": {
         "at": {
           "$ref": "#/$defs/Where"
@@ -3357,7 +3357,7 @@
       "type": "object"
     },
     "PolicyState": {
-      "description": "The current policy epoch (04).",
+      "description": "The current policy epoch.",
       "properties": {
         "allowed": {
           "$ref": "#/$defs/ConsequenceSet"
@@ -3378,7 +3378,7 @@
       "type": "object"
     },
     "Principal": {
-      "description": "Who caused an entry (04).",
+      "description": "The actor that caused an entry.",
       "oneOf": [
         {
           "properties": {
@@ -3469,7 +3469,7 @@
               "type": "null"
             }
           ],
-          "description": "Caller-chosen dedup key: a prompt whose key the log has seen is not run again (16)."
+          "description": "Caller-chosen dedup key: a prompt whose key the log has seen is not run again."
         },
         "text": {
           "type": "string"
@@ -3495,7 +3495,7 @@
       "type": "object"
     },
     "Proposal": {
-      "description": "A planned (and with `apply`, written) configuration change (05: plan → diff → apply).",
+      "description": "A planned (and with `apply`, written) configuration change (plan → diff → apply).",
       "properties": {
         "applied": {
           "type": "boolean"
@@ -3556,7 +3556,7 @@
       "type": "object"
     },
     "RecoveryRole": {
-      "description": "Role in a crash recovery (12).",
+      "description": "Role in a crash recovery.",
       "enum": [
         "initiator",
         "interrupted_peer",
@@ -3566,7 +3566,7 @@
       "type": "string"
     },
     "RewindMode": {
-      "description": "What a rewind restored (11).",
+      "description": "The scope a rewind restored.",
       "enum": [
         "both",
         "chat_only",
@@ -3576,7 +3576,7 @@
       "type": "string"
     },
     "RewindModeName": {
-      "description": "What `session.rewind` restores; default `both`.",
+      "description": "The scope `session.rewind` restores; default `both`.",
       "enum": [
         "both",
         "chat",
@@ -3625,7 +3625,7 @@
       "type": "object"
     },
     "Scope": {
-      "description": "Config breadth (03).",
+      "description": "Config breadth.",
       "enum": [
         "machine",
         "user",
@@ -3637,7 +3637,7 @@
       "type": "string"
     },
     "ServerFrame": {
-      "description": "Server → client. Unknown fields are ignored.",
+      "description": "Server → client. Readers ignore unknown fields.",
       "properties": {
         "event": {
           "type": "string"
@@ -3858,7 +3858,7 @@
       "type": "string"
     },
     "Sourced": {
-      "description": "A resolved config value with its winning origin (03).",
+      "description": "A resolved config value with its winning origin.",
       "properties": {
         "shadowed": {
           "description": "Every loser, most specific first.",
@@ -3911,7 +3911,7 @@
       "type": "integer"
     },
     "StopReason": {
-      "description": "Why the model stopped.",
+      "description": "The reason the model stopped.",
       "enum": [
         "end_turn",
         "tool_use",
@@ -4060,7 +4060,7 @@
       "type": "object"
     },
     "Takeover": {
-      "description": "Whether an attaching surface took the session (12).",
+      "description": "The takeover decision for an attaching surface.",
       "oneOf": [
         {
           "properties": {
@@ -4098,7 +4098,7 @@
       "type": "integer"
     },
     "ToolOutcome": {
-      "description": "How a tool call ended.",
+      "description": "The outcome of a tool call.",
       "oneOf": [
         {
           "properties": {
@@ -4149,7 +4149,7 @@
       "title": "ToolOutcome"
     },
     "Transition": {
-      "description": "How a step or turn ended (10).",
+      "description": "The way a step or turn ended.",
       "oneOf": [
         {
           "properties": {
@@ -4326,7 +4326,7 @@
       "type": "object"
     },
     "Verdict": {
-      "description": "An invariant check result (13).",
+      "description": "An invariant check result.",
       "oneOf": [
         {
           "properties": {
@@ -4395,7 +4395,7 @@
       "title": "Verdict"
     },
     "Where": {
-      "description": "Where a config value was written.",
+      "description": "The place a config value was written.",
       "oneOf": [
         {
           "properties": {
@@ -4479,7 +4479,7 @@
   },
   "$id": "urn:aho:rpc",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "NDJSON frames over stdio or a unix socket (08, 12). The first client frame is `hello`; every request carries `id` and is answered by a `result` or `error` frame with `reply_to = id`; events carry `reply_to: null`. Unknown fields are ignored.",
+  "description": "NDJSON frames over stdio or a unix socket. The first client frame is `hello`; every request carries `id` and the server answers it with a `result` or `error` frame with `reply_to = id`; events carry `reply_to: null`. Readers ignore unknown fields.",
   "oneOf": [
     {
       "$ref": "#/$defs/ClientMessage"
@@ -4563,7 +4563,7 @@
       "sdk": "caps_enable"
     },
     "caps.explain": {
-      "description": "Where a setting's value comes from, or why a capability is in its state (05); shape owned by aho-inspect.",
+      "description": "Explains where a setting's value comes from, or why a capability is in its state; shape owned by aho-inspect.",
       "params": {
         "$ref": "#/$defs/CapsExplainParams"
       },
@@ -4571,7 +4571,7 @@
       "sdk": "caps_explain"
     },
     "caps.list": {
-      "description": "Inventory rows (05); shape owned by aho-inspect.",
+      "description": "Inventory rows; shape owned by aho-inspect.",
       "params": {
         "$ref": "#/$defs/CapsListParams"
       },
@@ -4579,7 +4579,7 @@
       "sdk": "caps_list"
     },
     "caps.plan": {
-      "description": "The resolved plan, or the diff a patch layer would make (05).",
+      "description": "The resolved plan, or the diff a patch layer would make.",
       "params": {
         "$ref": "#/$defs/CapsPlanParams"
       },
@@ -4607,7 +4607,7 @@
       "sdk": "caps_set"
     },
     "caps.tree": {
-      "description": "The capability tree (05); shape owned by aho-inspect.",
+      "description": "The capability tree; shape owned by aho-inspect.",
       "params": {
         "$ref": "#/$defs/CapsTreeParams"
       },
@@ -4615,7 +4615,7 @@
       "sdk": "caps_tree"
     },
     "caps.why": {
-      "description": "Why a capability is in its state and how to change it (05).",
+      "description": "Explains why a capability is in its state and how to change it.",
       "params": {
         "$ref": "#/$defs/CapsWhyParams"
       },
@@ -4653,7 +4653,7 @@
       "sdk": "prompt"
     },
     "session.rewind": {
-      "description": "Rewinds chat and/or code to a checkpoint (11).",
+      "description": "Rewinds chat and/or code to a checkpoint.",
       "params": {
         "$ref": "#/$defs/RewindParams"
       },

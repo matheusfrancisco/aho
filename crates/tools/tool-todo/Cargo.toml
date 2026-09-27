@@ -3,7 +3,7 @@ name = "tool-todo"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "todo_write: whole-list task snapshots on the session log, invariants checked in the fold (10)"
+description = "todo_write: whole-list task snapshots on the session log, invariants checked in the fold"
 
 [dependencies]
 aho-types.workspace = true

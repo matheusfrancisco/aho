@@ -3,7 +3,7 @@ name = "skills-fsdir"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Skills from directories: SKILL.md discovery (precedence by root rank), per-skill enable switches (10)"
+description = "Skills from directories: SKILL.md discovery (precedence by root rank), per-skill enable switches"
 
 [dependencies]
 aho-types.workspace = true

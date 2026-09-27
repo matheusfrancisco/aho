@@ -1,7 +1,7 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 
-# Ambient authority guard (02/03/04/12). These are acquisition/effect entry points,
+# Ambient authority guard. These are acquisition/effect entry points,
 # not pure path/address manipulation or operations on an already granted handle.
 # Exceptions require an item-scoped authority ID audited by scripts/authority/guard.py.
 # This is a development guardrail, never OS isolation or a transitive-dependency sandbox.

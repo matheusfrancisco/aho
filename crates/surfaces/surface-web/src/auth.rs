@@ -1,4 +1,4 @@
-//! Process token, one-time cookie exchange, and the Host/Origin fence (08).
+//! Process token, one-time cookie exchange, and the Host/Origin fence.
 
 use std::net::SocketAddr;
 
@@ -38,7 +38,7 @@ pub fn cookie(h: &HeaderMap) -> Option<&str> {
         .find_map(|kv| kv.trim().strip_prefix(COOKIE).and_then(|r| r.strip_prefix('=')))
 }
 
-/// Which `Host` values and `Origin`s this server answers to. A request naming another host is a
+/// The `Host` values and `Origin`s this server answers to. A request naming another host is a
 /// DNS-rebinding attempt; a foreign `Origin` is a cross-site request. Both are refused.
 #[derive(Clone, Debug)]
 pub struct Fence {

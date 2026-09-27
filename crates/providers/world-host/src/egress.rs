@@ -1,4 +1,4 @@
-//! The host network as the world's `Egress` (07): `enforced by: policy only`. The operator's
+//! The host network as the world's `Egress`: `enforced by: policy only`. The operator's
 //! host list is checked on every hop against the host reqwest's own URL parser produced, before
 //! connecting; redirects are followed here (never by reqwest) so each one is counted and checked.
 

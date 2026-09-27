@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Audit ambient-authority lint inheritance and narrowly declared exceptions (02/04/12).
+"""Audit ambient-authority lint inheritance and narrowly declared exceptions.
 
-Clippy resolves methods, including aliases and UFCS; this guard does not pretend source
-matching can replace that. This checks the *escape hatches* and ownership declarations.
-There is deliberately no --update: adding an exception requires an explicit code review.
+Clippy resolves methods, including aliases and UFCS, and source matching cannot replace that.
+This guard checks the *escape hatches* and ownership declarations. There is no --update:
+adding an exception requires an explicit code review.
 """
 from __future__ import annotations
 

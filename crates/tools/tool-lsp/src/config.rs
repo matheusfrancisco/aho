@@ -191,14 +191,19 @@ impl Config for LspConfig {
                 READY_KEY,
                 Ty::Int,
                 Some(json!(DEFAULT_READY_MS)),
-                "How long an lsp call waits for its server to finish indexing before answering anyway.",
+                "Milliseconds an lsp call waits for its server to finish indexing before answering anyway.",
             ),
-            ConfigKey::new(REQUEST_KEY, Ty::Int, Some(json!(DEFAULT_REQUEST_MS)), "How long one request to a language server may take."),
+            ConfigKey::new(
+                REQUEST_KEY,
+                Ty::Int,
+                Some(json!(DEFAULT_REQUEST_MS)),
+                "Milliseconds one request to a language server may take.",
+            ),
             ConfigKey::new(
                 DIAGNOSTICS_KEY,
                 Ty::Int,
                 Some(json!(DEFAULT_DIAGNOSTICS_MS)),
-                "How long lsp_diagnostics waits for the server to publish diagnostics for the current file content.",
+                "Milliseconds lsp_diagnostics waits for the server to publish diagnostics for the current file content.",
             ),
             ConfigKey::new(
                 MAX_RESULTS_KEY,

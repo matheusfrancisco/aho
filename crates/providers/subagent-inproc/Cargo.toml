@@ -3,7 +3,7 @@ name = "subagent-inproc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "In-process subagents: spawn and fork child Sessions under parent ⊓ decl; descriptor in the child log, lifecycle in the parent (04, 10, 12, 16)"
+description = "In-process subagents: spawn and fork child Sessions under parent ⊓ decl; descriptor in the child log, lifecycle in the parent"
 
 [dependencies]
 aho-types.workspace = true

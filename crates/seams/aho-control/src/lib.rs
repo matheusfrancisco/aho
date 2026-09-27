@@ -1,15 +1,15 @@
-//! What drivers and session modes may ask of a live session (`01` "an engineer with a different
-//! runtime writes a driver, not a fork", `04` authority, `10` goals / plan mode).
+//! The requests drivers and session modes may make of a live session. An engineer with a
+//! different runtime writes a driver, not a fork.
 //!
-//! * [`PromptSink`] — run one turn with a prompt, exactly once per key. Schedules and ralph loops
-//!   (`00` agent management) fire through it; [`ChannelSink`] routes the same requests over a real
-//!   channel to whoever runs the turns (an embedder's loop, a test).
-//! * [`Clock`] — wall time for drivers: [`SystemClock`] in production, [`SteppedClock`] when the
+//! * [`PromptSink`]: run one turn with a prompt, exactly once per key. Schedules and ralph loops
+//!   fire through it; [`ChannelSink`] routes the same requests over a real channel to whoever
+//!   runs the turns (an embedder's loop, a test).
+//! * [`Clock`]: wall time for drivers: [`SystemClock`] in production, [`SteppedClock`] when the
 //!   embedder drives time itself (simulations, game loops, deterministic tests).
-//! * [`SessionCeiling`] — the live policy a mode (plan mode, `04`) may narrow by a meet, and may
+//! * [`SessionCeiling`]: the live policy a mode (plan mode) may narrow by a meet, and may
 //!   ask the operator to widen. The implementation raises the approval card itself, so a caller
 //!   cannot answer for the operator: tools never mint authority.
-//! * [`turn_report`] / [`record`] — read a keyed turn's outcome off the log; append a driver's
+//! * [`turn_report`] / [`record`]: read a keyed turn's outcome off the log; append a driver's
 //!   own `Custom` records as `System(<driver>)`.
 
 #![forbid(unsafe_code)]

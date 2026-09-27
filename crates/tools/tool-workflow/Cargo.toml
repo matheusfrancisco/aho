@@ -3,7 +3,7 @@ name = "tool-workflow"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ralph_start / ralph_stop / ralph_status: re-feed one prompt after every turn until the completion promise or the budget, with the Looper driver (00, 10)"
+description = "ralph_start / ralph_stop / ralph_status: re-feed one prompt after every turn until the completion promise or the budget, with the Looper driver"
 
 [dependencies]
 aho-types.workspace = true

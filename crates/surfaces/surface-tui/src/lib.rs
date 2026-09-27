@@ -1,8 +1,8 @@
-//! `08`/`12` — the terminal surface. One interactive owner per session; the only state it keeps
+//! The terminal surface. One interactive owner per session; the only state it keeps
 //! is surface-local (draft, cursor, scroll, focus, sidebar tab, HUD); the transcript, tree,
 //! inventory, jobs and invariants are folds of the session log and plan.
 //!
-//! Visual debug (12): [`render_to_buffer`] is a pure function of [`UiState`], every drawn frame is
+//! Visual debug: [`render_to_buffer`] is a pure function of [`UiState`], every drawn frame is
 //! captured into a [`FrameCapture`] ring (rects, text per area, timing, `check` anomalies),
 //! identical frames are dropped unless anomalous, and [`render_frame_json`] is the
 //! `aho tui --headless` screen.

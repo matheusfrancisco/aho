@@ -1,4 +1,4 @@
-//! `surface.webhook.*` — the typed config slice (03). The HMAC secret is a credential ref
+//! `surface.webhook.*`: the typed config slice. The HMAC secret is a credential ref
 //! (`cred:<name>`, resolved through `credentials.<name>` like every other capability); a plain
 //! secret pasted into a project file is refused so it cannot be committed by accident.
 
@@ -33,7 +33,7 @@ const K_TLS_CERT: &str = "surface.webhook.tls_cert";
 const K_TLS_KEY: &str = "surface.webhook.tls_key";
 const K_INSECURE: &str = "surface.webhook.insecure_loopback";
 
-/// How the listener speaks: HTTPS with the operator's pair, or plain HTTP on loopback only.
+/// The listener's transport: HTTPS with the operator's pair, or plain HTTP on loopback only.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Transport {
     Tls {

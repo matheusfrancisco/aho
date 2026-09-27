@@ -14,7 +14,7 @@ use crate::TaskError;
 pub const ROOT_GATE: &str = "gate:root";
 /// Longest id a caller may choose.
 pub const MAX_ID_LEN: usize = 64;
-/// How many recent tool-call summaries a node keeps for `Salvage`.
+/// Number of recent tool-call summaries a node keeps for `Salvage`.
 pub const RECENT_CAP: usize = 8;
 
 // ───────────────────────────────── ids ─────────────────────────────────
@@ -113,7 +113,7 @@ impl Kind {
             _ => return None,
         })
     }
-    /// Kinds a caller may seed, expand into or inject; gates are only ever inserted by the graph.
+    /// Kinds a caller may seed, expand into or inject; only the graph inserts gates.
     pub fn parse_work(s: &str) -> Result<Kind, TaskError> {
         match Kind::parse(s.trim()) {
             Some(k) if !k.is_gate() => Ok(k),
@@ -133,7 +133,7 @@ impl Kind {
     pub fn needs_contract(self) -> bool {
         matches!(self, Kind::Code | Kind::Synthesize)
     }
-    /// Which gate reviews children of this kind: Verify for code, Critique for everything else.
+    /// The gate that reviews children of this kind: Verify for code, Critique for everything else.
     pub fn gate_for(self) -> GateKind {
         match self {
             Kind::Code => GateKind::Verify,
@@ -227,7 +227,7 @@ impl FailReason {
     }
 }
 
-/// Operator control ops (12: `Task/Control{op, by: Operator}`).
+/// Operator control ops, logged as `Task/Control{op, by: Operator}`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Control {
@@ -303,7 +303,7 @@ impl Confidence {
         })
     }
 
-    /// `0.9`, `9` (of 10), `85` (of 100) — the scale is inferred from the magnitude.
+    /// `0.9`, `9` (of 10), `85` (of 100): the magnitude decides the scale.
     fn from_scaled(x: f64) -> Option<Confidence> {
         if x < 0.0 || !x.is_finite() {
             return None;
@@ -466,7 +466,7 @@ pub struct HandoffArtifact {
     pub covers: Vec<TaskId>,
 }
 
-/// A dependency edge is a contract, not a message: filenames, formats, units, versions, acceptance checks.
+/// A dependency edge as a contract: filenames, formats, units, versions, acceptance checks.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Contract {
     pub outputs: Vec<Output>,
@@ -604,7 +604,7 @@ impl Contract {
 
 // ───────────────────────────────── salvage ─────────────────────────────────
 
-/// What a replacement worker inherits from a dead one (12: Salvage → Snapshot).
+/// The snapshot a replacement worker inherits from a dead one (Salvage → Snapshot).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Salvage {
     #[serde(default, with = "agent_serde::opt", skip_serializing_if = "Option::is_none")]
@@ -638,7 +638,7 @@ pub struct Node {
     /// The last agent that held it (completed it, died on it, released it).
     #[serde(default, with = "agent_serde::opt", skip_serializing_if = "Option::is_none")]
     pub last_owner: Option<AgentId>,
-    /// Who expanded this node; its synthesis join prefers that agent (planner affinity).
+    /// The agent that expanded this node; its synthesis join prefers that agent (planner affinity).
     #[serde(default, with = "agent_serde::opt", skip_serializing_if = "Option::is_none")]
     pub planner: Option<AgentId>,
     /// Set by an operator Reassign: only this agent may start it.
@@ -673,7 +673,7 @@ pub struct Node {
     pub recent: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub salvage: Option<Salvage>,
-    /// Why a dependent re-opened this node (failed acceptance).
+    /// The reason a dependent re-opened this node (failed acceptance).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feedback: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -756,8 +756,8 @@ impl Settings {
 
 // ───────────────────────────────── actors ─────────────────────────────────
 
-/// Who caused a task event. The custom fold never sees the entry's principal, so bodies carry it.
-/// Serialized as `operator`, `engineer`, `agent:<n>`, `system:<name>`.
+/// The actor behind a task event. The custom fold never sees the entry's principal, so bodies
+/// carry it. Serialized as `operator`, `engineer`, `agent:<n>`, `system:<name>`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Actor {
     Operator,

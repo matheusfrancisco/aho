@@ -3,7 +3,7 @@ name = "aho-compose"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "load(Composition, Inputs) -> Planned (loadout + plan + env); bootstrap log entries; aho.lock; loadouts; apply; plan diff (03)."
+description = "load(Composition, Inputs) -> Planned (loadout + plan + env); bootstrap log entries; aho.lock; loadouts; apply; plan diff."
 
 [dependencies]
 aho-types.workspace = true

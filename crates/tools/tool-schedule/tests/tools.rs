@@ -63,7 +63,7 @@ fn text(o: &ExecOutcome) -> String {
     }
 }
 
-/// What the session does after the result: append `value.events`, fold, run the context hooks.
+/// The session's steps after the result: append `value.events`, fold, run the context hooks.
 fn land(reg: &Registry, out: &ExecOutcome, state: &mut State) {
     let ExecOutcome::Done { value, .. } = out else { panic!("{out:?}") };
     for e in value["events"].as_array().unwrap() {

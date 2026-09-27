@@ -1,5 +1,5 @@
 #!/bin/sh
-# The CI gate (doc 12): formatting, clippy with warnings denied, ratchets, and the cargo-metadata
+# The CI gate: formatting, clippy with warnings denied, ratchets, and the cargo-metadata
 # layer guard. One script locally and in CI.
 #
 #   scripts/gate.sh          check everything; exit 1 if any section fails
@@ -88,7 +88,7 @@ fi
 
 echo
 if [ -n "$FAILED" ]; then
-    echo "gate: FAIL —$FAILED"
+    echo "gate: FAIL:$FAILED"
     exit 1
 fi
 echo "gate: PASS"

@@ -1,4 +1,4 @@
-//! The YAML subset SKILL.md frontmatter actually uses, parsed by hand (no YAML dependency).
+//! The YAML subset SKILL.md frontmatter uses, parsed by hand (no YAML dependency).
 //!
 //! Supported: `key: value` at column 1, plain / `"double"` / `'single'` scalars (plain scalars
 //! may continue on indented lines), `|` and `>` block scalars, `[a, b]` flow lists, block lists

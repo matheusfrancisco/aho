@@ -1,4 +1,4 @@
-//! `05` — the operator CLI. Every verb is a thin client of the `caps.*` verb set (surface-rpc) or
+//! The operator CLI. Every verb is a thin client of the `caps.*` verb set (surface-rpc) or
 //! a projection over a session log (aho-inspect); none exists in this client only.
 //!
 //! Exit codes: 0 ok, 1 error, 2 plan or verify failure.
@@ -52,7 +52,7 @@ use cli::{
 use ctx::{Ctx, Fail};
 
 async fn dispatch(cli: Cli) -> Result<(), Fail> {
-    // 12: a reloaded daemon learns where to signal readiness from its environment; take it before
+    // A reloaded daemon learns where to signal readiness from its environment; take it before
     // anything else can spawn a process that would inherit it.
     let ready = if matches!(cli.verb, Verb::Serve(_)) { daemon::ready::take_ready_fd() } else { None };
     let ctx = Ctx::new(cli.global)?;
