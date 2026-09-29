@@ -129,6 +129,7 @@ pub fn router(app: App) -> Router {
         .route("/api/session/abort", post(abort))
         .route("/api/session/fold", post(fold))
         .route("/api/session/jobs", post(jobs))
+        .route("/api/session/stats", post(stats))
         .route("/api/session/rewind", post(rewind))
         .route("/api/caps/tree", post(caps_tree))
         .route("/api/caps/why", post(caps_why))
@@ -369,6 +370,13 @@ async fn fold(State(app): State<App>) -> Response {
 
 async fn jobs(State(app): State<App>) -> Response {
     ok(json!({ "jobs": views::jobs_json(app.session.ops()) }))
+}
+
+async fn stats(State(app): State<App>) -> Response {
+    match branch(&app) {
+        Ok(br) => ok(json!({ "stats": aho_inspect::stats(&br) })),
+        Err(r) => r,
+    }
 }
 
 async fn rewind(State(app): State<App>, body: Bytes) -> Response {

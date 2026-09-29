@@ -239,3 +239,53 @@ mod wide_id_tests {
         assert!(matches!(b[1].kind, EntryKind::SubagentStarted { child: SessionId(c), .. } if c == 1 << 100));
     }
 }
+
+mod writer_lock_tests {
+    use crate::*;
+
+    fn note(log: &dyn LogStore, t: &str) -> Result<Entry, LogError> {
+        log.append(None, Principal::system("t"), EntryKind::UserMessage { form: Form::Notice, text: t.into(), client_key: None })
+    }
+
+    #[test]
+    fn a_second_writer_on_the_same_file_is_refused_while_the_first_holds_the_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("s.jsonl");
+        let a = JsonlLog::open(&p).unwrap();
+        let b = JsonlLog::open(&p).unwrap();
+        note(&a, "first").unwrap();
+        let err = note(&b, "second").unwrap_err().to_string();
+        assert!(err.contains("writer lock"), "{err}");
+        // readers stay lock-free while the writer holds
+        let r = JsonlLog::open(&p).unwrap();
+        assert_eq!(r.read_from(None).len(), 1);
+    }
+
+    #[test]
+    fn a_stale_writer_is_refused_even_after_the_lock_frees() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("s.jsonl");
+        let a = JsonlLog::open(&p).unwrap();
+        {
+            let b = JsonlLog::open(&p).unwrap();
+            note(&b, "b wins the file").unwrap();
+        } // b exits; the OS lock frees
+        let err = note(&a, "a is stale").unwrap_err().to_string();
+        assert!(err.contains("advanced"), "{err}");
+        // the file holds only b's entry; a fresh open continues cleanly
+        let c = JsonlLog::open(&p).unwrap();
+        note(&c, "fresh writer").unwrap();
+        assert_eq!(c.read_from(None).len(), 2);
+    }
+
+    #[test]
+    fn fork_takes_the_same_writer_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("s.jsonl");
+        let a = JsonlLog::open(&p).unwrap();
+        let first = note(&a, "one").unwrap();
+        let b = JsonlLog::open(&p).unwrap();
+        let err = b.fork(first.id).unwrap_err().to_string();
+        assert!(err.contains("writer lock"), "{err}");
+    }
+}

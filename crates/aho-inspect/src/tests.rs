@@ -433,3 +433,249 @@ fn status_lists_active_capabilities_loudest_first_and_flags_config_drift() {
     let out = render_status(&s);
     assert!(out.contains("config changed since") && out.contains("lease 1  vm:ubuntu  expires in 6s"), "{out}");
 }
+
+// ───────────────────────────── stats & telemetry vocabulary ─────────────────────────────
+
+/// Entries with controlled timestamps; stats/events never verify the chain, so fake hashes are fine
+/// (same fixture shape as `aho-sdk/tests/schema.rs`).
+fn timed(kinds: Vec<(u64, EntryKind)>) -> Vec<Entry> {
+    kinds
+        .into_iter()
+        .enumerate()
+        .map(|(i, (at, kind))| Entry {
+            id: EntryId(i as u64 + 1),
+            parent: (i > 0).then(|| EntryId(i as u64)),
+            prev_hash: Hash::of(b"prev"),
+            hash: Hash::of(b"this"),
+            at: Timestamp(at),
+            by: sys(),
+            kind,
+        })
+        .collect()
+}
+
+fn session_fixture() -> Vec<Entry> {
+    use aho_log::{ApprovalOutcome, GrantScope, OpStatus, ToolOutcome, Transition};
+    timed(vec![
+        (1_000, EntryKind::TurnStart { turn: TurnId(1) }),
+        (
+            1_000,
+            EntryKind::RequestHeader {
+                model: "m".into(),
+                tools_visible: vec![],
+                policy_epoch: Epoch(1),
+                plan_hash: Hash::ZERO,
+                section_hashes: vec![],
+                open_calls: vec![],
+                request_hash: Hash::ZERO,
+            },
+        ),
+        (
+            3_500,
+            EntryKind::AssistantMessage {
+                content: vec![],
+                usage: Usage { input_tokens: 100, output_tokens: 40, cache_read_tokens: 900, cache_write_tokens: 0 },
+                stop: StopReason::ToolUse,
+            },
+        ),
+        (4_000, EntryKind::ToolCall { call: CallId("c1".into()), tool: "bash".into(), args: json!({}), class: Consequence::SpawnsProcess }),
+        (
+            4_010,
+            EntryKind::ToolCall {
+                call: CallId("c2".into()),
+                tool: "mcp__gh__issues".into(),
+                args: json!({}),
+                class: Consequence::NetworkEgress,
+            },
+        ),
+        (
+            6_500,
+            EntryKind::ToolResult {
+                call: CallId("c1".into()),
+                outcome: ToolOutcome::Ok,
+                value: json!(null),
+                content: vec![],
+                spill_ref: None,
+                meta: None,
+                late: false,
+            },
+        ),
+        (
+            7_000,
+            EntryKind::ToolResult {
+                call: CallId("c2".into()),
+                outcome: ToolOutcome::Err { code: "EGRESS_DENIED".into(), reason: "denied".into() },
+                value: json!(null),
+                content: vec![],
+                spill_ref: None,
+                meta: None,
+                late: true,
+            },
+        ),
+        (
+            7_100,
+            EntryKind::ApprovalRequested {
+                wants: ConsequenceSet::of(&[Consequence::NetworkEgress]),
+                for_cap: "tool-web-fetch".into(),
+                call: None,
+                reason: "widen".into(),
+            },
+        ),
+        (19_100, EntryKind::ApprovalDecided { req: EntryId(8), outcome: ApprovalOutcome::Rejected, scope: GrantScope::Once }),
+        (
+            19_200,
+            EntryKind::OpStarted {
+                op: OpId(1),
+                call: CallId("c1".into()),
+                kind: OpKind::Process,
+                rerunnable: true,
+                external_effect: false,
+            },
+        ),
+        (19_300, EntryKind::OpDone { op: OpId(1), status: OpStatus::Uncertain { last_seen: Timestamp(19_250) } }),
+        (19_400, EntryKind::StepEnd { step: StepId(0), transition: Transition::Completed }),
+        (61_000, EntryKind::TurnEnd { turn: TurnId(1) }),
+    ])
+}
+
+#[test]
+fn stats_joins_calls_to_results_and_reports_exact_latencies() {
+    let s = stats(&session_fixture());
+    assert_eq!(s.turns, 1);
+    assert_eq!(s.duration_ms, Some(60_000));
+    assert_eq!(s.requests, 1);
+    assert_eq!(s.model_p50_ms, Some(2_500));
+    assert_eq!(s.cache_hit_pct, Some(90));
+    let bash = s.tools.iter().find(|t| t.tool == "bash").unwrap();
+    assert_eq!((bash.calls, bash.ok, bash.p50_ms), (1, 1, Some(2_500)));
+    let mcp = s.tools.iter().find(|t| t.tool == "mcp__gh__issues").unwrap();
+    assert_eq!((mcp.errors, mcp.late, mcp.p50_ms), (1, 1, Some(2_990)));
+    assert_eq!((s.approvals.requested, s.approvals.rejected, s.approvals.p50_ms), (1, 1, Some(12_000)));
+    assert_eq!(s.ops.uncertain, 1);
+    assert_eq!(s.transitions, vec![("completed".to_string(), 1)]);
+    let out = render_stats(&s);
+    assert!(out.contains("turns: 1") && out.contains("bash") && out.contains("1 rejected"), "{out}");
+}
+
+#[test]
+fn telemetry_events_bucket_latency_and_collapse_third_party_names() {
+    let ev = events(&session_fixture());
+    assert!(ev.contains(&Event::ModelResponse { stop: StopClass::ToolUse, latency: latency_bucket(2_500), cache: pct_bucket(90) }));
+    assert!(ev.contains(&Event::ToolFinished {
+        tool: ToolClass::Bash,
+        outcome: ToolOutcomeClass::Ok,
+        latency: latency_bucket(2_500),
+        late: false
+    }));
+    // the MCP tool's name never appears; only its class does
+    assert!(ev.iter().any(|e| matches!(e, Event::ToolFinished { tool: ToolClass::Mcp, late: true, .. })));
+    assert!(ev.iter().any(|e| matches!(e, Event::TurnEnded { tools: CountBucket::C2to5, duration: DurationBucket::Lt10m, .. })));
+    assert_eq!(tool_class("my_private_tool"), ToolClass::Other);
+    let snap = session_snapshot(&session_fixture());
+    assert!(matches!(snap, Event::SessionSnapshot { turns: CountBucket::C1, .. }));
+}
+
+#[test]
+fn telemetry_events_serialize_only_vocabulary_tokens() {
+    let vocab: HashSet<&str> = vocab().into_iter().collect();
+    let mut samples = events(&session_fixture());
+    samples.push(session_snapshot(&session_fixture()));
+    samples.extend(one_of_each());
+    // exhaustiveness: a new Event variant must be added to `one_of_each` or this stops compiling
+    for e in &samples {
+        match e {
+            Event::ModelResponse { .. }
+            | Event::ToolFinished { .. }
+            | Event::ApprovalResolved { .. }
+            | Event::OpClosed { .. }
+            | Event::CapChanged { .. }
+            | Event::TurnEnded { .. }
+            | Event::SessionSnapshot { .. } => {}
+        }
+    }
+    let mut strings: Vec<String> = Vec::new();
+    for e in &samples {
+        collect_strings(&serde_json::to_value(e).unwrap(), &mut strings);
+    }
+    assert!(!strings.is_empty());
+    for s in strings {
+        assert!(vocab.contains(s.as_str()), "`{s}` is not in the closed vocabulary; the event would leak it");
+    }
+}
+
+/// One sample per `Event` variant, cycling every closed field enum so the leak test sees
+/// every token that can ever reach the wire.
+fn one_of_each() -> Vec<Event> {
+    let mut out = Vec::new();
+    for (i, stop) in StopClass::ALL.iter().enumerate() {
+        out.push(Event::ModelResponse {
+            stop: *stop,
+            latency: LatencyBucket::ALL[i % LatencyBucket::ALL.len()],
+            cache: PctBucket::ALL[i % PctBucket::ALL.len()],
+        });
+    }
+    for (i, tool) in ToolClass::ALL.iter().enumerate() {
+        out.push(Event::ToolFinished {
+            tool: *tool,
+            outcome: ToolOutcomeClass::ALL[i % ToolOutcomeClass::ALL.len()],
+            latency: LatencyBucket::ALL[i % LatencyBucket::ALL.len()],
+            late: i % 2 == 0,
+        });
+    }
+    for (i, outcome) in ApprovalClass::ALL.iter().enumerate() {
+        out.push(Event::ApprovalResolved {
+            outcome: *outcome,
+            scope: ScopeClass::ALL[i % ScopeClass::ALL.len()],
+            latency: LatencyBucket::ALL[i % LatencyBucket::ALL.len()],
+        });
+    }
+    for (i, kind) in OpClass::ALL.iter().enumerate() {
+        out.push(Event::OpClosed {
+            kind: *kind,
+            status: OpOutcome::ALL[i % OpOutcome::ALL.len()],
+            latency: LatencyBucket::ALL[i % LatencyBucket::ALL.len()],
+        });
+    }
+    for op in CapChange::ALL {
+        out.push(Event::CapChanged { op: *op });
+    }
+    for (i, transition) in TransitionClass::ALL.iter().enumerate() {
+        out.push(Event::TurnEnded {
+            tools: CountBucket::ALL[i % CountBucket::ALL.len()],
+            duration: DurationBucket::ALL[i % DurationBucket::ALL.len()],
+            transition: *transition,
+        });
+    }
+    for (i, turns) in CountBucket::ALL.iter().enumerate() {
+        out.push(Event::SessionSnapshot {
+            turns: *turns,
+            duration: DurationBucket::ALL[i % DurationBucket::ALL.len()],
+            cache: PctBucket::ALL[i % PctBucket::ALL.len()],
+        });
+    }
+    out
+}
+
+fn collect_strings(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::String(s) => out.push(s.clone()),
+        Value::Array(a) => a.iter().for_each(|x| collect_strings(x, out)),
+        Value::Object(m) => {
+            for (k, x) in m {
+                out.push(k.clone());
+                collect_strings(x, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[test]
+fn the_envelope_carries_only_version_schema_and_coarse_time() {
+    let env = envelope(Timestamp(1_695_000_000_000), false, true);
+    // 2023-09-18 01:20 UTC was a Monday
+    assert_eq!(env.hw, "mon/01");
+    assert_eq!(env.schema, vocab_hash());
+    let v = serde_json::to_value(&env).unwrap();
+    assert_eq!(v.as_object().unwrap().keys().collect::<Vec<_>>(), vec!["hw", "is_ci", "ran_from_cargo", "schema", "version"]);
+}

@@ -31,4 +31,6 @@ shape from bundled prose, authority from a defaulted `read-only` preset. See
   `aho net allow host-lan|other-sessions|internet` for an isolation rule.
 
 ## Gaps and direction
-[TODO.md](TODO.md). Direction is in [ROADMAP.md](ROADMAP.md).
+
+How it works: [docs/](docs/README.md). Unfinished work and known gaps: [TODO.md](TODO.md).
+Direction: [ROADMAP.md](ROADMAP.md).

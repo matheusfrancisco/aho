@@ -3,7 +3,7 @@ name = "aho"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "the operator CLI: plan tree inventory explain why catalog enable disable allow set preset loadout lock apply run attach serve session fork checkpoints checkpoint rewind shell status rpc tui web cert webhook acp selfdev invariants doctor caps schedule ralph plan-mode spec credential login logout add"
+description = "the operator CLI: plan tree inventory explain why catalog enable disable allow set preset loadout lock apply run attach serve session fork checkpoints checkpoint rewind shell status stats telemetry rpc tui web cert webhook acp selfdev invariants doctor caps schedule ralph plan-mode spec credential login logout add"
 
 [[bin]]
 name = "aho"
@@ -62,6 +62,7 @@ tool-plan-mode = { path = "../../crates/tools/tool-plan-mode" }
 tool-session = { path = "../../crates/tools/tool-session" }
 embed-local = { path = "../../crates/providers/embed-local" }
 gc = { path = "../../crates/providers/gc" }
+telemetry = { path = "../../crates/providers/telemetry" }
 clap.workspace = true
 tokio.workspace = true
 serde.workspace = true

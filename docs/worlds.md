@@ -53,7 +53,19 @@ NIC), an operator lease (`aho lease grant`, machines-at-once including the sandb
 - namespace: `world.ns.rootfs` (unpacked recipe with `/bin/sh`), iproute2, unprivileged user
   namespaces, overlayfs, `/dev/net/tun`, and `aho-ns-helper`
   (`cargo install --locked --path crates/providers/world-ns --bin aho-ns-helper`).
-- vm: QEMU (`qemu-system-*`, `qemu-img`), `aho-vm-supervisor`
+- vm: QEMU ≥ 9.2 (`qemu-system-*`, `qemu-img`; the netdev uses `reconnect-ms`),
+  `aho-vm-supervisor`
   (`cargo install --locked --path crates/providers/world-vm --bin aho-vm-supervisor`), a guest
-  image running `vm-guest-agent --workspace <dir>` on virtio port `org.aho.agent`, and a lease.
-  Keep `vm.dir` short: machines listen on unix sockets under it.
+  image running `vm-guest-agent --workspace <dir>` on virtio port `org.aho.agent` — the
+  `--workspace` must equal the recipe's `workspace` (default `/workspace`) or the world
+  refuses the agent — and a lease. Keep `vm.dir` short: machines listen on unix sockets
+  under it.
+
+`scripts/vm-setup.sh --image <cloud-image> [--smoke]` does all of the vm setup from a stock
+cloud-init image: prerequisite checks with exact fixes, agent cross-compile, seed build,
+content-detected media import, recipe, config, and (with `--smoke`) a lease plus a proven
+`aho shell -- uname -a` boot.
+
+Validated end to end 2026-09-28: Ubuntu 24.04.5 arm64 cloud image with a
+cloud-init-installed agent, QEMU 11.1.1/HVF on macOS; shell, file round-trip, `aho export`,
+and revoke-then-refuse all through the guest agent.

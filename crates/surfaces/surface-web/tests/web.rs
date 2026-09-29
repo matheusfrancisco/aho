@@ -429,12 +429,37 @@ async fn an_approval_answer_resolves_the_pending_card() {
 }
 
 #[tokio::test]
+async fn session_stats_aggregates_the_branch_after_a_folded_turn() {
+    let r = rig("");
+    let (web, _s) = start(
+        &r,
+        vec![
+            Step::tool_call("read", json!({"path": "a.txt"})).with_stop(ScriptedStop::ToolUse),
+            Step::text("the file says alpha").expect_tool_result("alpha"),
+        ],
+    )
+    .await;
+    let (status, out) = post(&web, "session/prompt", json!({"text": "read a.txt"})).await;
+    assert_eq!(status, 200, "{out}");
+
+    let (status, body) = post(&web, "session/stats", json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let stats = &body["stats"];
+    assert_eq!(stats["turns"], 1, "{body}");
+    assert_eq!(stats["requests"], 2, "{body}");
+    let tools = stats["tools"].as_array().unwrap();
+    let read = tools.iter().find(|t| t["tool"] == "read").unwrap();
+    assert_eq!(read["calls"], 1, "{body}");
+    assert_eq!(read["ok"], 1, "{body}");
+}
+
+#[tokio::test]
 async fn panels_ship_only_for_active_capabilities() {
     let r = rig("");
     let (web, s) = start(&r, vec![]).await;
     let (_, p) = post(&web, "ui/panels", json!({})).await;
     let slots: Vec<&str> = p["panels"].as_array().unwrap().iter().map(|x| x["slot"].as_str().unwrap()).collect();
-    assert_eq!(slots, ["chat", "sidebar.tree", "sidebar.inventory", "sidebar.jobs", "sidebar.invariants"]);
+    assert_eq!(slots, ["chat", "sidebar.tree", "sidebar.inventory", "sidebar.jobs", "sidebar.stats", "sidebar.invariants"]);
     assert_eq!(p["tools"]["read"], "tool-fs");
 
     let mut st: State = s.fold().unwrap();

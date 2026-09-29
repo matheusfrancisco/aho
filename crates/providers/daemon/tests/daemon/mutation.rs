@@ -23,12 +23,14 @@ use crate::serve::connect_when_up;
 struct RebootHost {
     rig: Rig,
     steps: Vec<Step>,
-    sessions: Mutex<Vec<Arc<Session>>>,
+    /// Weak: a host must never retain a session the daemon closed — a retained `Arc<Session>`
+    /// keeps the log's writer lock and blocks the daemon's next open of the same id.
+    sessions: Mutex<Vec<std::sync::Weak<Session>>>,
 }
 
 impl RebootHost {
     fn latest(&self) -> Arc<Session> {
-        self.sessions.lock().unwrap().last().unwrap().clone()
+        self.sessions.lock().unwrap().iter().rev().find_map(std::sync::Weak::upgrade).unwrap()
     }
 }
 
@@ -39,7 +41,7 @@ impl SessionHost for RebootHost {
     fn boot(&self, id: SessionId, log: Arc<dyn LogStore>, approval: Arc<dyn Approval>) -> BoxFuture<'_, Result<Arc<Session>, String>> {
         Box::pin(async move {
             let session = boot(&self.rig, id, Arc::new(ScriptedLlm::from_steps(self.steps.clone())), log, approval).await?;
-            self.sessions.lock().unwrap().push(session.clone());
+            self.sessions.lock().unwrap().push(Arc::downgrade(&session));
             Ok(session)
         })
     }

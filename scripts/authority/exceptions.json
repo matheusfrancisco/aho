@@ -1120,5 +1120,17 @@
     "item": "fn judge",
     "authority": "fs: list sandbox and network directories in session.dir and VM owner state",
     "reason": "`aho gc` finds `<id>.ns` / `<id>.net` directories and VM machines whose owning session log is gone (or whose lease ended) by listing aho's own state; reclaiming goes through each world's destroy path, never a raw delete of foreign paths."
+  },
+  "telemetry-env": {
+    "path": "crates/providers/telemetry/src/lib.rs",
+    "item": "fn from_process",
+    "authority": "env: read DO_NOT_TRACK, CI and CARGO",
+    "reason": "EnvProbe::from_process reads exactly the three opt-out/envelope variables telemetry documents: a non-empty DO_NOT_TRACK refuses to build the capability, CI and CARGO become the two boolean envelope flags; nothing else in the environment is visible to it."
+  },
+  "telemetry-latch": {
+    "path": "crates/providers/telemetry/src/lib.rs",
+    "item": "fn latch_file",
+    "authority": "fs: read/write <aho.home>/telemetry.latch",
+    "reason": "latch_file touches only the one latch path built from the seeded aho.home service: it reads the previously refused endpoint at build time and records the endpoint after a definitive 4xx, so a refusing receiver is never contacted again until the endpoint changes."
   }
 }

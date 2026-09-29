@@ -137,7 +137,7 @@ impl MemoryLog {
     }
 }
 
-fn lock(m: &Mutex<Inner>) -> std::sync::MutexGuard<'_, Inner> {
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
@@ -177,9 +177,21 @@ impl LogStore for MemoryLog {
 
 /// One JSONL file per session, append-only. A `{"head": id}` line records fork pointer moves so a
 /// reopened log resumes on the same branch; nothing is ever rewritten.
+///
+/// Writes are single-process: the first mutation takes an exclusive OS lock on the file and holds
+/// it for this log's lifetime, and refuses if the file grew since open (another writer got there
+/// first). Readers never lock.
 pub struct JsonlLog {
     path: PathBuf,
     mem: MemoryLog,
+    writer: Mutex<Writer>,
+}
+
+/// The held lock handle plus the file length this process last saw.
+#[derive(Default)]
+struct Writer {
+    file: Option<std::fs::File>,
+    expected_len: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -194,6 +206,7 @@ impl JsonlLog {
     pub fn open(path: impl Into<PathBuf>) -> Result<Self, LogError> {
         let path = path.into();
         let mem = MemoryLog::new();
+        let mut len = 0;
         if path.exists() {
             let f = std::fs::File::open(&path).map_err(|e| LogError::Io(e.to_string()))?;
             let mut g = lock(&mem.inner);
@@ -201,17 +214,54 @@ impl JsonlLog {
                 let line = line.map_err(|e| LogError::Io(e.to_string()))?;
                 g.replay_line(&line)?;
             }
+            len = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
         } else if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| LogError::Io(e.to_string()))?;
         }
-        Ok(JsonlLog { path, mem })
+        Ok(JsonlLog { path, mem, writer: Mutex::new(Writer { file: None, expected_len: len }) })
     }
     #[allow(clippy::disallowed_methods, reason = "authority: jsonl-append")]
     fn write_line(&self, line: &Line) -> Result<(), LogError> {
-        let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&self.path).map_err(|e| LogError::Io(e.to_string()))?;
+        let mut w = lock(&self.writer);
+        if w.file.is_none() {
+            let f = std::fs::OpenOptions::new().create(true).append(true).open(&self.path).map_err(|e| LogError::Io(e.to_string()))?;
+            // A previous owner may still be unwinding (daemon detach→open handoff, an embedder
+            // closing a session): wait briefly for a dying holder; a live one still refuses.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+            loop {
+                match f.try_lock() {
+                    Ok(()) => break,
+                    Err(e) if std::time::Instant::now() < deadline => {
+                        let _ = e;
+                        std::thread::sleep(std::time::Duration::from_millis(25));
+                    }
+                    Err(e) => {
+                        return Err(LogError::Io(format!(
+                            "another process holds the writer lock on {}: {e}. One writer per session: attach through the owning surface (or the daemon), or wait for it to exit",
+                            self.path.display()
+                        )));
+                    }
+                }
+            }
+            let len = f.metadata().map(|m| m.len()).map_err(|e| LogError::Io(e.to_string()))?;
+            if len != w.expected_len {
+                return Err(LogError::Io(format!(
+                    "{} advanced from {} to {} bytes since this process opened it (another writer got there first); reopen the session to continue from its real head",
+                    self.path.display(),
+                    w.expected_len,
+                    len
+                )));
+            }
+            w.file = Some(f);
+        }
+        let Some(f) = w.file.as_mut() else {
+            return Err(LogError::Io("writer lock state is impossible; reopen the session".into()));
+        };
         let mut s = serde_json::to_string(line).map_err(|e| LogError::Io(e.to_string()))?;
         s.push('\n');
-        f.write_all(s.as_bytes()).map_err(|e| LogError::Io(e.to_string()))
+        f.write_all(s.as_bytes()).map_err(|e| LogError::Io(e.to_string()))?;
+        w.expected_len += s.len() as u64;
+        Ok(())
     }
 }
 

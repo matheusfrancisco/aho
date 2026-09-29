@@ -8,6 +8,7 @@ mod catalog;
 mod explain;
 mod query;
 mod session;
+mod stats;
 mod tree;
 
 use aho_log::CapState;
@@ -19,6 +20,11 @@ pub use query::{parse_session_query, render_session_query};
 pub use session::{
     CatchUp, InvariantRow, LeaseRow, OpenCall, Orphan, OrphanKind, OrphanScan, SessionStatus, Status, catch_up, current_invariants,
     invariants, orphans, render_catch_up, render_invariants, render_orphans, render_status, session_status, status,
+};
+pub use stats::{
+    ApprovalClass, ApprovalStat, CapChange, CountBucket, DurationBucket, Envelope, Event, LatencyBucket, OpClass, OpOutcome, OpStat,
+    PctBucket, ScopeClass, Stats, StopClass, ToolClass, ToolOutcomeClass, ToolStat, TransitionClass, count_bucket, duration_bucket,
+    envelope, events, hour_weekday, latency_bucket, pct_bucket, render_stats, session_snapshot, stats, tool_class, vocab, vocab_hash,
 };
 pub use tree::{Card, Missing, Setting, TreeNode, Why, govern, inventory, inventory_in, render_inventory, render_tree, tree, why, why_in};
 

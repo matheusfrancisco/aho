@@ -198,6 +198,19 @@ pub enum Verb {
         #[arg(long)]
         json: bool,
     },
+    /// Latency, token, tool, and approval aggregates folded from the session log; nothing
+    /// leaves the machine.
+    Stats {
+        #[arg(long, value_name = "ID")]
+        session: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// The telemetry exporter: what it would send, before anything is sent.
+    Telemetry {
+        #[command(subcommand)]
+        cmd: TelemetryVerb,
+    },
     /// Serve the NDJSON rpc protocol on stdio, or on a unix socket.
     Rpc {
         #[arg(long, value_name = "PATH")]
@@ -562,6 +575,15 @@ pub enum SessionVerb {
         rebuild: bool,
         #[arg(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum TelemetryVerb {
+    /// Print exactly what one flush would send: same fold, same vocabulary, same envelope.
+    Preview {
+        #[arg(long, value_name = "ID")]
+        session: Option<String>,
     },
 }
 

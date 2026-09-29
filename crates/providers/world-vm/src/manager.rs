@@ -363,7 +363,11 @@ impl VmManager {
             }
         }
         let mac = mac.iter().map(|b| format!("{b:02x}")).collect::<Vec<_>>().join(":");
-        push(&["-netdev", &format!("stream,id=net0,server=off,reconnect=1,addr.type=unix,addr.path={}", path(&dir.join("net.sock")))]);
+        // `reconnect-ms` (QEMU ≥ 9.2); QEMU 10 removed the old `reconnect=SECONDS` spelling.
+        push(&[
+            "-netdev",
+            &format!("stream,id=net0,server=off,reconnect-ms=1000,addr.type=unix,addr.path={}", path(&dir.join("net.sock"))),
+        ]);
         push(&["-device", &format!("virtio-net-pci,netdev=net0,mac={mac}")]);
         push(&["-device", "virtio-serial-pci"]);
         push(&["-chardev", &format!("socket,id=agent,path={},server=on,wait=off", path(&dir.join("agent.sock")))]);

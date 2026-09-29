@@ -17,20 +17,48 @@ against TLA+ specs; six surfaces over one `Session`; subagents (in-process, ACP,
 Claude/Codex CLIs); generated TS/Python SDKs with drift checks; provider logins; driver-level
 stop/loop/budget guards; gated prompt prose with bundled scout/reviewer roles.
 
+Added since: `aho stats` (local, log-derived latency/token/tool/approval aggregates; a
+`sidebar.stats` web panel reads the same projection) and the opt-in `telemetry` capability —
+events derive from the closed vocabulary in `aho-inspect` (no `String` field can reach the
+wire), `caps.telemetry.enabled = false` until an operator layer flips it, `DO_NOT_TRACK`
+refuses the build, a 4xx latches the endpoint off, and `aho telemetry preview` prints exactly
+what one flush would send.
+
 ## Next
 
 Ordered by risk retired per unit of work; details in [TODO.md](TODO.md).
 
-1. **Real-guest VM validation** — boot a real image through media → recipe → lease → guest
-   agent. Retires the largest untested-reality risk in the lab.
-2. **`swallowed` ratchet paydown** — the gate is red today; either fix the sites or accept
+1. ~~Real-guest VM validation~~ — done 2026-09-28: Ubuntu 24.04 arm64 through media → recipe
+   → lease → guest agent (QEMU 11.1/HVF, macOS); details in TODO.md's closed entry.
+2. **World-error surfacing** — a broken world must show its own error, not
+   `no Subprocess provider is bound` (found during the boot validation; see TODO.md).
+3. **`swallowed` ratchet paydown** — the gate is red today; either fix the sites or accept
    them deliberately. A red gate that stays red trains people to ignore it.
-3. **Gated live acceptance for foreign CLIs and providers** — one operator-invoked run for
+4. **Gated live acceptance for foreign CLIs and providers** — one operator-invoked run for
    `claude`/`codex` adapters and one per login route; never in unattended CI.
-4. **Unprivileged namespace world** — prove `world-ns` on a stock distro without a privileged
+5. **Unprivileged namespace world** — prove `world-ns` on a stock distro without a privileged
    container, or narrow the documented claim.
-5. **`aho session import`** — foreign transcripts folded into valid logs; `session verify`
+6. **`aho session import`** — foreign transcripts folded into valid logs; `session verify`
    green on the result.
+
+### The "sessions as branches" arc
+
+One writer per session is now enforced (the 2026-09-28 lock); that unlocks a three-step arc,
+each independently shippable:
+
+1. ~~**Writer lock**~~ — done: exclusive OS lock on the jsonl at first mutation; second and
+   stale writers refused loudly; 2s patience for a dying holder covers ownership handoff.
+2. **Multi-TUI attach** — `aho tui` becomes a client: the first process on a session owns the
+   log (or the daemon does) and later TUIs discover the owner socket and attach over rpc
+   (`subscribe_from` replay, prompts/steers as queued inputs, approval cards broadcast,
+   first answer wins). Invariant: a direct open against a held lock fails with the owner's
+   address — never races.
+3. **Fork-from-viewer** — any attached TUI splits off at an entry (chat-only) or a checkpoint
+   (chat+code): `session.fork { at, mode }` executed by the owner; the fork inherits the log
+   prefix, `fold(log[..N]).policy`, and the checkpoint's worktree — never the lease. vm world
+   gains the same via qcow2 snapshots per checkpoint, which also closes its time-travel gap.
+   Invariant: source and fork both `verify` green, share bytes ≤ N, diverge only after.
+   `session diff`/`merge` complete the loop: fork → diverge → diff → merge.
 
 ## Later
 
@@ -42,5 +70,4 @@ Direction, not commitment; each enters *Next* only with a runnable result attach
   ecosystem the `Capability` contract invites.
 - **Richer role library** — further subagent roles only where an output shape earns its
   bytes against the prose ratchet; authority always from presets, never text.
-- **Telemetry** — operator-visible, log-derived; nothing phones home.
 - **Desktop shell and bilingual docs** — after the surfaces underneath stop moving.

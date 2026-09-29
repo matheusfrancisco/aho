@@ -330,7 +330,7 @@ async function applyRewind() {
 
 // ───────────────────────────── sidebar ─────────────────────────────
 
-const TABS = [["sidebar.tree", "Tree"], ["sidebar.inventory", "Inventory"], ["sidebar.jobs", "Jobs"], ["sidebar.invariants", "Invariants"]];
+const TABS = [["sidebar.tree", "Tree"], ["sidebar.inventory", "Inventory"], ["sidebar.jobs", "Jobs"], ["sidebar.stats", "Stats"], ["sidebar.invariants", "Invariants"]];
 const STATE_CLASS = { active: "active", unlocked: "unlocked", locked: "locked", broken: "broken", disabled: "disabled" };
 const GLYPH = { active: "●", unlocked: "○", locked: "◌", broken: "✕", disabled: "⊘" };
 
@@ -384,6 +384,20 @@ async function refreshPanel(fetch = true) {
         el("span", { class: x.status ? (x.status.status === "completed" ? "" : "err") : "warn" },
           x.status ? (x.status.status === "completed" ? `✓ exit ${x.status.code}` : x.status.status) : "running")))
         : [el("div", { class: "notice" }, "no operations yet")]));
+    } else if (S.tab === "sidebar.stats") {
+      const st = (await api("session/stats")).stats;
+      const cache = st.cache_hit_pct === null || st.cache_hit_pct === undefined ? "-" : st.cache_hit_pct + "%";
+      fill(p,
+        el("div", {}, `turns ${st.turns} · session ${hms(st.duration_ms)}`),
+        el("div", {}, `model p50 ${hms(st.model_p50_ms)} · cache ${cache}`),
+        el("div", {}, `tokens in ${st.usage.input_tokens} / out ${st.usage.output_tokens}`),
+        st.tools.length
+          ? el("table", {},
+              el("tr", {}, ...["tool", "calls", "ok/err/cancel", "p50"].map((h) => el("th", {}, h))),
+              ...st.tools.map((t) => el("tr", {},
+                el("td", {}, t.tool), el("td", {}, t.calls),
+                el("td", {}, `${t.ok}/${t.errors}/${t.cancelled}`), el("td", {}, hms(t.p50_ms)))))
+          : el("div", { class: "notice" }, "no tool calls yet"));
     } else if (S.tab === "sidebar.invariants") {
       const f = await api("session/fold");
       fill(p, ...(f.invariants.length ? f.invariants.map((r) => el("div", {}, r.id + "  ",
@@ -392,6 +406,13 @@ async function refreshPanel(fetch = true) {
         : [el("div", { class: "notice" }, "no invariants checked in this session")]));
     }
   } catch (e) { fill(p, el("div", { class: "err" }, e.message)); }
+}
+
+function hms(ms) {
+  if (ms === null || ms === undefined) return "-";
+  if (ms < 1000) return ms + "ms";
+  if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
+  return Math.floor(ms / 60000) + "m" + String(Math.round((ms % 60000) / 1000)).padStart(2, "0") + "s";
 }
 
 // ───────────────────────────── mux ─────────────────────────────
@@ -407,6 +428,7 @@ function onFrame(f) {
       if (p.kind.type === "assistant_message") S.live = { text: "", thinking: "", tools: [] };
       if (S.ready && ["cap_delta", "policy_epoch"].includes(p.kind.type)) { S.tree = null; loadPanels(); }
       if (S.ready && S.tab === "sidebar.jobs" && ["op_started", "op_done", "tool_result"].includes(p.kind.type)) refreshPanel();
+      if (S.ready && S.tab === "sidebar.stats" && ["tool_result", "turn_end"].includes(p.kind.type)) refreshPanel();
       break;
     case "stream":
       if (p.kind === "text") S.live.text += p.text;
@@ -494,7 +516,7 @@ async function loadPanels() {
 async function boot() {
   try { await loadPanels(); } catch (e) { if (!$("login").hidden) return; notice(e.message); return; }
   connect();
-  setInterval(() => { if (S.tab === "sidebar.jobs") refreshPanel(); }, 2000);
+  setInterval(() => { if (S.tab === "sidebar.jobs" || S.tab === "sidebar.stats") refreshPanel(); }, 2000);
 }
 
 boot();

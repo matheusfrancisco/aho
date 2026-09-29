@@ -47,7 +47,7 @@ use clap::error::ErrorKind;
 
 use cli::{
     AddWhat, CapsVerb, CatalogWhat, CheckpointVerb, Cli, CredentialVerb, DoctorWhat, LoadoutVerb, PlanModeVerb, RalphVerb, ScheduleVerb,
-    SessionVerb, Verb,
+    SessionVerb, TelemetryVerb, Verb,
 };
 use ctx::{Ctx, Fail};
 
@@ -94,6 +94,8 @@ async fn dispatch(cli: Cli) -> Result<(), Fail> {
         Verb::Rewind { checkpoint, chat, code, session } => session::rewind(&ctx, checkpoint, *chat, *code, session.as_deref()).await,
         Verb::Shell { session, cmd } => session::shell(&ctx, session.as_deref(), cmd).await,
         Verb::Status { loud, session, json } => session::status(&ctx, *loud, session.as_deref(), *json),
+        Verb::Stats { session, json } => session::stats_cmd(&ctx, session.as_deref(), *json),
+        Verb::Telemetry { cmd: TelemetryVerb::Preview { session } } => session::telemetry_preview(&ctx, session.as_deref()),
         Verb::Rpc { socket, session } => session::rpc(&ctx, socket.as_deref(), session.as_deref()).await,
         Verb::Spec { sub } => spec::run(&ctx, sub.as_ref()).await,
         Verb::Credential { sub: CredentialVerb::Set { name } } => config::credential_set(&ctx, name),

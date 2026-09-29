@@ -47,6 +47,9 @@ body.hud .hud-note { display: block; }
 #tabs button { border: none; border-radius: 0; flex: 1; background: transparent; color: var(--dim); }
 #tabs button.on { color: var(--fg); border-bottom: 2px solid var(--cyan); }
 #panel { flex: 1; overflow-y: auto; padding: 8px; }
+#panel table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+#panel th { color: var(--dim); text-align: left; font-weight: normal; }
+#panel td, #panel th { padding: 1px 6px 1px 0; }
 .node { cursor: pointer; }
 .node .g.active { color: var(--green); } .node .g.unlocked { color: var(--blue); } .node .g.locked { color: var(--yellow); }
 .node .g.broken { color: var(--red); } .node .g.disabled { color: var(--dim); }

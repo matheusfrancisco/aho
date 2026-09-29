@@ -736,3 +736,20 @@ async fn the_last_budgeted_step_gets_a_wrap_up_notice() {
     );
     assert!(replay_ok(&s) >= 2);
 }
+
+#[tokio::test]
+async fn a_dropped_session_releases_its_log() {
+    let r = rig("workspace", "");
+    let log: Arc<dyn LogStore> = Arc::new(MemoryLog::new());
+    let weak = Arc::downgrade(&log);
+    let (s, _llm) = boot(&r, vec![], log.clone(), Arc::new(NeverApproval)).await;
+    drop(s);
+    drop(log);
+    for _ in 0..100u32 {
+        if weak.upgrade().is_none() {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    panic!("the session still retains its log 2s after being dropped; a leaked Arc<Session> keeps the writer lock");
+}

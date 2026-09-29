@@ -59,6 +59,7 @@ impl Capability for SurfaceWeb {
         r.panel("sidebar.tree", &["tree"]);
         r.panel("sidebar.inventory", &["inventory"]);
         r.panel("sidebar.jobs", &["ops"]);
+        r.panel("sidebar.stats", &["stats"]);
         r.panel("sidebar.invariants", &["invariants"]);
     }
 }
@@ -80,6 +81,7 @@ pub const SLOTS: &[&str] = &[
     "sidebar.goals",
     "sidebar.todo",
     "sidebar.jobs",
+    "sidebar.stats",
     "sidebar.vm",
     "sidebar.mcp",
     "sidebar.skills",

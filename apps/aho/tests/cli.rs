@@ -101,6 +101,28 @@ fn json_mode_keeps_the_wrapper_contract() {
 }
 
 #[test]
+fn stats_folds_the_log_locally_and_telemetry_preview_shows_one_flush() {
+    let p = project();
+    let empty = aho(&p, &["stats"], "");
+    assert_eq!(empty.status.code(), Some(0));
+    assert!(text(&empty.stdout).contains("no session yet"), "{}", text(&empty.stdout));
+    let run = aho(&p, &["run", "--script", "script.json", "-p", "read a.txt"], "");
+    assert_eq!(run.status.code(), Some(0), "{}", text(&run.stderr));
+    let out = aho(&p, &["stats", "--json"], "");
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let v: serde_json::Value = serde_json::from_str(&text(&out.stdout)).unwrap();
+    assert!(v["session"].is_string(), "{v}");
+    assert!(v["stats"]["turns"].as_u64().is_some_and(|t| t >= 1), "{v}");
+    assert!(v["stats"]["tools"].as_array().is_some_and(|t| !t.is_empty()), "one read call was made: {v}");
+    let prev = aho(&p, &["telemetry", "preview"], "");
+    assert_eq!(prev.status.code(), Some(0), "{}", text(&prev.stderr));
+    let v: serde_json::Value = serde_json::from_str(&text(&prev.stdout)).unwrap();
+    assert!(v["envelope"]["version"].is_string(), "{v}");
+    let events = v["events"].as_array().unwrap();
+    assert_eq!(events.last().unwrap()["e"], "session_snapshot", "the whole-branch summary comes last: {v}");
+}
+
+#[test]
 fn set_plans_asks_and_writes_the_most_specific_file() {
     let p = project();
     let declined = aho(&p, &["set", "policy.preset", "read-only"], "n\n");

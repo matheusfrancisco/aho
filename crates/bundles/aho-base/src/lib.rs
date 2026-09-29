@@ -25,8 +25,9 @@ pub const NAME: &str = "aho-base";
 /// Engineer defaults (`Layer::Bundle`). The product ships under `workspace`, with a 1 s grace
 /// window for async tool calls and a 10 min heartbeat while only calls are pending.
 /// `tool-terminal` stays Unlocked until `aho enable tool-terminal`; Claude Code hooks run
-/// commands a repository ships, so they also wait for the operator's `aho enable hooks-claude-code`.
-pub fn defaults() -> [(&'static str, serde_json::Value); 7] {
+/// commands a repository ships, so they also wait for the operator's `aho enable hooks-claude-code`;
+/// telemetry is opt-in the same way (`aho enable telemetry`) and additionally needs an endpoint.
+pub fn defaults() -> [(&'static str, serde_json::Value); 8] {
     [
         ("policy.preset", json!("workspace")),
         ("seams.world", json!("host")),
@@ -35,6 +36,7 @@ pub fn defaults() -> [(&'static str, serde_json::Value); 7] {
         ("tools.heartbeat_s", json!(600)),
         ("caps.tool-terminal.enabled", json!(false)),
         ("caps.hooks-claude-code.enabled", json!(false)),
+        ("caps.telemetry.enabled", json!(false)),
     ]
 }
 
@@ -74,7 +76,8 @@ pub fn spine() -> Composition {
         .consume::<tool_inspect::ToolInspect>()
         .provide::<tool_web::WebFetch>()
         .provide::<tool_web::WebSearch>()
-        .provide::<hooks_claude_code::ClaudeCodeHooks>();
+        .provide::<hooks_claude_code::ClaudeCodeHooks>()
+        .provide::<telemetry::Telemetry>();
     defaults().into_iter().fold(c, |c, (k, v)| c.default(k, v))
 }
 

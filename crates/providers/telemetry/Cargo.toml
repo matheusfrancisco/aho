@@ -1,0 +1,23 @@
+[package]
+name = "telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Anonymous usage telemetry: closed-vocabulary events derived from the session log, flushed to telemetry.endpoint"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-inspect.workspace = true
+aho-egress = { path = "../../seams/aho-egress" }
+serde_json.workspace = true
+
+[dev-dependencies]
+world-host = { path = "../world-host" }
+tokio.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

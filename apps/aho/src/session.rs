@@ -715,6 +715,54 @@ pub fn status(ctx: &Ctx, loud: bool, session: Option<&str>, json: bool) -> Resul
     Ok(())
 }
 
+/// `aho stats`: exact aggregates over the newest (or named) session's current branch.
+/// Everything is computed here from the log; nothing leaves the machine.
+pub fn stats_cmd(ctx: &Ctx, session: Option<&str>, json: bool) -> Result<(), Fail> {
+    let p = ctx.load(&ctx.inputs(&[], false)?)?;
+    let found = match session {
+        Some(w) => Some(find_session(&ctx.session_dir(&p), Some(w))?),
+        None => sessions(&ctx.session_dir(&p))?.into_iter().next(),
+    };
+    let Some(s) = found else {
+        if json {
+            println!("{}", serde_json::to_string_pretty(&json!({"stats": Value::Null, "session": Value::Null}))?);
+        } else {
+            println!("no session yet; start one with `aho run`");
+        }
+        return Ok(());
+    };
+    let (_, entries) = branch(&s.path)?;
+    let stats = aho_inspect::stats(&entries);
+    if json {
+        println!("{}", serde_json::to_string_pretty(&json!({"stats": stats, "session": hex(s.id)}))?);
+        return Ok(());
+    }
+    print!("{}", aho_inspect::render_stats(&stats));
+    Ok(())
+}
+
+/// `aho telemetry preview`: the exact JSON one flush would send — the same fold, the same
+/// closed vocabulary, the same envelope — so it can be read before anything is sent.
+pub fn telemetry_preview(ctx: &Ctx, session: Option<&str>) -> Result<(), Fail> {
+    let p = ctx.load(&ctx.inputs(&[], false)?)?;
+    let found = match session {
+        Some(w) => Some(find_session(&ctx.session_dir(&p), Some(w))?),
+        None => sessions(&ctx.session_dir(&p))?.into_iter().next(),
+    };
+    let Some(s) = found else {
+        println!("no session yet; start one with `aho run`");
+        return Ok(());
+    };
+    let (_, entries) = branch(&s.path)?;
+    let mut events = aho_inspect::events(&entries);
+    events.push(aho_inspect::session_snapshot(&entries));
+    let is_ci = std::env::var("CI").is_ok_and(|v| !v.is_empty());
+    let ran_from_cargo = std::env::var("CARGO").is_ok();
+    let envelope = aho_inspect::envelope(Timestamp::now(), is_ci, ran_from_cargo);
+    println!("{}", serde_json::to_string_pretty(&telemetry::payload(&envelope, &events))?);
+    Ok(())
+}
+
 pub async fn rpc(ctx: &Ctx, socket: Option<&std::path::Path>, session: Option<&str>) -> Result<(), Fail> {
     // While `aho serve` runs it owns the project's sessions, and `aho rpc` speaks the same
     // protocol as the daemon's client. Settings for this invocation only need a plan of their

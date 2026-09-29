@@ -104,6 +104,11 @@ async fn an_embedded_session_runs_a_tool_turn_and_streams_typed_events() {
     let (id, path) = (s.id(), s.log_path().unwrap().to_path_buf());
     s.close().await.unwrap();
     assert!(path.starts_with(std::fs::canonicalize(&f.project).unwrap().join(".aho/sessions")), "{}", path.display());
+    // close() must release the log's writer lock immediately (a leaked Arc<Session> here once
+    // kept it held forever via the approval pump); resume below would then fail to append.
+    let probe = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+    probe.try_lock().expect("the closed session released its writer lock");
+    drop(probe);
     let resumed = sdk.open_session(Open::Resume(id)).await.unwrap();
     assert_eq!(resumed.fold().await.unwrap().turns, 1, "the log on disk resumes");
     resumed.close().await.unwrap();

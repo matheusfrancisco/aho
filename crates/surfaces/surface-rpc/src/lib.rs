@@ -114,10 +114,14 @@ impl ApprovalBroker {
         Arc::new(ApprovalBroker { next: AtomicU64::new(1), pending: Mutex::new(BTreeMap::new()), cards })
     }
 
-    fn pump(self: &Arc<Self>, mut rx: mpsc::Receiver<ApprovalRequest>, session: Arc<Session>) {
+    /// The pump holds the session weakly: a card needs the live session for its capability and
+    /// epoch, but a parked pump must never keep a closed session (and its log writer lock) alive.
+    fn pump(self: &Arc<Self>, mut rx: mpsc::Receiver<ApprovalRequest>, session: &Arc<Session>) {
         let me = self.clone();
+        let session = Arc::downgrade(session);
         tokio::spawn(async move {
             while let Some((card, reply)) = rx.recv().await {
+                let Some(session) = session.upgrade() else { break };
                 let id = me.next.fetch_add(1, Ordering::Relaxed);
                 let reg = session.registry();
                 let cap = reg
@@ -178,7 +182,7 @@ impl RpcContext {
     pub fn new(session: &Arc<Session>, approvals: Option<mpsc::Receiver<ApprovalRequest>>, caps: Option<CapsContext>) -> Arc<RpcContext> {
         let broker = ApprovalBroker::new();
         if let Some(rx) = approvals {
-            broker.pump(rx, session.clone());
+            broker.pump(rx, session);
         }
         Arc::new(RpcContext { caps, approvals: broker, owner: Mutex::new(None) })
     }
