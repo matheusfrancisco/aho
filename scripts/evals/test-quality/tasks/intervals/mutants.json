@@ -1,0 +1,10 @@
+[
+  {"name": "touching-not-merged", "find": "start <= out[-1][1]", "replace": "start < out[-1][1]"},
+  {"name": "contained-shrinks-end", "find": "if end > out[-1][1]:", "replace": "if True:"},
+  {"name": "no-sort", "find": "pairs = sorted(_checked(intervals))", "replace": "pairs = _checked(intervals)"},
+  {"name": "zero-length-rejected", "find": "if start > end:", "replace": "if start >= end:"},
+  {"name": "no-validation", "find": "raise ValueError(f\"interval {item!r} has start > end\")", "replace": "pass"},
+  {"name": "inclusive-length", "find": "sum(end - start for", "replace": "sum(end - start + 1 for"},
+  {"name": "length-double-counts", "find": "for start, end in merge(intervals))", "replace": "for start, end in _checked(intervals))"},
+  {"name": "merge-loses-start", "find": "out[-1] = (out[-1][0], end)", "replace": "out[-1] = (start, end)"}
+]

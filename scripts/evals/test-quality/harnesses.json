@@ -1,0 +1,70 @@
+{
+  "prompt": "Implement the specification in README.md in the `{package}` package: its public functions belong in `{package}/__init__.py`, which is a stub now. Write a test suite for it under `tests/` that runs with `python3 -m unittest discover -s tests`. Use only the Python standard library.",
+  "vars": {
+    "model": "claude-sonnet-4-5",
+    "thinking_budget": "4096",
+    "omp_thinking": "low",
+    "aho_baseline": "",
+    "aho_new": "{repo}/target/debug/aho",
+    "omp": "omp"
+  },
+  "harnesses": {
+    "aho-baseline": {
+      "argv": ["{aho_baseline}", "run", "--project", "{work}", "-y",
+               "--set", "seams.world=host", "--set", "policy.ask=never",
+               "--set", "model.provider=anthropic", "--set", "model.name={model}",
+               "--set", "model.thinking=true", "--set", "model.thinking_budget={thinking_budget}",
+               "-p", "{prompt}"],
+      "cwd": "{work}",
+      "timeout": 1800
+    },
+    "aho-new": {
+      "argv": ["{aho_new}", "run", "--project", "{work}", "-y",
+               "--set", "seams.world=host", "--set", "policy.ask=never",
+               "--set", "model.provider=anthropic", "--set", "model.name={model}",
+               "--set", "model.thinking=true", "--set", "model.thinking_budget={thinking_budget}",
+               "-p", "{prompt}"],
+      "cwd": "{work}",
+      "timeout": 1800
+    },
+    "aho-new-defaults": {
+      "argv": ["{aho_new}", "run", "--project", "{work}", "-y",
+               "--set", "seams.world=host", "--set", "policy.ask=never",
+               "--set", "model.provider=anthropic", "--set", "model.name={model}",
+               "-p", "{prompt}"],
+      "cwd": "{work}",
+      "timeout": 1800
+    },
+    "aho-new-coding": {
+      "argv": ["{aho_new}", "--profile", "coding", "run", "--project", "{work}", "-y",
+               "--set", "seams.world=host", "--set", "policy.ask=never",
+               "--set", "model.provider=anthropic", "--set", "model.name={model}",
+               "-p", "{prompt}"],
+      "cwd": "{work}",
+      "timeout": 1800
+    },
+    "omp": {
+      "argv": ["{omp}", "-p", "--model", "anthropic/{model}", "--thinking", "{omp_thinking}",
+               "--cwd", "{work}", "--session-dir", "{run_dir}/omp-sessions", "--no-title",
+               "--no-rules", "--no-skills", "--no-extensions", "--auto-approve",
+               "{prompt}"],
+      "cwd": "{work}",
+      "timeout": 1800
+    },
+    "fake-reference": {
+      "argv": ["{python}", "{eval_dir}/fake_harness.py", "reference", "{task_dir}", "{work}", "{package}"],
+      "cwd": "{work}",
+      "timeout": 60
+    },
+    "fake-tautology": {
+      "argv": ["{python}", "{eval_dir}/fake_harness.py", "tautology", "{task_dir}", "{work}", "{package}"],
+      "cwd": "{work}",
+      "timeout": 60
+    },
+    "fake-first-mutant": {
+      "argv": ["{python}", "{eval_dir}/fake_harness.py", "first-mutant", "{task_dir}", "{work}", "{package}"],
+      "cwd": "{work}",
+      "timeout": 60
+    }
+  }
+}

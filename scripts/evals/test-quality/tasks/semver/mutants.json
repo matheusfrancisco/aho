@@ -1,0 +1,11 @@
+[
+  {"name": "prerelease-outranks-release", "find": "return _cmp(len(pre_b), len(pre_a))", "replace": "return _cmp(len(pre_a), len(pre_b))"},
+  {"name": "numeric-outranks-alpha", "find": "return -1 if a_num else 1", "replace": "return 1 if a_num else -1"},
+  {"name": "numeric-idents-lexical", "find": "_number(ident, version) if ident.isdigit() else ident", "replace": "ident"},
+  {"name": "longer-prerelease-not-higher", "find": "    return _cmp(len(pre_a), len(pre_b))\n", "replace": "    return 0\n"},
+  {"name": "core-compared-as-text", "find": "key = tuple(_number(n, version) for n in numbers)", "replace": "key = tuple(str(_number(n, version)) for n in numbers)"},
+  {"name": "build-not-stripped", "find": "rest, plus, build = version.partition(\"+\")", "replace": "rest, plus, build = version, \"\", \"\""},
+  {"name": "leading-zeros-accepted", "find": "_NUMBER = re.compile(r\"0|[1-9][0-9]*\")", "replace": "_NUMBER = re.compile(r\"[0-9]+\")"},
+  {"name": "extra-core-number-accepted", "find": "if len(numbers) != 3:", "replace": "if len(numbers) < 3:"},
+  {"name": "only-first-identifier-compared", "find": "        if c:\n            return c\n", "replace": "        return c\n"}
+]
