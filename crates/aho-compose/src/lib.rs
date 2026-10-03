@@ -8,6 +8,7 @@
 #![cfg_attr(test, allow(clippy::disallowed_methods))] // unit-test fixtures only
 #![forbid(unsafe_code)]
 
+mod boot;
 mod credentials;
 mod diff;
 mod inputs;
@@ -18,10 +19,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use aho_cap::{Composition, Discovered, Env, HandleKind, Manifest, Os, Plan, PlanError, PolicyInput};
-use aho_config::{Loadout, ResolveError, ResolveInputs, Schema};
+use aho_config::{FileSnapshot, Layer, Loadout, ResolveError, ResolveInputs, Schema};
 use aho_log::EntryKind;
 use aho_types::*;
 
+pub use boot::{WorldRefusal, with_boot, world_refusal};
 pub use credentials::{CredentialOrigin, credential_name, credentials};
 pub use diff::{CapFlip, ConfigChange, PlanDiff, plan_diff, render_plan_diff};
 pub use inputs::{CRED_ENV_PREFIX, Inputs, apply, apply_target};
@@ -52,6 +54,8 @@ pub enum ComposeError {
     ProfileNotFound {
         name: String,
         path: PathBuf,
+        /// The composition's built-in profile names, so the message can offer them.
+        builtin: Vec<&'static str>,
     },
     BadName {
         what: &'static str,
@@ -102,8 +106,13 @@ impl std::fmt::Display for ComposeError {
                 f,
                 "`policy.preset = {name}` ({origin}) names no preset. Nothing was started; use one of read-only, workspace, dev, lab, full, spec."
             ),
-            ComposeError::ProfileNotFound { name, path } => {
-                write!(f, "profile `{name}` does not exist at {}. Nothing was loaded; create the file or drop --profile.", path.display())
+            ComposeError::ProfileNotFound { name, path, builtin } => {
+                let offer = if builtin.is_empty() { "none".to_string() } else { builtin.join(", ") };
+                write!(
+                    f,
+                    "profile `{name}` is not built in (built-in: {offer}) and does not exist at {}. Nothing was loaded; create the file or drop --profile.",
+                    path.display()
+                )
             }
             ComposeError::BadName { what, name } => {
                 write!(f, "`{name}` is not a valid {what} name (letters, digits, `-` and `_` only). Nothing was read or written.")
@@ -139,11 +148,28 @@ pub fn schema_of(comp: &Composition) -> Schema {
 
 /// The layer stack handed to `aho_config::resolve`. Credential env vars (`AHO_CRED_*`) are not
 /// config keys: they only mark a credential present, so they never reach the resolver.
+/// With `--profile <name>`, the composition's built-in fragments of `<name>` go first at
+/// `Layer::Profile(name)`, so the operator's `~/.aho/profiles/<name>.toml` (same rank, later)
+/// wins key by key; `disable` lists from every layer still add up.
 pub fn resolve_inputs(comp: &Composition, inputs: &Inputs) -> ResolveInputs {
+    let mut files: Vec<FileSnapshot> = match &inputs.profile {
+        Some(name) => comp
+            .profiles()
+            .iter()
+            .filter(|p| p.name == name)
+            .map(|p| FileSnapshot {
+                path: format!("builtin:{}/profiles/{}.toml", p.bundle, p.name),
+                layer: Layer::Profile(name.clone()),
+                text: p.text.to_string(),
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    files.extend(inputs.files.iter().cloned());
     ResolveInputs {
         sets: inputs.sets.clone(),
         env: inputs.env.iter().filter(|(k, _)| !k.starts_with(CRED_ENV_PREFIX)).map(|(k, v)| (k.clone(), v.clone())).collect(),
-        files: inputs.files.clone(),
+        files,
         bundle: comp.name.to_string(),
         bundle_defaults: comp.defaults().to_vec(),
         runtime: Vec::new(),
@@ -151,12 +177,29 @@ pub fn resolve_inputs(comp: &Composition, inputs: &Inputs) -> ResolveInputs {
     }
 }
 
+/// `--profile <name>` must name a built-in profile or an existing `~/.aho/profiles/<name>.toml`.
+fn check_profile(comp: &Composition, inputs: &Inputs) -> Result<(), ComposeError> {
+    let Some(name) = &inputs.profile else { return Ok(()) };
+    let builtin = comp.profiles().iter().any(|p| p.name == name);
+    let file = inputs.files.iter().any(|f| matches!(&f.layer, Layer::Profile(n) if n == name));
+    if builtin || file {
+        return Ok(());
+    }
+    let mut names: Vec<&'static str> = comp.profiles().iter().map(|p| p.name).collect();
+    names.sort_unstable();
+    names.dedup();
+    Err(ComposeError::ProfileNotFound { name: name.clone(), path: inputs.profile_path(name), builtin: names })
+}
+
 /// Resolve the layers, probe the environment, and plan twice: first with every class allowed to
 /// learn which world binds, then with the preset's cut for that world.
 pub fn load(comp: &Composition, inputs: &Inputs) -> Result<Planned, ComposeError> {
+    check_profile(comp, inputs)?;
     let schema = schema_of(comp);
     let mut loadout = aho_config::resolve(&resolve_inputs(comp, inputs), &schema, inputs.strict).map_err(ComposeError::Resolve)?;
     credentials::redact(&mut loadout);
+    // The model's limits from the catalog, ranked under every operator layer (`aho explain`).
+    aho_llm::models::apply_catalog(&mut loadout);
 
     let manifests = comp.manifests();
     let needed = aho_cap::binaries_needed(&manifests);

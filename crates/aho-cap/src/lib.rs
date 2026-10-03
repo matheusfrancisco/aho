@@ -58,7 +58,7 @@ mod plan;
 #[cfg(test)]
 mod tests;
 
-pub use composition::{BuildFn, Composition, Resolver, core_keys, render_origin};
+pub use composition::{BuildFn, BuiltinProfile, Composition, Resolver, core_keys, render_origin};
 pub use plan::{ADDITIVE_SEAMS, Because, Missing, Plan, PlanError, PlanRow, PolicyInput, binaries_needed, fingerprint, follows, plan};
 
 // ───────────────────────────────── identity ─────────────────────────────────

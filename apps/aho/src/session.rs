@@ -26,6 +26,21 @@ pub(crate) fn operator() -> Operator {
     crate::boot::operator()
 }
 
+/// The coding capabilities `aho run` refuses to start without (`aho_compose::world_refusal`):
+/// file and shell tools, both of which live in the world.
+const CODING: &[&str] = &["tool-fs", "tool-bash"];
+
+/// `p` with what the newest session's last boot found Broken laid over it: the plan cannot know
+/// that a world failed to open; the log of the boot that tried does. A newest log that does not
+/// read leaves the plan as planned (`aho status` and `aho session verify` report the log itself).
+pub(crate) fn booted(ctx: &Ctx, p: &Planned) -> Result<Planned, Fail> {
+    let Some(s) = sessions(&ctx.session_dir(p))?.into_iter().next() else { return Ok(p.clone()) };
+    Ok(match branch(&s.path).and_then(|(_, entries)| state_of(&entries)) {
+        Ok(state) => aho_compose::with_boot(p, &state),
+        Err(_) => p.clone(),
+    })
+}
+
 pub(crate) struct Opened {
     pub(crate) session: Arc<Session>,
     pub(crate) id: SessionId,
@@ -195,8 +210,17 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
             )));
         }
     }
+    // A session without its world would run with no file or shell tools and say nothing; refuse
+    // instead. A world Locked by the plan refuses before any log exists; one that fails to open
+    // refuses after the boot that found out, so its error stays in the log for `aho status`.
+    if let Some(r) = aho_compose::world_refusal(&planned, &[], CODING) {
+        return Err(Fail::Plan(r.to_string()));
+    }
     let prompts = !a.json && stdin_tty() && planned.loadout.str("policy.ask") != Some("never");
     let o = open(ctx, &planned, &inputs.home, a.session.as_deref(), prompts, false).await?;
+    if let Some(r) = aho_compose::world_refusal(&planned, o.session.broken(), CODING) {
+        return Err(Fail::Plan(format!("{r}\n(this boot is recorded in session {}; `aho status` shows it)", hex(o.id))));
+    }
     let mode = if a.json { Mode::Json } else { Mode::Text };
     let mut printer =
         Printer::new(mode, Style { color: !a.json && color(), hud: a.hud, echo_user: false }, std::io::stdout(), std::io::stderr())
@@ -674,11 +698,23 @@ pub fn status(ctx: &Ctx, loud: bool, session: Option<&str>, json: bool) -> Resul
         None => (State::default(), None),
     };
     let st = aho_inspect::status(&p.plan, &state, Timestamp::now());
-    let nodes = surface_rpc::caps::nodes(&p);
+    // What the plan cannot know: rows the session's last boot could not build, with their errors.
+    let shown = aho_compose::with_boot(&p, &state);
+    let nodes = surface_rpc::caps::nodes(&shown);
+    let broken: Vec<(&str, &str)> = shown
+        .plan
+        .rows
+        .iter()
+        .filter_map(|r| match &r.state {
+            aho_log::CapState::Broken { err } => Some((r.id.name, err.as_str())),
+            _ => None,
+        })
+        .collect();
     if json {
         let v = json!({
             "status": st,
             "session": sess.as_ref().map(|(id, (s, why))| json!({"id": id, "status": s, "reason": why})),
+            "broken": broken.iter().map(|(id, err)| json!({"id": id, "err": err})).collect::<Vec<_>>(),
             "diagnostics": if loud { json!(p.loadout.diagnostics) } else { Value::Null },
             "not_active": if loud { json!(nodes.iter().filter(|n| !matches!(n.state, aho_log::CapState::Active)).collect::<Vec<_>>()) } else { Value::Null },
         });
@@ -689,6 +725,12 @@ pub fn status(ctx: &Ctx, loud: bool, session: Option<&str>, json: bool) -> Resul
     match &sess {
         Some((id, (s, why))) => println!("session {id}: {s:?} ({why})"),
         None => println!("no session yet; start one with `aho run`"),
+    }
+    if !broken.is_empty() {
+        println!("broken at the session's last boot (`aho why <id>`):");
+        for (id, err) in &broken {
+            println!("  ✕ {id:<26} {err}");
+        }
     }
     if loud {
         if !p.loadout.diagnostics.is_empty() {

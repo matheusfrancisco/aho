@@ -29,7 +29,7 @@ pub struct Global {
     /// Disable a capability for this invocation; always wins, even over a broken config. Repeatable.
     #[arg(long = "disable", value_name = "ID", global = true)]
     pub disable: Vec<String>,
-    /// Named profile layer `~/.aho/profiles/<name>.toml`.
+    /// Named profile layer: built-in fragments (`coding`), then `~/.aho/profiles/<name>.toml` over them.
     #[arg(long, value_name = "NAME", global = true)]
     pub profile: Option<String>,
     /// Project directory (default: the current directory).

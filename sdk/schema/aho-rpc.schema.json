@@ -3171,6 +3171,21 @@
         {
           "properties": {
             "layer": {
+              "const": "catalog"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "layer",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "layer": {
               "const": "profile"
             },
             "name": {

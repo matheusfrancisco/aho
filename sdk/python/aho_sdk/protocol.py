@@ -243,6 +243,11 @@ class LayerBundle(TypedDict):
     name: str
 
 
+class LayerCatalog(TypedDict):
+    layer: Literal["catalog"]
+    name: str
+
+
 class LayerProfile(TypedDict):
     layer: Literal["profile"]
     name: str
@@ -272,6 +277,7 @@ class LayerRuntime(TypedDict):
 Layer = Union[
     "LayerDefault",
     "LayerBundle",
+    "LayerCatalog",
     "LayerProfile",
     "LayerFileHome",
     "LayerFileProject",

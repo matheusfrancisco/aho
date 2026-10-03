@@ -60,18 +60,20 @@ pub struct SessionConfig {
 }
 
 impl SessionConfig {
+    /// The model limits come from `aho_llm::models::limits` (operator > model catalog > default),
+    /// the rule the TUI's context gauge and `aho explain` show too.
     pub fn from_loadout(l: &Loadout, spill_dir: PathBuf) -> Self {
         let u = |k: &str, d: u64| l.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
         let f = |k: &str, d: f64| l.get(k).and_then(|v| v.as_f64()).unwrap_or(d);
-        let provider = l.str("model.provider").unwrap_or("openai").to_string();
-        let model = l.str("model.name").unwrap_or("gpt-4.1-mini").to_string();
+        let (provider, model) = aho_llm::models::selected(l);
+        let limits = aho_llm::models::limits(l);
         let reasoning = (l.get("model.thinking").and_then(|v| v.as_bool()).unwrap_or(true)
-            && aho_llm::models::lookup(&provider, &model).is_some_and(|m| m.reasoning))
-        .then(|| aho_llm::Reasoning { budget_tokens: u("model.thinking_budget", 4096) as u32 });
+            && aho_llm::models::lookup(provider, model).is_some_and(|m| m.reasoning))
+        .then_some(aho_llm::Reasoning { budget_tokens: limits.thinking_budget });
         SessionConfig {
-            provider,
-            model,
-            max_tokens: u("model.max_tokens", 8192) as u32,
+            provider: provider.to_string(),
+            model: model.to_string(),
+            max_tokens: limits.max_tokens,
             reasoning,
             grace_ms: u("tools.grace_ms", 1000),
             heartbeat_s: u("tools.heartbeat_s", 600),
@@ -79,7 +81,7 @@ impl SessionConfig {
             max_steps: u("session.max_turns", 200),
             spill_budget: u("tools.spill_budget", 200_000) as usize,
             spill_dir,
-            context_window: u("model.context_window", 128_000),
+            context_window: limits.context_window,
             compaction_threshold: f("compaction.threshold", 0.8),
             compaction_retain: f("compaction.retain", 0.16),
             checkpoint_per_call: l.str("checkpoint.granularity").unwrap_or("call") != "turn",
@@ -175,6 +177,8 @@ pub struct Session {
     allowed_caps: BTreeSet<String>,
     /// Sequence for nested (PTC) call ids: `<parent call>.ptc<n>`.
     ptc_seq: std::sync::atomic::AtomicU64,
+    /// Capabilities whose build failed at this boot, with the error each was logged Broken with.
+    broken: Vec<(aho_cap::CapabilityId, String)>,
 }
 
 /// Service `aho.tool_call` (PTC): `(parent call's view, cancel, tool, args) → outcome`, one
@@ -280,6 +284,18 @@ impl Session {
         }
 
         let state = fold_head(&*b.log, &reg.entry_kinds)?;
+        // A row an earlier boot of this log recorded Broken that built this time is Active again,
+        // so `aho status`/`aho why` stop reporting an error that is gone.
+        for row in b.plan.active() {
+            let name = row.id.name;
+            if matches!(state.caps.get(name), Some(aho_log::CapState::Broken { .. })) && !broken.iter().any(|(id, _)| id.name == name) {
+                b.log.append(
+                    None,
+                    Principal::system("resolver"),
+                    EntryKind::CapDelta { id: name.to_string(), op: aho_log::CapDeltaOp::Activated, reason: "built at boot".into() },
+                )?;
+            }
+        }
         let world = b.plan.world.clone();
         // Commands and paths resolve against the bound world's own root: under a confining
         // world that is the sandbox's `/workspace` or the remote directory, not the host project,
@@ -335,6 +351,7 @@ impl Session {
             running: Arc::new(tokio::sync::Mutex::new(())),
             allowed_caps,
             ptc_seq: std::sync::atomic::AtomicU64::new(0),
+            broken,
         });
         let weak = Arc::downgrade(&s);
         nested.get_or_init(move || -> NestedToolCall {
@@ -378,6 +395,10 @@ impl Session {
     }
     pub fn registry(&self) -> &Registry {
         &self.reg
+    }
+    /// What failed to build at this boot (`id`, error); the log holds the same as `CapDelta::Broken`.
+    pub fn broken(&self) -> &[(aho_cap::CapabilityId, String)] {
+        &self.broken
     }
     /// The model route, model id and budgets this session runs with.
     pub fn config(&self) -> &SessionConfig {

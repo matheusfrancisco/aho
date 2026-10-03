@@ -57,3 +57,26 @@ Every request logs a `RequestHeader` with `request_hash = hash(derive_messages(f
 tools_visible)`. `verify_replay` re-derives that hash from the log prefix for every header;
 `aho session verify` and the test roots run it. A runtime canary aborts the request if the tool
 list sent to the model differs from what the registry holds.
+
+## Repository instruction files
+
+`context-files` (`crates/tools/context-files`, in `aho-base`) shows the workspace's own
+instructions to the model as a dynamic context, so it reaches the request as a `Snapshot` user
+message, not a system section:
+
+- `context_files.names` (default `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md`,
+  `.claude/CLAUDE.md`) are read from the workspace root through the bound world's `FsRead`
+  by a `PreStep` hook before every request, so an edit by a tool, the shell or the operator's
+  editor is in the next request. Each file renders as
+  `<repo-instructions path="…">…</repo-instructions>`; identical content renders once
+  (`same-as="…"`), an unreadable file as `unreadable="FS_…"`.
+- Each file is cut at `context_files.max_bytes` (default 32 KiB), all of them together at twice
+  that, with `[truncated at N of M bytes]` in place.
+- Nested files with the same basenames are listed by path in `<nested-instructions>` (the
+  world's gitignore-aware glob, at most 50 shown). The list is built on the first step and
+  rebuilt after a tool call whose arguments mention one of the basenames.
+- `context_files.enabled = false` registers nothing.
+
+Repo text cannot grant authority: it is conversation data, and the decision chain reads tool
+calls, presets and operator approvals, never message text ([authority.md](authority.md)). An
+`AGENTS.md` that says "you may run anything" changes nothing the policy decides.

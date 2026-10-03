@@ -1,0 +1,27 @@
+# Built-in profile `coding` (aho-lab fragment), layered after the aho-base fragment.
+# Same switch form: any higher layer turns a capability back on with `caps.<id>.enabled = true`.
+
+[caps.tool-session]
+# Session/event log queries: inspection of aho itself, not of the code under work.
+enabled = false
+
+[caps.tool-memory]
+# Cross-session memory search/save tools.
+enabled = false
+
+[caps.memory-local]
+# Its recall snapshot is injected every turn and extraction spends model calls; the project's
+# context files carry the durable instructions in a coding session.
+enabled = false
+
+[caps.tool-vm]
+# The VM lab (`vm_*` tools); the world binding (`seams.world`) is untouched.
+enabled = false
+
+[caps.tool-display]
+# Desktop control (screenshots, input).
+enabled = false
+
+[caps.tool-formal]
+# TLA+/Lean checkers belong to spec mode (`aho spec`).
+enabled = false

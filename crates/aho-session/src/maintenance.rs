@@ -231,7 +231,8 @@ impl Session {
 
     /// `aho shell -- <cmd>`: an operator command in the same world, logged and shown to the agent.
     pub async fn operator_command(&self, _op: &Operator, command: &str) -> Result<String, SessionError> {
-        let sp = self.reg.handle::<SubprocessHandle>().ok_or_else(|| SessionError::NotFound("no Subprocess provider is bound".into()))?;
+        let sp =
+            self.reg.handle::<SubprocessHandle>().ok_or_else(|| SessionError::NotFound(self.unbound(aho_cap::HandleKind::Subprocess)))?;
         // One view, one lock: a second `lk` inside the same expression would wait on the guard
         // the first one still holds (temporaries live to the end of the statement).
         let view = lk(&self.policy).view();
@@ -270,6 +271,17 @@ impl Session {
             EntryKind::UserMessage { form: Form::Notice, text: format!("Operator ran `{command}`; exit {}.", exit.code), client_key: None },
         )?;
         Ok(text)
+    }
+
+    /// "no `kind` provider is bound", plus the error of the provider that declares `kind` and
+    /// failed to build at this boot (the world's own reason, not just the missing handle).
+    fn unbound(&self, kind: aho_cap::HandleKind) -> String {
+        let manifests = self.reg.service::<Arc<Vec<&'static aho_cap::Manifest>>>("aho.manifests").unwrap_or_default();
+        let cause = self.broken.iter().find(|(id, _)| manifests.iter().any(|m| m.id == *id && m.provides_handles.contains(&kind)));
+        match cause {
+            Some((id, err)) => format!("no {kind:?} provider is bound: {} is Broken: {err}", id.name),
+            None => format!("no {kind:?} provider is bound"),
+        }
     }
 
     /// Ops that were open at load: re-runnable → re-dispatch; external effect → Uncertain; else Failed.

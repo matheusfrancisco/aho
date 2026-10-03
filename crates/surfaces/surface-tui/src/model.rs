@@ -634,7 +634,8 @@ pub struct PlanInfo {
     pub model: String,
     /// The model's list price on its route; `None` (not in the catalog) shows token counts.
     pub price: Option<Price>,
-    /// The context budget (`model.context_window`) and the ratio of it compaction starts at.
+    /// The context budget (`model.context_window`, or the model catalog's window: the session's
+    /// own `SessionConfig` value) and the ratio of it compaction starts at.
     pub context_window: u64,
     pub compact_at: f64,
     /// The workspace as the status line shows it (`~/…`); empty hides it.

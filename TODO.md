@@ -20,6 +20,12 @@ Unfinished work and known gaps, with what closing each one looks like. Direction
 - **Namespace overlay lifetime**: the recipe root's overlay writes last only while the keeper
   runs; `/workspace` and `/session` persist across keeper restarts. Document-only gap unless a
   persistent overlay is wanted.
+- **verify-gate checks once per turn**: the session lets a TurnStopping hook keep a turn going
+  only once, so the stop after a failed check is not re-verified. Closed when a denied stop
+  can be re-checked without breaking the once-only recursion guard.
+- **Deleted instruction files leave their last snapshot**: when every AGENTS.md/CLAUDE.md is
+  removed mid-session, `context-files` sends nothing new, so the model keeps the last text it
+  saw. Closed when removal is sent as an explicit empty snapshot.
 
 ## Enforcement gaps
 
@@ -96,11 +102,6 @@ alone. Prior art: NVIDIA OpenShell (supervisor, egress proxy, prover, sandbox li
   `vm-guest`/`vm-guest-agent` (8), `mcp-stdio/client` (+4), `surface-tui/runtime` (+4),
   `aho-proc` (+1), `display-xserver` (3). Closed by handling or annotating each site, or by a
   deliberate `scripts/gate.sh --fix` with review — not by letting the baseline drift.
-- **World build errors are flattened**: a failing `world = vm` boot surfaces to `aho shell`
-  only as `no Subprocess provider is bound`; the actual reason (observed: `agent workspace is
-  /work, not /workspace`) is swallowed per-attempt in `VmWorld::open` (`let _ = e`) and lost
-  again when the Broken capability is reported by handle. Closed when the operator sees the
-  world's own error text without patching in an `eprintln`.
 - **CLI panics on closed stdout**: `aho sandbox status | head -2` → `failed printing to
   stdout: Broken pipe` panic. Closed by tolerating EPIPE process-wide.
 - ~~Cross-process append race can brick a session log~~ **fixed 2026-09-28** (it struck three

@@ -354,6 +354,7 @@ pub static DEFS: &[Def] = &[
         &[
             var("default", &[]),
             var("bundle", &[req("name", Str)]),
+            var("catalog", &[req("name", Str)]),
             var("profile", &[req("name", Str)]),
             var("file_home", &[]),
             var("file_project", &[]),

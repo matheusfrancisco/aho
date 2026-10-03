@@ -556,6 +556,8 @@ pub fn child_plan(
     let mut loadout = loadout.clone();
     if let Some(m) = model {
         override_key(&mut loadout, "model.name", json!(m), "subagent model");
+        // The parent's catalog limits were for its model; the child's log shows the child's.
+        aho_llm::models::apply_catalog(&mut loadout);
     }
     if tool_filter.is_empty() {
         return Ok((plan, loadout));

@@ -6,6 +6,16 @@ use super::*;
 
 pub type BuildFn = fn(&mut Resolver, &Loadout) -> Result<(), BuildError>;
 
+/// One bundle's fragment of a built-in profile: TOML that `--profile <name>` layers at
+/// `Layer::Profile(name)` below the operator's own `~/.aho/profiles/<name>.toml`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BuiltinProfile {
+    pub name: &'static str,
+    /// The composition that shipped the fragment (kept through `include`).
+    pub bundle: &'static str,
+    pub text: &'static str,
+}
+
 /// A product is a Rust value, not a YAML stack.
 #[derive(Clone)]
 pub struct Composition {
@@ -13,11 +23,12 @@ pub struct Composition {
     rows: Vec<(&'static Manifest, BuildFn)>,
     defaults: Vec<(String, Value)>,
     discoverers: Vec<Arc<dyn Discoverer>>,
+    profiles: Vec<BuiltinProfile>,
 }
 
 impl Composition {
     pub fn new(name: &'static str) -> Self {
-        Composition { name, rows: vec![], defaults: vec![], discoverers: vec![] }
+        Composition { name, rows: vec![], defaults: vec![], discoverers: vec![], profiles: vec![] }
     }
     pub fn include(mut self, other: Composition) -> Self {
         for r in other.rows {
@@ -27,6 +38,11 @@ impl Composition {
         }
         self.defaults.extend(other.defaults);
         self.discoverers.extend(other.discoverers);
+        for p in other.profiles {
+            if !self.profiles.iter().any(|q| q.name == p.name && q.bundle == p.bundle) {
+                self.profiles.push(p);
+            }
+        }
         self
     }
     /// `provide` / `consume` / `surface` are the same call; the split is documentation.
@@ -56,6 +72,13 @@ impl Composition {
         self.discoverers.push(d);
         self
     }
+    /// Ships `text` (TOML) as this bundle's fragment of built-in profile `name`. Fragments of one
+    /// name from included bundles layer in include order; later fragments win within the rank.
+    pub fn profile(mut self, name: &'static str, text: &'static str) -> Self {
+        self.profiles.retain(|p| !(p.name == name && p.bundle == self.name));
+        self.profiles.push(BuiltinProfile { name, bundle: self.name, text });
+        self
+    }
     pub fn manifests(&self) -> Vec<&'static Manifest> {
         self.rows.iter().map(|(m, _)| *m).collect()
     }
@@ -64,6 +87,10 @@ impl Composition {
     }
     pub fn discoverers(&self) -> &[Arc<dyn Discoverer>] {
         &self.discoverers
+    }
+    /// Every built-in profile fragment, in layering order.
+    pub fn profiles(&self) -> &[BuiltinProfile] {
+        &self.profiles
     }
     /// Every config key any linked capability declares, plus the core keys.
     pub fn config_keys(&self) -> Vec<ConfigKey> {
@@ -75,7 +102,9 @@ impl Composition {
     }
 
     /// Builds Active rows in plan order. A capability whose build/register fails, or whose
-    /// registration drifts from its manifest, is marked Broken; the rest still start.
+    /// registration drifts from its manifest, is marked Broken; the rest still start. A row that
+    /// fails for a handle a Broken provider declared carries that provider's error, so a broken
+    /// world reads `missing handle FsRead: world-vm is Broken: <its own error>` on every dependent.
     pub fn start(&self, plan: &Plan, loadout: &Loadout) -> (Registry, Vec<(CapabilityId, String)>) {
         self.start_seeded(plan, loadout, Registry::default())
     }
@@ -84,7 +113,9 @@ impl Composition {
     /// approval channel) already in the resolver so tools can declare them in `Deps`.
     pub fn start_seeded(&self, plan: &Plan, loadout: &Loadout, seed: Registry) -> (Registry, Vec<(CapabilityId, String)>) {
         let mut resolver = Resolver { reg: seed, policy: plan.allowed };
-        let mut broken = Vec::new();
+        let mut broken: Vec<(CapabilityId, String)> = Vec::new();
+        // The manifest behind each `broken` row, index for index.
+        let mut failed: Vec<&'static Manifest> = Vec::new();
         // Build in dependency order so a provider that holds another provider's handle sees it built;
         // `plan.rows` is sorted for display. A cycle already failed `plan`, so the fallback is unreachable
         // in a planned composition.
@@ -99,7 +130,16 @@ impl Composition {
                 continue;
             }
             if let Err(e) = build(&mut resolver, loadout) {
-                broken.push((m.id, e.to_string()));
+                let cause = match e {
+                    BuildError::Missing(kind) => failed.iter().zip(&broken).find(|(f, _)| f.provides_handles.contains(&kind)),
+                    _ => None,
+                };
+                let err = match cause {
+                    Some((f, (_, cause))) => format!("{e}: {} is Broken: {cause}", f.id.name),
+                    None => e.to_string(),
+                };
+                failed.push(m);
+                broken.push((m.id, err));
             }
         }
         (resolver.reg, broken)
@@ -133,7 +173,12 @@ pub fn core_keys() -> Vec<ConfigKey> {
         ConfigKey::new("policy.ask", Ty::String, Some(json!("ask")), "Approval policy: ask | never."),
         ConfigKey::new("model.provider", Ty::String, Some(json!("openai")), "Default model provider (an llm adapter route)."),
         ConfigKey::new("model.name", Ty::String, Some(json!("gpt-4.1-mini")), "Default model id."),
-        ConfigKey::new("model.max_tokens", Ty::Int, Some(json!(8192)), "Max output tokens per request."),
+        ConfigKey::new(
+            "model.max_tokens",
+            Ty::Int,
+            Some(json!(8192)),
+            "Max output tokens per request. Unset: the model catalog's output limit, capped at 64000 and at the window above `compaction.threshold`; this default for uncatalogued models.",
+        ),
         ConfigKey::new(
             "model.thinking",
             Ty::Bool,
@@ -144,13 +189,13 @@ pub fn core_keys() -> Vec<ConfigKey> {
             "model.thinking_budget",
             Ty::Int,
             Some(json!(4096)),
-            "Provider reasoning-token budget; Anthropic clamps it below `model.max_tokens`.",
+            "Provider reasoning-token budget, kept below `model.max_tokens`. Unset: min(16384, max_tokens / 2) for catalogued reasoning models.",
         ),
         ConfigKey::new(
             "model.context_window",
             Ty::Int,
             Some(json!(128000)),
-            "Context budget in tokens: compaction and the TUI's context gauge measure against it.",
+            "Context budget in tokens: compaction and the TUI's context gauge measure against it. Unset: the model catalog's window (anthropic: 200000, no 1M beta); this default for uncatalogued models.",
         ),
         ConfigKey::new("session.dir", Ty::String, Some(json!(".aho/sessions")), "Session log directory."),
         ConfigKey::new("session.max_turns", Ty::Int, Some(json!(200)), "Hard cap on steps per turn."),

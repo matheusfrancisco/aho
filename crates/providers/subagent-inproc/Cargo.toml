@@ -14,12 +14,12 @@ aho-policy.workspace = true
 aho-approval.workspace = true
 aho-session.workspace = true
 aho-subagent.workspace = true
+aho-llm.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-aho-llm.workspace = true
 llm-scripted = { path = "../llm-scripted" }
 
 [lints]

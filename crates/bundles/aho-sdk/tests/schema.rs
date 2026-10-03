@@ -146,6 +146,7 @@ fn sourced() -> Sourced<Value> {
             (Origin::new(Layer::Profile("ci".into()), file("ci.toml", 3)), json!(1)),
             (Origin::new(Layer::Runtime("unlock_request".into()), Where::Entry { id: EntryId(7) }), json!({"a": 1})),
             (Origin::new(Layer::Bundle("aho-base".into()), Where::Const), json!("workspace")),
+            (Origin::new(Layer::Catalog("anthropic/claude-sonnet-4-5".into()), Where::Const), json!(64000)),
             (Origin::new(Layer::Default, Where::Const), json!("read-only")),
         ],
     }

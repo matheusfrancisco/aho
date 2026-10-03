@@ -17,6 +17,9 @@ use serde::{Deserialize, Serialize};
 pub enum Layer {
     Default,
     Bundle(String),
+    /// Derived, not set: a value read from a catalog for other settings (the `model.*` limits
+    /// of `<provider>/<model>`). Beats engineer defaults, loses to every operator layer.
+    Catalog(String),
     Profile(String),
     FileHome,
     FileProject,
@@ -30,17 +33,23 @@ impl Layer {
         match self {
             Layer::Default => 0,
             Layer::Bundle(_) => 1,
-            Layer::Profile(_) => 2,
-            Layer::FileHome => 3,
-            Layer::FileProject => 4,
-            Layer::Env => 5,
-            Layer::Arg => 6,
-            Layer::Runtime(_) => 7,
+            Layer::Catalog(_) => 2,
+            Layer::Profile(_) => 3,
+            Layer::FileHome => 4,
+            Layer::FileProject => 5,
+            Layer::Env => 6,
+            Layer::Arg => 7,
+            Layer::Runtime(_) => 8,
         }
+    }
+    /// Someone chose this value (profile, files, env, flags, runtime), rather than the engineer
+    /// (Default, Bundle) or a catalog.
+    pub fn is_operator(&self) -> bool {
+        !matches!(self, Layer::Default | Layer::Bundle(_) | Layer::Catalog(_))
     }
     pub fn scope(&self) -> Scope {
         match self {
-            Layer::Default | Layer::Bundle(_) | Layer::Profile(_) => Scope::Machine,
+            Layer::Default | Layer::Bundle(_) | Layer::Catalog(_) | Layer::Profile(_) => Scope::Machine,
             Layer::FileHome => Scope::User,
             Layer::FileProject => Scope::Project,
             // Env vars usually come from a shell rc: user-wide, not this invocation.
@@ -88,6 +97,7 @@ impl Origin {
         let layer = match &self.layer {
             Layer::Default => "Default".to_string(),
             Layer::Bundle(n) => format!("Bundle {n}"),
+            Layer::Catalog(n) => format!("Catalog {n}"),
             Layer::Profile(n) => format!("Profile {n}"),
             Layer::FileHome | Layer::FileProject => "File".to_string(),
             Layer::Env => "Env".to_string(),
@@ -321,6 +331,27 @@ impl Loadout {
         }
         root
     }
+    /// Ranks a value derived from other settings (`Layer::Catalog` named `name`) among the key's
+    /// layers: it wins over Default and Bundle values and is shadowed by every operator layer.
+    /// An earlier catalog value of the key is replaced, so re-deriving after the model changes
+    /// never stacks; `None` only drops it.
+    pub fn derive(&mut self, key: &str, value: Option<Value>, name: &str) {
+        let mut layers: Vec<(Origin, Value)> = match self.config.remove(key) {
+            Some(s) => std::iter::once((s.winner, s.value)).chain(s.shadowed).collect(),
+            None => Vec::new(),
+        };
+        layers.retain(|(o, _)| !matches!(o.layer, Layer::Catalog(_)));
+        if let Some(v) = value {
+            let origin = Origin::new(Layer::Catalog(name.to_string()), Where::Const);
+            let at = layers.iter().position(|(o, _)| o.layer.rank() < origin.layer.rank()).unwrap_or(layers.len());
+            layers.insert(at, (origin, v));
+        }
+        let mut layers = layers.into_iter();
+        if let Some((winner, value)) = layers.next() {
+            self.config.insert(key.to_string(), Sourced { value, winner, shadowed: layers.collect() });
+        }
+        self.hash = loadout_hash(&self.config, &self.disabled, self.schema_hash);
+    }
 }
 
 #[derive(Debug)]
@@ -474,11 +505,7 @@ pub fn resolve(inputs: &ResolveInputs, schema: &Schema, strict: bool) -> Result<
     }
 
     let schema_hash = schema.hash();
-    let hash = {
-        let values: BTreeMap<&String, &Value> = config.iter().map(|(k, s)| (k, &s.value)).collect();
-        let dis: Vec<&String> = disabled.iter().map(|(d, _)| d).collect();
-        Hash::of_json(&(values, dis, schema_hash))
-    };
+    let hash = loadout_hash(&config, &disabled, schema_hash);
     if strict {
         let errs: Vec<Diagnostic> = diagnostics.iter().filter(|d| d.severity >= Severity::Warning).cloned().collect();
         if !errs.is_empty() {
@@ -486,6 +513,13 @@ pub fn resolve(inputs: &ResolveInputs, schema: &Schema, strict: bool) -> Result<
         }
     }
     Ok(Loadout { hash, config, secrets, disabled, inputs: input_digests, schema_hash, diagnostics })
+}
+
+/// The loadout's identity: winning values, disabled ids and the schema, never origins.
+fn loadout_hash(config: &BTreeMap<String, Sourced<Value>>, disabled: &[(String, Origin)], schema_hash: Hash) -> Hash {
+    let values: BTreeMap<&String, &Value> = config.iter().map(|(k, s)| (k, &s.value)).collect();
+    let dis: Vec<&String> = disabled.iter().map(|(d, _)| d).collect();
+    Hash::of_json(&(values, dis, schema_hash))
 }
 
 /// Flattens TOML into dotted leaf keys.
@@ -704,6 +738,33 @@ mod tests {
             diff(&resolve(&c, &schema(), false).unwrap(), &la),
             vec![("sandbox.mode".into(), Some(json!("host")), Some(json!("vm")))]
         );
+    }
+
+    #[test]
+    fn a_catalog_value_beats_engineer_defaults_loses_to_operators_and_rederiving_replaces_it() {
+        let mut l = resolve(&ResolveInputs::default(), &schema(), false).unwrap();
+        let before = l.hash;
+        l.derive("tools.grace_ms", Some(json!(5)), "a/m");
+        let s = &l.config["tools.grace_ms"];
+        assert_eq!((s.value.clone(), s.winner.render()), (json!(5), "Catalog a/m".to_string()));
+        assert_eq!(s.shadowed[0].0.layer, Layer::Default);
+        assert_ne!(l.hash, before, "the winning value changed, so the loadout's identity did");
+        l.derive("tools.grace_ms", Some(json!(7)), "a/n");
+        let s = &l.config["tools.grace_ms"];
+        assert_eq!((s.value.clone(), s.shadowed.len()), (json!(7), 1), "a re-derived value replaces the stale one");
+        l.derive("tools.grace_ms", None, "a/unknown");
+        assert_eq!(l.config["tools.grace_ms"].value, json!(1000), "an uncatalogued model falls back to the default");
+        assert_eq!(l.hash, before);
+
+        let mut inputs = ResolveInputs::default();
+        inputs.files.push(file("./aho.toml", Layer::FileProject, "[tools]\ngrace_ms = 3\n"));
+        let mut l = resolve(&inputs, &schema(), false).unwrap();
+        l.derive("tools.grace_ms", Some(json!(5)), "a/m");
+        let s = &l.config["tools.grace_ms"];
+        assert_eq!(s.value, json!(3), "an operator value wins over the catalog");
+        assert!(s.winner.layer.is_operator());
+        let ranks: Vec<String> = s.shadowed.iter().map(|(o, _)| o.render()).collect();
+        assert_eq!(ranks, ["Catalog a/m", "Default"]);
     }
 
     #[test]

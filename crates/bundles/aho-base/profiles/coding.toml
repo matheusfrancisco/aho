@@ -1,0 +1,40 @@
+# Built-in profile `coding` (aho-base fragment): `aho --profile coding run`.
+#
+# Shows the model only what a coding session uses. Switches are `caps.<id>.enabled` keys, not a
+# `disable` list, so any higher layer turns one back on: `caps.tool-goals.enabled = true` in
+# ~/.aho/profiles/coding.toml, ~/.aho/config.toml or ./aho.toml, or
+# `--set caps.tool-goals.enabled=true`.
+#
+# Kept as the bundle ships them (no line here): tool-fs, tool-bash, tool-jobs
+# (background builds), tool-lsp, tool-run-code, tool-todo, tool-subagent (scout/reviewer),
+# tool-skills, tool-web-fetch / tool-web-search, tool-plan-mode (read-only planning is a coding
+# safety rail), tool-inspect (aho_why / unlock_request tell the model why a tool is missing),
+# and MCP servers' own tools (mcp-stdio / mcp-http).
+
+[caps.verify-gate]
+# Checks the work before the turn may stop.
+enabled = true
+
+[caps.context-files]
+# Loads the project's context files (AGENTS.md / CLAUDE.md) into the system prompt.
+enabled = true
+
+[caps.tool-goals]
+# Multi-round goal tracking: the todo list covers a coding turn.
+enabled = false
+
+[caps.tool-schedule]
+# Timed and recurring prompts belong to the daemon, not an edit loop.
+enabled = false
+
+[caps.tool-workflow]
+# The `ralph` loop is an operator-driven workflow (`aho ralph`), not a model tool.
+enabled = false
+
+[caps.tool-tasks]
+# The task-graph swarm: subagent scout/reviewer covers delegation in a coding session.
+enabled = false
+
+[caps.tool-mcp-resources]
+# Generic MCP resource browsing; servers' own tools stay.
+enabled = false

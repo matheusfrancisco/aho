@@ -8,7 +8,9 @@
 //! subagent-inproc` by default), skills (SKILL.md directories, discovered into the tree), MCP
 //! servers over stdio and HTTP with their resource tools, the task-graph, goal, todo, schedule,
 //! workflow and plan-mode tools, web fetch/search, LSP, Claude Code hooks compatibility (opt-in),
-//! and the self-inspection tools (`aho_why`, `aho_inspect`, `unlock_request`) the session points
+//! the verify gate (`verify-gate`: before a turn that changed the workspace stops, the project's
+//! check runs in the bound world; a failure keeps the turn going once, `verify.enabled` turns it
+//! off), and the self-inspection tools (`aho_why`, `aho_inspect`, `unlock_request`) the session points
 //! the model at when a tool is missing, plus the engineer defaults that sit at `Layer::Bundle`:
 //! every operator layer (profile, files, env, flags) still shadows them.
 //! Products built on the spine `include` it; `Composition::include` carries these defaults along.
@@ -21,6 +23,10 @@ use aho_cap::Composition;
 use serde_json::json;
 
 pub const NAME: &str = "aho-base";
+
+/// The spine's fragment of built-in profile `coding` (`aho --profile coding`): turns off the
+/// non-coding tool families; the operator's `~/.aho/profiles/coding.toml` layers over it.
+pub const CODING_PROFILE: &str = include_str!("../profiles/coding.toml");
 
 /// Engineer defaults (`Layer::Bundle`). The product ships under `workspace`, with a 1 s grace
 /// window for async tool calls and a 10 min heartbeat while only calls are pending.
@@ -55,6 +61,7 @@ pub fn spine() -> Composition {
         .consume::<tool_terminal::ToolTerminal>()
         .consume::<tool_run_code::ToolRunCode>()
         .consume::<tool_fs::ToolFs>()
+        .consume::<context_files::ContextFiles>()
         .consume::<tool_bash::ToolBash>()
         .consume::<tool_jobs::ToolJobs>()
         .consume::<tool_lsp::ToolLsp>()
@@ -77,6 +84,8 @@ pub fn spine() -> Composition {
         .provide::<tool_web::WebFetch>()
         .provide::<tool_web::WebSearch>()
         .provide::<hooks_claude_code::ClaudeCodeHooks>()
+        .provide::<verify_gate::VerifyGate>()
+        .profile("coding", CODING_PROFILE)
         .provide::<telemetry::Telemetry>();
     defaults().into_iter().fold(c, |c, (k, v)| c.default(k, v))
 }

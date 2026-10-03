@@ -9,6 +9,8 @@ description = "the spine every product includes"
 aho-cap.workspace = true
 serde_json.workspace = true
 tool-fs = { path = "../../tools/tool-fs" }
+context-files = { path = "../../tools/context-files" }
+verify-gate = { path = "../../tools/verify-gate" }
 tool-inspect = { path = "../../tools/tool-inspect" }
 tool-web = { path = "../../tools/tool-web" }
 mcp-http = { path = "../../providers/mcp-http" }

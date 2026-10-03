@@ -60,10 +60,12 @@ pub fn plan(ctx: &Ctx, patch: Option<&Path>, lock: bool, strict: bool, json: boo
     };
     let shown = after.as_ref().unwrap_or(&before);
     let diff = after.as_ref().map(|a| aho_compose::plan_diff(&before, a));
+    // Rows the last boot of this very plan could not build show Broken with their error.
+    let display = crate::session::booted(ctx, shown)?;
     if json {
         print_json(&json!({
             "composition": ctx.comp.name,
-            "plan": shown.plan,
+            "plan": display.plan,
             "config": shown.loadout.config,
             "disabled": shown.loadout.disabled.iter().map(|(id, o)| json!({"id": id, "origin": o.render()})).collect::<Vec<_>>(),
             "diagnostics": shown.loadout.diagnostics,
@@ -72,7 +74,7 @@ pub fn plan(ctx: &Ctx, patch: Option<&Path>, lock: bool, strict: bool, json: boo
             "diff": diff,
         }))?;
     } else {
-        print!("{}", aho_inspect::render_tree(ctx.comp.name, &caps::nodes(shown), &shown.plan));
+        print!("{}", aho_inspect::render_tree(ctx.comp.name, &caps::nodes(&display), &display.plan));
         println!("\nconfig:");
         print!("{}", config_lines(&shown.loadout.config));
         if !shown.loadout.diagnostics.is_empty() {
@@ -111,7 +113,7 @@ pub fn lock(ctx: &Ctx) -> Result<(), Fail> {
 // ───────────────────────────── projections ─────────────────────────────
 
 pub fn tree(ctx: &Ctx, id: Option<&str>, json: bool) -> Result<(), Fail> {
-    let p = ctx.load(&ctx.inputs(&[], false)?)?;
+    let p = crate::session::booted(ctx, &ctx.load(&ctx.inputs(&[], false)?)?)?;
     let all = caps::nodes(&p);
     let picked: Vec<TreeNode> = match id {
         Some(id) => vec![caps::find_node(&all, id).cloned().ok_or_else(|| unknown_cap(id, &all))?],
@@ -152,6 +154,9 @@ pub fn render_why(w: &Why) -> String {
     let mut out = format!("{} {}  {}  ({})\n", aho_inspect::glyph(&w.state), w.id, aho_inspect::state_name(&w.state), w.kind);
     let row = |k: &str, v: String| format!("  {k:<12} {v}\n");
     out.push_str(&row("because", w.because.clone()));
+    if let aho_log::CapState::Broken { err } = &w.state {
+        out.push_str(&row("error", err.clone()));
+    }
     if w.classes.0 != 0 {
         out.push_str(&row("classes", aho_inspect::render_classes(w.classes)));
     }
@@ -189,7 +194,7 @@ pub fn render_why(w: &Why) -> String {
 }
 
 pub fn why(ctx: &Ctx, id: &str, json: bool) -> Result<(), Fail> {
-    let p = ctx.load(&ctx.inputs(&[], false)?)?;
+    let p = crate::session::booted(ctx, &ctx.load(&ctx.inputs(&[], false)?)?)?;
     let nodes = caps::nodes(&p);
     let w = aho_inspect::why_in(&nodes, &p.plan, id).ok_or_else(|| unknown_cap(id, &nodes))?;
     if json {

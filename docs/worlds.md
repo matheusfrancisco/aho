@@ -13,6 +13,28 @@ A world is where the session's files, processes, and terminals live. The column 
 "Policy only" means the decision chain is the last line of defense — a floor, not a sandbox.
 The sandbox worlds hold even against a maximally wrong agent.
 
+## When the world does not come up
+
+The plan is pure, so a world can be Active in it and still fail to open (ssh refuses, the
+sandbox VM's agent answers with an error). That failure is the world's own Broken row, and every
+capability that needed its handles carries it:
+`tool-fs  Broken: missing handle FsRead: world-ssh is Broken: probe failed: <the world's error>`.
+`world-vm` keeps the distinct errors of its connect attempts (newest first, with counts) in that
+text rather than only the last timeout.
+
+- `aho run` (interactive and `-p`) refuses with exit 2 when the selected world is not usable:
+  Locked/Disabled by the plan (refused before a log exists) while `tool-fs` or `tool-bash` is
+  on, or Broken at boot (always; the boot is logged first). It prints the world's error, which
+  coding tools lost it, and the fixes (the world's own, then `aho why <world>`). A coding tool
+  the operator switched off (`--disable`, `caps.<id>.enabled = false`) is not a reason.
+  Runs through a live `aho serve` daemon are booted by the daemon and not checked here.
+- `aho status` lists `broken at the session's last boot`; `aho plan`, `aho tree` and `aho why`
+  show those rows Broken with their error (`why` prints an `error` line). Only the newest
+  session's log counts, and only when it was sealed under the current plan; a later boot that
+  builds the row again records it Active.
+- `aho shell -- <cmd>` names the Broken provider: `no Subprocess provider is bound: world-ssh is
+  Broken: …`.
+
 ## aho-net
 
 Sandbox worlds plug their only NIC into `net-userspace`: a userspace switch with DHCP/DHCPv6/RA,

@@ -307,18 +307,20 @@ impl VmWorld {
         manager.start_sandbox()?;
         let socket = manager.guest_socket(SANDBOX_NAME)?;
         let until = std::time::Instant::now() + boot;
+        let mut attempts = Attempts::default();
         let guest = loop {
             match vm_guest::Guest::connect(socket.clone(), machine.recipe.workspace.clone(), manager.guard(SANDBOX_NAME)) {
                 Ok(guest) => break guest,
-                Err(e) if std::time::Instant::now() < until => {
-                    let _ = e;
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                }
                 Err(e) => {
-                    return Err(VmError::Locked(format!(
-                        "the sandbox VM did not answer within {}s: {e}. Its console (`aho sandbox status`) shows how far it booted; the recipe's image must run vm-guest-agent",
-                        boot.as_secs()
-                    )));
+                    attempts.push(e);
+                    if std::time::Instant::now() >= until {
+                        return Err(VmError::Locked(format!(
+                            "the sandbox VM did not answer within {}s: {}. Its console (`aho sandbox status`) shows how far it booted; the recipe's image must run vm-guest-agent",
+                            boot.as_secs(),
+                            attempts.render()
+                        )));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
                 }
             }
         };
@@ -346,6 +348,47 @@ impl VmWorld {
     }
     pub fn manager(&self) -> &Arc<VmManager> {
         &self.manager
+    }
+}
+
+/// The distinct errors of a retried connect, newest last, with how often each occurred. Bounded:
+/// a guest that answers with a new error every attempt keeps the latest few and counts the rest.
+#[derive(Default)]
+struct Attempts {
+    seen: Vec<(String, u32)>,
+    dropped: u32,
+}
+
+impl Attempts {
+    const KEEP: usize = 4;
+
+    fn push(&mut self, err: String) {
+        if let Some(i) = self.seen.iter().position(|(e, _)| *e == err) {
+            let (e, n) = self.seen.remove(i);
+            self.seen.push((e, n + 1));
+            return;
+        }
+        if self.seen.len() == Self::KEEP {
+            self.seen.remove(0);
+            self.dropped += 1;
+        }
+        self.seen.push((err, 1));
+    }
+
+    /// `last error (×n); earlier: other (×m); …`, so a guest that refuses the agent (wrong
+    /// workspace, protocol mismatch) is told apart from one that never answered.
+    fn render(&self) -> String {
+        let one = |(e, n): &(String, u32)| if *n > 1 { format!("{e} (×{n})") } else { e.clone() };
+        let Some((last, earlier)) = self.seen.split_last() else { return "no attempt was made".into() };
+        let mut out = one(last);
+        if !earlier.is_empty() {
+            out.push_str("; earlier: ");
+            out.push_str(&earlier.iter().rev().map(one).collect::<Vec<_>>().join("; "));
+        }
+        if self.dropped > 0 {
+            out.push_str(&format!("; and {} other error(s)", self.dropped));
+        }
+        out
     }
 }
 
@@ -431,4 +474,27 @@ pub fn media_kind(name: &str) -> Option<MediaKind> {
         "firmware" => MediaKind::Firmware,
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Attempts;
+
+    #[test]
+    fn a_refused_agent_is_reported_next_to_the_timeouts_that_followed_it() {
+        let mut a = Attempts::default();
+        a.push("agent workspace is /work, not /workspace".into());
+        a.push("agent workspace is /work, not /workspace".into());
+        a.push("connection refused".into());
+        assert_eq!(a.render(), "connection refused; earlier: agent workspace is /work, not /workspace (×2)");
+    }
+
+    #[test]
+    fn many_distinct_errors_keep_the_latest_few_and_count_the_rest() {
+        let mut a = Attempts::default();
+        for i in 0..7 {
+            a.push(format!("e{i}"));
+        }
+        assert_eq!(a.render(), "e6; earlier: e5; e4; e3; and 3 other error(s)");
+    }
 }

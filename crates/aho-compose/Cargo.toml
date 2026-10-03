@@ -10,6 +10,7 @@ aho-types.workspace = true
 aho-log.workspace = true
 aho-cap.workspace = true
 aho-config.workspace = true
+aho-llm.workspace = true
 aho-policy.workspace = true
 serde.workspace = true
 serde_json.workspace = true

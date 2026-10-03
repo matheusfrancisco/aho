@@ -63,15 +63,17 @@ impl Inputs {
         self.home.join(".aho").join("profiles").join(format!("{name}.toml"))
     }
 
-    /// Reads the profile (if named), `~/.aho/config.toml`, and `./aho.toml` into `files`,
-    /// replacing any earlier capture of those three layers. A named profile must exist.
+    /// Reads the profile file (if named and present), `~/.aho/config.toml`, and `./aho.toml` into
+    /// `files`, replacing any earlier capture of those three layers. A named profile with neither a
+    /// file nor a built-in fragment is refused by `load`, which knows the composition's built-ins.
     pub fn capture_files(&mut self) -> Result<(), ComposeError> {
         self.files.retain(|f| !matches!(f.layer, Layer::Profile(_) | Layer::FileHome | Layer::FileProject));
         if let Some(name) = self.profile.clone() {
             validate_name("profile", &name)?;
             let path = self.profile_path(&name);
-            let text = read_optional(&path)?.ok_or_else(|| ComposeError::ProfileNotFound { name: name.clone(), path: path.clone() })?;
-            self.files.push(FileSnapshot { path: path.display().to_string(), layer: Layer::Profile(name), text });
+            if let Some(text) = read_optional(&path)? {
+                self.files.push(FileSnapshot { path: path.display().to_string(), layer: Layer::Profile(name), text });
+            }
         }
         for (path, layer) in [(self.home_config(), Layer::FileHome), (self.project_config(), Layer::FileProject)] {
             if let Some(text) = read_optional(&path)? {

@@ -1007,7 +1007,7 @@ fn thinking_settings_default_on_and_can_disable_generation_and_display() {
     };
     let defaults = load("");
     let cfg = aho_session::SessionConfig::from_loadout(&defaults, std::path::PathBuf::new());
-    assert_eq!(cfg.reasoning, Some(aho_llm::Reasoning { budget_tokens: 4096 }));
+    assert_eq!(cfg.reasoning, Some(aho_llm::Reasoning { budget_tokens: 16_384 }), "the catalog-derived budget for Sonnet 4.5");
     assert_eq!(defaults.get("tui.thinking").and_then(|v| v.as_bool()), Some(true));
 
     let disabled = load("thinking = false\nthinking_budget = 2048\n[tui]\nthinking = false\n");

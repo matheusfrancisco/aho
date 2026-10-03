@@ -5,7 +5,8 @@ Standing rules, carried from the original phase plan:
 - every item ends with something an operator can run and an invariant a test pins; no item
   ships a stub for the next;
 - model-facing prose is ratcheted (`scripts/ratchets/prose.json`); a new prose line needs a
-  scripted transcript (`llm-scripted`) that fails without it.
+  scripted transcript (`llm-scripted`) proving it reaches the request, and judgment prose also a
+  recorded real-model eval with and without it (docs/prompts.md).
 
 ## Shipped
 
@@ -24,14 +25,23 @@ wire), `caps.telemetry.enabled = false` until an operator layer flips it, `DO_NO
 refuses the build, a 4xx latches the endpoint off, and `aho telemetry preview` prints exactly
 what one flush would send.
 
+Code quality (2026-10-03): `aho run` refuses a session whose world is broken or that lost
+its coding tools, showing the world's own error; model limits (`max_tokens`, thinking budget,
+context window) come from the catalog unless the operator sets them; `verify-gate` runs the
+project's check before a turn that changed the workspace may end; `tool-lsp` appends
+diagnostics to write results and sends later ones (on-save `cargo check`) as a late notice;
+`context-files` sends AGENTS.md/CLAUDE.md as context; the contract carries test-craft rules;
+a built-in `coding` profile (`aho --profile coding`) trims the tool list from 53 to 33; and
+`scripts/evals/test-quality` is the operator-invoked eval for judgment prose.
+
 ## Next
 
 Ordered by risk retired per unit of work; details in [TODO.md](TODO.md).
 
 1. ~~Real-guest VM validation~~ — done 2026-09-28: Ubuntu 24.04 arm64 through media → recipe
    → lease → guest agent (QEMU 11.1/HVF, macOS); details in TODO.md's closed entry.
-2. **World-error surfacing** — a broken world must show its own error, not
-   `no Subprocess provider is bound` (found during the boot validation; see TODO.md).
+2. ~~World-error surfacing~~ — done 2026-10-03: the world's error reaches `plan`/`status`/
+   `why`/`shell`, and `aho run` refuses with it (docs/worlds.md).
 3. **`swallowed` ratchet paydown** — the gate is red today; either fix the sites or accept
    them deliberately. A red gate that stays red trains people to ignore it.
 4. **Gated live acceptance for foreign CLIs and providers** — one operator-invoked run for

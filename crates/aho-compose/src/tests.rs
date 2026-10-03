@@ -517,9 +517,60 @@ fn profile_ranks_between_bundle_defaults_and_home_files() {
     assert_eq!(s.shadowed[0].0.layer, Layer::Profile("web".into()));
 
     i.profile = Some("missing".into());
-    assert!(matches!(i.capture_files(), Err(ComposeError::ProfileNotFound { .. })));
+    i.capture_files().unwrap();
+    let err = load(&c, &i).unwrap_err();
+    assert!(matches!(&err, ComposeError::ProfileNotFound { name, builtin, .. } if name == "missing" && builtin.is_empty()), "{err}");
     i.profile = Some("../web".into());
     assert!(matches!(i.capture_files(), Err(ComposeError::BadName { .. })));
+}
+
+#[test]
+fn builtin_profile_layers_under_the_operator_file_of_the_same_name() {
+    let f = fixture();
+    let c = Composition::new("product")
+        .include(comp().profile("web", "[edit]\nmode = \"base\"\nbackup = false\n"))
+        .profile("web", "[edit]\nmode = \"product\"\n");
+    let at = |s: &aho_config::Sourced<serde_json::Value>| match &s.winner.at {
+        Where::File { path, .. } => path.clone(),
+        other => format!("{other:?}"),
+    };
+    let mut i = Inputs::new(&f.project, &f.home);
+    let s = load_ok(&c, &i).loadout.config["edit.mode"].clone();
+    assert_eq!(s.value, json!("safe"), "built-in fragments apply only when the profile is named");
+
+    // no file: the fragments alone, the including product's after the included bundle's
+    i.profile = Some("web".into());
+    i.capture_files().unwrap();
+    let l = load_ok(&c, &i).loadout;
+    let (mode, backup) = (&l.config["edit.mode"], &l.config["edit.backup"]);
+    assert_eq!((mode.value.clone(), mode.winner.layer.clone()), (json!("product"), Layer::Profile("web".into())));
+    assert_eq!(at(mode), "builtin:product/profiles/web.toml");
+    assert_eq!((backup.value.clone(), at(backup)), (json!(false), "builtin:test-bundle/profiles/web.toml".to_string()));
+
+    // the operator's file of the same name wins key by key and inherits the rest
+    std::fs::create_dir_all(f.home.join(".aho/profiles")).unwrap();
+    let file = f.home.join(".aho/profiles/web.toml");
+    std::fs::write(&file, "[edit]\nmode = \"mine\"\n").unwrap();
+    i.capture_files().unwrap();
+    let l = load_ok(&c, &i).loadout;
+    let mode = &l.config["edit.mode"];
+    assert_eq!((mode.value.clone(), at(mode)), (json!("mine"), file.display().to_string()));
+    assert!(
+        mode.shadowed
+            .iter()
+            .any(|(o, v)| matches!(&o.at, Where::File { path, .. } if path.starts_with("builtin:")) && *v == json!("product"))
+    );
+    assert_eq!(l.config["edit.backup"].value, json!(false));
+
+    // ~/.aho/config.toml still outranks every profile layer
+    f.home_file("[edit]\nmode = \"home\"\n");
+    i.capture_files().unwrap();
+    assert_eq!(load_ok(&c, &i).loadout.config["edit.mode"].value, json!("home"));
+
+    i.profile = Some("nope".into());
+    i.capture_files().unwrap();
+    let err = load(&c, &i).unwrap_err();
+    assert!(err.to_string().contains("(built-in: web)"), "{err}");
 }
 
 #[test]

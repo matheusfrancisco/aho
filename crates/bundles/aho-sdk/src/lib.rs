@@ -165,7 +165,8 @@ impl SdkBuilder {
         self.disable.push(id.to_string());
         self
     }
-    /// `--profile <name>`: `~/.aho/profiles/<name>.toml`.
+    /// `--profile <name>`: the composition's built-in fragments of `<name>` (e.g. `coding`), then
+    /// `~/.aho/profiles/<name>.toml` over them.
     pub fn profile(mut self, name: &str) -> Self {
         self.profile = Some(name.to_string());
         self

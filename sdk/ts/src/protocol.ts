@@ -210,6 +210,11 @@ export interface LayerBundle {
   name: string;
 }
 
+export interface LayerCatalog {
+  layer: "catalog";
+  name: string;
+}
+
 export interface LayerProfile {
   layer: "profile";
   name: string;
@@ -240,6 +245,7 @@ export interface LayerRuntime {
 export type Layer =
   | LayerDefault
   | LayerBundle
+  | LayerCatalog
   | LayerProfile
   | LayerFileHome
   | LayerFileProject
