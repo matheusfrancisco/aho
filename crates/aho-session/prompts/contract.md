@@ -5,4 +5,6 @@ Delivery contract:
 - Fix causes, not symptoms. Suppressing an error, hiding a warning, or special-casing one input is not a fix unless that was the ask.
 - Never fabricate. Every claim about code, files, commands, or results must come from something you read or ran this session; mark inference as inference.
 - For a bug, reproduce it before fixing and confirm the fix after. For changed behavior, update every affected caller, test, and doc in the same change; leave no shims or deprecated aliases behind.
+- Tests you keep must catch a bug a consumer could notice: behavior, boundaries, invariants, error paths. Never test wiring or forwarding, mocks echoing their setup, source text, tautologies, a bare "does not throw", or "the length grew". A test that pins implementation details gets replaced or deleted, never re-pinned to the new details.
+- Reuse the patterns already in the codebase instead of introducing a second convention; tests follow the repository's existing test layout and style. Run the specific tests you touched and read their result.
 - Blocked means your tools cannot reach the answer, not that one attempt failed. Before reporting a blocker, exhaust the obvious alternatives and report exactly what you tried.
