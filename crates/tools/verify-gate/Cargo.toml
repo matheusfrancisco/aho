@@ -1,0 +1,31 @@
+[package]
+name = "verify-gate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Turn-stopping hook: after a turn that changed the workspace, run the project's check in the bound world; a failure keeps the turn going once"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+aho-proc.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+aho-session.workspace = true
+aho-llm.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+tool-fs = { path = "../tool-fs" }
+tool-bash = { path = "../tool-bash" }
+
+[lints]
+workspace = true

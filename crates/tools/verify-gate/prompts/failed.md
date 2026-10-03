@@ -1,0 +1,2 @@
+verify: {command} {outcome}
+{tail}
