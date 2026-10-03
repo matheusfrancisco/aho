@@ -25,6 +25,8 @@ const LAUNCH: &str = "command -v \"$0\" >/dev/null 2>&1 || exit 127; exec \"$0\"
 struct Doc {
     version: i64,
     text: String,
+    /// When the server was given this text.
+    since: Instant,
 }
 
 pub struct Server {
@@ -44,6 +46,8 @@ pub struct Synced {
     pub version: i64,
     /// The instant the server was told about new content; `None` = it already had this text.
     pub changed_at: Option<Instant>,
+    /// When the server was given this text (now or by an earlier sync).
+    pub content_at: Instant,
 }
 
 impl Server {
@@ -52,23 +56,44 @@ impl Server {
         let text = fs.read(rel, None).await.map_err(|e| e.to_string())?.text;
         let uri = path_to_uri(&join(&fs.root(), rel));
         let mut docs = self.docs.lock().await;
-        let (version, changed_at) = match docs.get_mut(&uri) {
-            Some(doc) if doc.text == text => (doc.version, None),
+        let (version, changed_at, content_at) = match docs.get_mut(&uri) {
+            Some(doc) if doc.text == text => (doc.version, None, doc.since),
             Some(doc) => {
                 doc.version += 1;
                 doc.text = text.clone();
                 let params = json!({"textDocument": {"uri": uri, "version": doc.version}, "contentChanges": [{"text": text}]});
+                // Taken before sending: a publish answering this change is never older than it.
+                doc.since = Instant::now();
                 self.client.notify("textDocument/didChange", params).await.map_err(|e| e.to_string())?;
-                (doc.version, Some(Instant::now()))
+                (doc.version, Some(doc.since), doc.since)
             }
             None => {
                 let params = json!({"textDocument": {"uri": uri, "languageId": language_id, "version": 1, "text": text}});
+                let since = Instant::now();
                 self.client.notify("textDocument/didOpen", params).await.map_err(|e| e.to_string())?;
-                docs.insert(uri.clone(), Doc { version: 1, text: text.clone() });
-                (1, Some(Instant::now()))
+                docs.insert(uri.clone(), Doc { version: 1, text: text.clone(), since });
+                (1, Some(since), since)
             }
         };
-        Ok(Synced { uri, text, version, changed_at })
+        Ok(Synced { uri, text, version, changed_at, content_at })
+    }
+
+    /// `didSave` for a synced document, when the server asked for save notifications
+    /// (`textDocumentSync.save`). Returns the instant just before it was sent, so anything the
+    /// server publishes in answer is at or after it; `None` = the server does not want it.
+    pub async fn save(&self, synced: &Synced) -> Result<Option<Instant>, String> {
+        let include_text = match self.capabilities.pointer("/textDocumentSync/save") {
+            Some(Value::Bool(true)) => false,
+            Some(Value::Object(o)) => o.get("includeText").and_then(Value::as_bool) == Some(true),
+            _ => return Ok(None),
+        };
+        let mut params = json!({"textDocument": {"uri": synced.uri}});
+        if include_text {
+            params["text"] = json!(synced.text);
+        }
+        let at = Instant::now();
+        self.client.notify("textDocument/didSave", params).await.map_err(|e| e.to_string())?;
+        Ok(Some(at))
     }
 
     pub fn supports(&self, provider: &str) -> bool {
@@ -272,7 +297,7 @@ fn client_capabilities() -> Value {
         "window": {"workDoneProgress": true},
         "workspace": {"configuration": true, "workspaceFolders": true, "applyEdit": false, "symbol": {}},
         "textDocument": {
-            "synchronization": {"didSave": false, "willSave": false},
+            "synchronization": {"didSave": true, "willSave": false},
             "hover": {"contentFormat": ["markdown", "plaintext"]},
             "definition": {"linkSupport": true},
             "references": {},

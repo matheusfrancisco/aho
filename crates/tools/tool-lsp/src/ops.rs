@@ -23,12 +23,14 @@ const HOVER_MAX: usize = 8_000;
 const DIAGNOSTICS_SETTLE: Duration = Duration::from_millis(1_000);
 /// Pause before re-asking a server that cancelled a diagnostics pull.
 const PULL_RETRY: Duration = Duration::from_millis(200);
+/// A diagnostic message longer than this is clipped.
+const MESSAGE_MAX: usize = 400;
 
 pub fn bad_args(msg: impl Into<String>) -> ExecOutcome {
     ExecOutcome::err("TOOL_BAD_ARGS", msg)
 }
 
-fn lsp_err(e: LspError) -> ExecOutcome {
+pub(crate) fn lsp_err(e: LspError) -> ExecOutcome {
     match e {
         LspError::Cancelled => ExecOutcome::Cancelled,
         LspError::Timeout { .. } => ExecOutcome::err("LSP_TIMEOUT", e.to_string()),
@@ -207,6 +209,30 @@ fn severity(s: Option<u64>) -> &'static str {
         Some(3) => "info",
         Some(4) => "hint",
         _ => "diagnostic",
+    }
+}
+
+/// `path:line:col severity [code]: message (source)` for one LSP diagnostic, on one line.
+pub(crate) fn diagnostic_line(path: &str, line: usize, column: usize, d: &Value) -> String {
+    let sev = severity(d.get("severity").and_then(Value::as_u64));
+    let code = match d.get("code") {
+        Some(Value::String(s)) => format!(" [{s}]"),
+        Some(Value::Number(n)) => format!(" [{n}]"),
+        _ => String::new(),
+    };
+    let source = d.get("source").and_then(Value::as_str).map(|s| format!(" ({s})")).unwrap_or_default();
+    let message = d.get("message").and_then(Value::as_str).unwrap_or("");
+    format!("{path}:{line}:{column} {sev}{code}: {}{source}", clip(&message.replace('\n', " "), MESSAGE_MAX))
+}
+
+/// Adds `more` to `items`, skipping what is already there (same start and message): a server
+/// that answers pulls may also push, and an on-save check may repeat its own analysis.
+pub(crate) fn merge_diagnostics(items: &mut Vec<Value>, more: Vec<Value>) {
+    for d in more {
+        let same = |x: &Value| x.pointer("/range/start") == d.pointer("/range/start") && x.get("message") == d.get("message");
+        if !items.iter().any(same) {
+            items.push(d);
+        }
     }
 }
 
@@ -520,12 +546,19 @@ impl Pool {
             return lsp_err(e);
         }
         // Pull (`textDocument/diagnostic`) where the server offers it: it answers for exactly the
-        // content it has. rust-analyzer, for one, stops pushing once it has offered pull.
+        // content it has. rust-analyzer, for one, then pushes only its on-save check's findings.
         let items = if server.supports("diagnosticProvider") {
-            match self.pull_diagnostics(&server, &synced.uri, &req.cancel).await {
+            let wait = Duration::from_millis(self.cfg.diagnostics_wait_ms);
+            let mut items = match self.pull_diagnostics(&server, &synced.uri, wait, self.request_timeout(), &req.cancel).await {
                 Ok(items) => items,
                 Err(e) => return e,
+            };
+            // A server answering pulls still pushes what its on-save check found for this content
+            // (rust-analyzer's cargo check).
+            if let Some(p) = server.client.diagnostics(&synced.uri).filter(|p| p.at >= synced.content_at) {
+                merge_diagnostics(&mut items, p.items);
             }
+            items
         } else {
             match self.pushed_diagnostics(&server, &synced, &req.cancel, &mut notes).await {
                 Ok(Some(items)) => items,
@@ -547,20 +580,9 @@ impl Pool {
             let start = d.pointer("/range/start").cloned().unwrap_or(json!({"line": 0, "character": 0}));
             let loc = files.loc(&synced.uri, &start, server.encoding).await;
             let sev = severity(d.get("severity").and_then(Value::as_u64));
-            let code = match d.get("code") {
-                Some(Value::String(s)) => format!(" [{s}]"),
-                Some(Value::Number(n)) => format!(" [{n}]"),
-                _ => String::new(),
-            };
-            let source = d.get("source").and_then(Value::as_str).map(|s| format!(" ({s})")).unwrap_or_default();
             let message = d.get("message").and_then(Value::as_str).unwrap_or("").to_string();
-            text.push_str(&format!(
-                "{}:{}:{} {sev}{code}: {}{source}\n",
-                loc.path,
-                loc.line,
-                loc.column,
-                clip(&message.replace('\n', " "), 400)
-            ));
+            text.push_str(&diagnostic_line(&loc.path, loc.line, loc.column, d));
+            text.push('\n');
             if !loc.snippet.is_empty() {
                 text.push_str(&format!("    {}\n", loc.snippet));
             }
@@ -573,15 +595,19 @@ impl Pool {
         done(json!({"path": rel, "published": true, "total": total, "diagnostics": rows, "notes": notes}), text)
     }
 
-    /// `textDocument/diagnostic`, retried while the server reports the content as still moving.
-    async fn pull_diagnostics(&self, server: &Server, uri: &str, cancel: &CancelToken) -> Result<Vec<Value>, ExecOutcome> {
-        let deadline = tokio::time::Instant::now() + Duration::from_millis(self.cfg.diagnostics_wait_ms);
+    /// `textDocument/diagnostic`, retried for `retry_for` while the server reports the content as
+    /// still moving; each request may take `timeout`.
+    pub(crate) async fn pull_diagnostics(
+        &self,
+        server: &Server,
+        uri: &str,
+        retry_for: Duration,
+        timeout: Duration,
+        cancel: &CancelToken,
+    ) -> Result<Vec<Value>, ExecOutcome> {
+        let deadline = tokio::time::Instant::now() + retry_for;
         loop {
-            match server
-                .client
-                .request("textDocument/diagnostic", json!({"textDocument": {"uri": uri}}), self.request_timeout(), cancel)
-                .await
-            {
+            match server.client.request("textDocument/diagnostic", json!({"textDocument": {"uri": uri}}), timeout, cancel).await {
                 Ok(v) => return Ok(v.get("items").and_then(Value::as_array).cloned().unwrap_or_default()),
                 // ServerCancelled / ContentModified: the server asks to be asked again.
                 Err(LspError::Server { code: -32802 | -32801, .. }) if tokio::time::Instant::now() < deadline => {

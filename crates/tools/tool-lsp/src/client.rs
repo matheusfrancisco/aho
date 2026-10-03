@@ -73,6 +73,8 @@ struct State {
     pending: HashMap<i64, Reply>,
     diagnostics: HashMap<String, Published>,
     progress: BTreeSet<String>,
+    /// When the last work-done progress began (an on-save check announces itself this way).
+    progress_began: Option<Instant>,
     /// `experimental/serverStatus.quiescent` once the server sent one (rust-analyzer does).
     quiescent: Option<bool>,
     last_activity: Instant,
@@ -136,6 +138,7 @@ impl Client {
                 pending: HashMap::new(),
                 diagnostics: HashMap::new(),
                 progress: BTreeSet::new(),
+                progress_began: None,
                 quiescent: None,
                 last_activity: Instant::now(),
                 dead: None,
@@ -228,6 +231,16 @@ impl Client {
             Some(q) => q,
             None => st.progress.is_empty() && st.last_activity.elapsed() >= IDLE_SETTLE,
         }
+    }
+
+    /// Some work-done progress (indexing, a `cargo check`) is running.
+    pub fn busy(&self) -> bool {
+        !self.shared.lock().progress.is_empty()
+    }
+
+    /// When the most recent work-done progress began.
+    pub fn progress_began(&self) -> Option<Instant> {
+        self.shared.lock().progress_began
     }
 
     /// Waits until `is_ready`, the server dies, `cancel` fires, or `timeout` passes. `Ok(false)`
@@ -387,6 +400,7 @@ fn notification(shared: &Shared, method: &str, params: &Value) {
             match params.pointer("/value/kind").and_then(Value::as_str) {
                 Some("begin") => {
                     st.progress.insert(token);
+                    st.progress_began = Some(Instant::now());
                 }
                 Some("end") => {
                     st.progress.remove(&token);
@@ -412,6 +426,7 @@ mod tests {
                 pending: HashMap::new(),
                 diagnostics: HashMap::new(),
                 progress: BTreeSet::new(),
+                progress_began: None,
                 quiescent: None,
                 last_activity: Instant::now(),
                 dead: None,

@@ -4,9 +4,14 @@
 //!   `path` + `line` + `column` (1-based; column counts characters), `path` + `symbol`, or a
 //!   bare `symbol` name resolved through `workspace/symbol`.
 //! * `lsp_diagnostics{path}` opens the file with its current disk content and asks for its
-//!   diagnostics: pulled (`textDocument/diagnostic`) when the server offers it, else the pushed
-//!   `publishDiagnostics` for exactly that content once it settles (bounded wait). The built-in
-//!   rust row turns rust-analyzer's `checkOnSave` off, so no `cargo check` runs on the tools' behalf.
+//!   diagnostics: pulled (`textDocument/diagnostic`) when the server offers it (plus what the
+//!   server pushed for that content since, e.g. rust-analyzer's `cargo check`), else the pushed
+//!   `publishDiagnostics` for exactly that content once it settles (bounded wait).
+//! * After every successful `write` / `edit` / `str_replace_editor` of a file a configured server
+//!   covers, a `post_execute` appends the server's errors and warnings for the new content to the
+//!   result, waiting under a second; what arrives later (indexing, the on-save check) comes as a
+//!   late notice through the capability's `context` (see `on_write`). The built-in rust row turns
+//!   rust-analyzer's `checkOnSave` on (`caps.tool-lsp.check_on_save`): `cargo check` after saves.
 //! * `lsp_symbols` is the document outline (`path`) or a workspace symbol search (`query`).
 //! * `lsp_rename_preview` renders the server's `WorkspaceEdit` as unified diffs and writes
 //!   nothing; `workspace/applyEdit` requests from a server are always refused.
@@ -23,7 +28,7 @@ use std::sync::Arc;
 
 use aho_cap::*;
 use aho_fs::FsRead;
-use aho_log::OpKind;
+use aho_log::{OpKind, State};
 use aho_proc::SubprocessHandle;
 use aho_types::*;
 use serde_json::json;
@@ -31,6 +36,7 @@ use serde_json::json;
 pub mod client;
 pub mod config;
 pub mod framing;
+pub mod on_write;
 mod ops;
 pub mod pool;
 pub mod text;
@@ -54,6 +60,7 @@ impl Deps for LspDeps {
 #[derive(Clone)]
 pub struct ToolLsp {
     pool: Arc<Pool>,
+    late: Arc<on_write::Late>,
 }
 
 impl ToolLsp {
@@ -96,7 +103,7 @@ impl Capability for ToolLsp {
                 )),
             });
         }
-        Ok(ToolLsp { pool: Arc::new(Pool::new(deps.proc.0, deps.fs.0, Arc::new(cfg))) })
+        Ok(ToolLsp { pool: Arc::new(Pool::new(deps.proc.0, deps.fs.0, Arc::new(cfg))), late: Arc::default() })
     }
 
     fn register(&self, r: &mut Registrar<'_>) {
@@ -125,6 +132,10 @@ impl Capability for ToolLsp {
                 })
             }),
         });
+        let me = self.clone();
+        r.post_execute(Arc::new(move |view: &ExecView, outcome: &ExecOutcome| me.after_write(view, outcome)));
+        let late = self.late.clone();
+        r.context(Arc::new(move |_: &State| late.drain()));
     }
 }
 

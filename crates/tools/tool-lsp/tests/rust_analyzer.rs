@@ -204,3 +204,58 @@ fn the_manifest_is_locked_without_any_known_server_and_declares_only_spawn_class
     );
     assert_eq!(aho_cap::binaries_needed(&[m]), tool_lsp::KNOWN_SERVERS.iter().copied().collect());
 }
+
+/// The write path against the real server: rust-analyzer's own analysis (pulled) puts the type
+/// error in the write result; the `cargo check` it runs on `didSave` reports the borrow error its
+/// analysis cannot, as a late notice.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_write_carries_rust_analyzer_and_cargo_check_errors() {
+    for bin in ["rust-analyzer", "cargo"] {
+        if !on_path(bin) {
+            println!("SKIPPED: `{bin}` is not on PATH, so the rust-analyzer write test cannot run.");
+            return;
+        }
+    }
+    let (_dir, root) = project();
+    let mut cfg = LspConfig::default();
+    cfg.ready_timeout_ms = 180_000;
+    cfg.write_wait_ms = 60_000;
+    cfg.late_wait_ms = 180_000;
+    let t = tool(&root, cfg);
+    // Indexing finishes before the write, as it would in a session that already used the server.
+    done(t.run("lsp_diagnostics", &req("lsp_diagnostics", json!({"path": "src/main.rs"}))).await);
+
+    let host: Arc<dyn aho_fs::Fs> = Arc::new(HostFs::new(&root).unwrap());
+    let fs = tool_fs::ToolFs::build(tool_fs::FsDeps { read: FsRead(host.clone()), write: aho_fs::FsWrite(host) }, ()).unwrap();
+    let args = json!({
+        "path": "src/main.rs",
+        "content": MAIN.replace(
+            "    println!(\"{}\", y);\n}\n",
+            "    let s: i32 = \"not a number\";\n    println!(\"{} {}\", y, s);\n}\n\nfn moved() {\n    let v = vec![1];\n    let w = v;\n    println!(\"{:?} {:?}\", v, w);\n}\n",
+        ),
+    });
+    fs.run("read", &json!({"path": "src/main.rs"})).await;
+    let out = fs.run("write", &args).await;
+    let view = req("write", args).view;
+    let lsp = t.clone();
+    let decision = tokio::spawn(async move { lsp.after_write(&view, &out) }).await.unwrap();
+    let PostDecision::Accept { content: Some(content), .. } = decision else { panic!("no diagnostics were appended: {decision:?}") };
+    let seen: String = content.iter().filter_map(|b| b.as_text()).collect::<Vec<_>>().join("\n");
+    println!("{seen}");
+    let rows: Vec<&str> = seen.lines().filter(|l| l.starts_with("src/main.rs:")).collect();
+    assert!(rows.iter().any(|r| r.starts_with("src/main.rs:8:") && r.contains("error") && r.contains("E0308")), "{seen}");
+    let moved = |text: &str| text.lines().any(|r| r.starts_with("src/main.rs:15:") && r.contains("error") && r.contains("E0382"));
+    if !moved(&seen) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(180);
+        let late = loop {
+            if let Some(n) = t.late_notice() {
+                break n;
+            }
+            assert!(std::time::Instant::now() < deadline, "cargo check's E0382 never arrived");
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        };
+        println!("{late}");
+        assert!(moved(&late), "{late}");
+    }
+    t.shutdown().await;
+}

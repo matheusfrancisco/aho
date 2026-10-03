@@ -3,7 +3,7 @@ name = "tool-lsp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "lsp_definition/references/hover/diagnostics/symbols/rename_preview over language servers spawned in the bound world"
+description = "lsp_definition/references/hover/diagnostics/symbols/rename_preview over language servers spawned in the bound world; diagnostics appended to file writes"
 
 [dependencies]
 aho-types.workspace = true
@@ -16,8 +16,16 @@ globset.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 
+# Test fixture only: a tiny language server the integration tests spawn via `CARGO_BIN_EXE_lsp-fixture`.
+[[bin]]
+name = "lsp-fixture"
+path = "tests/fixture/lsp_fixture.rs"
+test = false
+doc = false
+
 [dev-dependencies]
 world-host = { path = "../../providers/world-host" }
+tool-fs = { path = "../tool-fs" }
 tempfile.workspace = true
 
 [lints]
