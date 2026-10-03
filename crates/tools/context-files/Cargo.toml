@@ -1,0 +1,29 @@
+[package]
+name = "context-files"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Project instruction files (AGENTS.md, CLAUDE.md, …) from the workspace root as dynamic context"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+aho-fs.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+# tests/session.rs: the context in a live scripted session's requests
+aho-approval.workspace = true
+aho-llm.workspace = true
+aho-policy.workspace = true
+aho-session.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+tool-fs = { path = "../tool-fs" }
+
+[lints]
+workspace = true
