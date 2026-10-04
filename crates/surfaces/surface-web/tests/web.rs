@@ -14,7 +14,7 @@ use aho_approval::{ApprovalRequest, ChannelApproval};
 use aho_cap::{Composition, Registry};
 use aho_config::{FileSnapshot, Layer};
 use aho_llm::LlmRoute;
-use aho_log::{CapState, MemoryLog, State};
+use aho_log::{CapState, MemoryLog, OpKind, OpStatus, State};
 use aho_session::{Boot, Session};
 use aho_types::*;
 use futures::{SinkExt, StreamExt};
@@ -465,4 +465,39 @@ async fn panels_ship_only_for_active_capabilities() {
     let mut st: State = s.fold().unwrap();
     st.caps.insert("surface-web".into(), CapState::Disabled { why: "--disable surface-web".into() });
     assert!(surface_web::active_slots(&s.registry().panels, &st).is_empty(), "a disabled capability ships no panel");
+}
+
+#[tokio::test]
+async fn session_jobs_marks_detached_ops_as_jobs_and_names_each_state() {
+    let r = rig("");
+    let (web, s) = start(&r, vec![]).await;
+    let ops = s.ops();
+    let (turn_running, _) = ops.register(CallId("c1".into()), "read", OpKind::Io, true, false);
+    let (job_running, _) = ops.register(CallId("c2".into()), "bash", OpKind::Process, false, true);
+    let (job_failed, _) = ops.register(CallId("c3".into()), "bash", OpKind::Process, false, true);
+    let (turn_done, _) = ops.register(CallId("c4".into()), "read", OpKind::Io, true, false);
+    assert!(ops.detach(job_running) && ops.detach(job_failed));
+    ops.finish(job_failed, OpStatus::Failed { err: "boom".into() });
+    ops.finish(turn_done, OpStatus::Completed { code: 0 });
+
+    let (status, body) = post(&web, "session/jobs", json!({})).await;
+    assert_eq!(status, 200, "{body}");
+    let rows: Vec<(u64, &str, &str)> = body["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|j| (j["op"].as_u64().unwrap(), j["scope"].as_str().unwrap(), j["state"].as_str().unwrap()))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            (turn_running.0, "turn", "running"),
+            (job_running.0, "job", "running"),
+            (job_failed.0, "job", "failed"),
+            (turn_done.0, "turn", "done")
+        ],
+        "{body}"
+    );
+    let failed = body["jobs"].as_array().unwrap().iter().find(|j| j["op"] == job_failed.0).unwrap();
+    assert_eq!(failed["status"], json!({ "status": "failed", "err": "boom" }), "{body}");
 }

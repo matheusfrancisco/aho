@@ -7,12 +7,17 @@
 
 mod ceiling;
 pub mod core;
+mod delivery;
+mod jobs;
 mod maintenance;
 mod tools;
+mod wake;
 
+pub use jobs::{AbortScope, DetachRule, JobInfo, JobsConfig, OnRewind};
 pub use maintenance::{COMPACTION_PROMPT, compaction_range};
 pub use tools::tool_events;
 use tools::{LoggedApproval, Started};
+pub use wake::{DeliverMode, JOBS_LEASE, JobsLease, WakeMode, Woke, jobs_lease, jobs_lease_subject};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -28,8 +33,8 @@ use aho_config::Loadout;
 use aho_fs::SnapshotHandle;
 use aho_llm::{LateResults, Llm, LlmError, LlmRoute, Request, StreamEvent};
 use aho_log::{
-    ApprovalOutcome, CancelReason, CheckpointCause, CustomFolds, Entry, EntryKind, GrantScope, LogError, LogStore, OpStatus, RewindMode,
-    State, ToolOutcome, Transition,
+    ApprovalOutcome, CancelReason, CheckpointCause, CustomFolds, DetachCause, Entry, EntryKind, GrantScope, LogError, LogStore, OpStatus,
+    RewindMode, State, ToolOutcome, Transition,
 };
 use aho_policy::{CallUnderReview, ChainOutcome, DenialCounter, Operator, Rule, SandboxPolicy};
 use aho_proc::{OpTable, OperationsHandle, SpawnSpec, SubprocessHandle};
@@ -96,7 +101,14 @@ impl SessionConfig {
 pub enum SessionEvent {
     Stream(StreamEvent),
     Entry(Box<Entry>),
-    Idle { turn: TurnId, transition: Transition },
+    Idle {
+        turn: TurnId,
+        transition: Transition,
+    },
+    /// A job finished while no turn runs; its outcome is delivered at the next turn's start.
+    JobFinished {
+        op: OpId,
+    },
     Error(String),
 }
 
@@ -107,6 +119,8 @@ pub enum SessionError {
     Boot(String),
     Busy,
     NotFound(String),
+    /// The request was understood and declined; the text says why and what stayed unchanged.
+    Refused(String),
 }
 
 impl std::fmt::Display for SessionError {
@@ -116,7 +130,7 @@ impl std::fmt::Display for SessionError {
             SessionError::Llm(e) => write!(f, "model call failed: {e}"),
             SessionError::Boot(e) => write!(f, "session could not start: {e}"),
             SessionError::Busy => write!(f, "a turn is already running in this session; queue input with steer/follow_up"),
-            SessionError::NotFound(e) => write!(f, "{e}"),
+            SessionError::NotFound(e) | SessionError::Refused(e) => write!(f, "{e}"),
         }
     }
 }
@@ -144,6 +158,7 @@ struct Finished {
     op: OpId,
     outcome: ExecOutcome,
     post_context: Vec<String>,
+    status: OpStatus,
 }
 
 // ───────────────────────────── session ─────────────────────────────
@@ -179,6 +194,15 @@ pub struct Session {
     ptc_seq: std::sync::atomic::AtomicU64,
     /// Capabilities whose build failed at this boot, with the error each was logged Broken with.
     broken: Vec<(aho_cap::CapabilityId, String)>,
+    /// `jobs.*` keys, parsed at boot.
+    jobs_cfg: JobsConfig,
+    /// Delivery queue and session-initiated cancel reasons.
+    jobs: Mutex<jobs::Book>,
+    /// Detach requests for the running turn's driver (operator, `after:<dur>`).
+    detach_tx: mpsc::UnboundedSender<(OpId, DetachCause)>,
+    detach_rx: tokio::sync::Mutex<mpsc::UnboundedReceiver<(OpId, DetachCause)>>,
+    /// Why a call that asked for the background ran in its turn (jobs limit); appended after its result.
+    job_notes: Mutex<BTreeMap<OpId, String>>,
 }
 
 /// Service `aho.tool_call` (PTC): `(parent call's view, cancel, tool, args) → outcome`, one
@@ -264,6 +288,7 @@ impl Session {
             })
             .unwrap_or_default();
         let rules = aho_policy::parse_rules(&rules_src).map_err(SessionError::Boot)?;
+        let jobs_cfg = JobsConfig::from_loadout(b.loadout).map_err(SessionError::Boot)?;
 
         let fresh = b.log.head().is_none();
         if fresh {
@@ -315,6 +340,7 @@ impl Session {
         let (events, _) = broadcast::channel(1024);
         let (inbox_tx, inbox_rx) = mpsc::unbounded_channel();
         let (results_tx, results_rx) = mpsc::unbounded_channel();
+        let (detach_tx, detach_rx) = mpsc::unbounded_channel();
         let folds = reg.entry_kinds.clone();
         let allowed_caps: BTreeSet<String> = b
             .loadout
@@ -352,6 +378,11 @@ impl Session {
             allowed_caps,
             ptc_seq: std::sync::atomic::AtomicU64::new(0),
             broken,
+            jobs_cfg,
+            jobs: Mutex::new(jobs::Book::new()),
+            detach_tx,
+            detach_rx: tokio::sync::Mutex::new(detach_rx),
+            job_notes: Mutex::new(BTreeMap::new()),
         });
         let weak = Arc::downgrade(&s);
         nested.get_or_init(move || -> NestedToolCall {
@@ -366,6 +397,7 @@ impl Session {
             })
         });
         me.get_or_init(|| Arc::downgrade(&s));
+        s.watch_jobs_lease();
         s.append(
             Principal::system("session"),
             EntryKind::SessionMeta {
@@ -425,8 +457,7 @@ impl Session {
     /// every surface instead of being dropped: the log is the only store.
     fn append_reported(&self, by: Principal, kind: EntryKind) {
         if let Err(e) = self.append(by, kind) {
-            let _ =
-                self.events.send(SessionEvent::Error(format!("could not write to the session log ({e}); the last action is not recorded")));
+            self.emit(SessionEvent::Error(format!("could not write to the session log ({e}); the last action is not recorded")));
         }
     }
 
@@ -446,8 +477,13 @@ impl Session {
 
     fn append(&self, by: Principal, kind: EntryKind) -> Result<Entry, LogError> {
         let e = self.log.append(None, by, kind)?;
-        let _ = self.events.send(SessionEvent::Entry(Box::new(e.clone())));
+        self.emit(SessionEvent::Entry(Box::new(e.clone())));
         Ok(e)
+    }
+
+    /// Live events are best effort: no subscriber is not an error.
+    fn emit(&self, ev: SessionEvent) {
+        let _ = self.events.send(ev);
     }
 
     /// Queue input for the running turn; injected at the next request boundary, never between a call and its result.
@@ -455,9 +491,10 @@ impl Session {
         let _ = self.inbox_tx.send(Input { by: Principal::Operator, form: Form::Prompt, text: text.into(), urgent, client_key: None });
     }
 
-    /// Hard interrupt: cancels running operations of this turn.
+    /// Hard interrupt of the turn: cancels its running operations; jobs keep running.
+    /// `abort_scope(AbortScope::All)` also cancels jobs.
     pub fn abort(&self) {
-        lk(&self.turn_cancel).cancel();
+        self.abort_scope(AbortScope::Turn);
     }
 
     /// Runs one turn to idle (or the step budget) and returns its final transition.
@@ -482,16 +519,22 @@ impl Session {
                 return Ok(Transition::Completed);
             }
         }
+        self.turn(by, text.into(), client_key).await
+    }
+
+    /// One turn from its prompt to `TurnEnd`; the caller holds the admission lock (`running`).
+    async fn turn(self: &Arc<Self>, by: Principal, text: String, client_key: Option<String>) -> Result<Transition, SessionError> {
+        let _jobs = self.turn_scope();
         *lk(&self.turn_cancel) = CancelToken::new();
         let turn = TurnId(self.fold()?.turns + 1);
         self.append(Principal::system("loop"), EntryKind::TurnStart { turn })?;
-        self.append(by, EntryKind::UserMessage { form: Form::Prompt, text: text.into(), client_key })?;
+        self.append(by, EntryKind::UserMessage { form: Form::Prompt, text, client_key })?;
         let mut stop_hook_active = false;
         let transition = loop {
             let t = match self.run_turn(turn).await {
                 Ok(t) => t,
                 Err(e) => {
-                    let _ = self.events.send(SessionEvent::Error(e.to_string()));
+                    self.emit(SessionEvent::Error(e.to_string()));
                     Transition::Aborted(e.to_string())
                 }
             };
@@ -514,6 +557,8 @@ impl Session {
                 _ => break t,
             }
         };
+        // Detach requests that arrived after the turn's last wait.
+        self.apply_detaches(&mut *self.detach_rx.lock().await)?;
         self.append(Principal::system("loop"), EntryKind::StepEnd { step: StepId(0), transition: transition.clone() })?;
         self.run_hooks(HookEvent::TurnEnd, serde_json::json!({ "turn": turn.0 })).await;
         self.checkpoint(CheckpointCause::TurnEnd).await;
@@ -525,13 +570,14 @@ impl Session {
             )?;
         }
         self.append(Principal::system("loop"), EntryKind::TurnEnd { turn })?;
-        let _ = self.events.send(SessionEvent::Idle { turn, transition: transition.clone() });
+        self.emit(SessionEvent::Idle { turn, transition: transition.clone() });
         Ok(transition)
     }
 
     async fn run_turn(self: &Arc<Self>, turn: TurnId) -> Result<Transition, SessionError> {
         let mut results = self.results_rx.lock().await;
         let mut inbox = self.inbox_rx.lock().await;
+        let mut detaches = self.detach_rx.lock().await;
         let mut pending = Pending::default();
         let mut queued: Vec<Input> = Vec::new();
         let mut overflow_retries = 0u32;
@@ -539,6 +585,8 @@ impl Session {
         // Consecutive identical replies (same visible text, same tool names + args).
         let mut loop_sig: Option<Hash> = None;
         let mut loop_run = 0u32;
+        // Job-awaiting calls (`job_wait`) issued this turn whose boundary has not passed yet.
+        let mut awaiting: Vec<CallId> = Vec::new();
 
         // results that landed between turns are recorded first (late results)
         while let Ok(f) = results.try_recv() {
@@ -554,15 +602,21 @@ impl Session {
                 self.settle_after_abort(&mut results).await?;
                 return Ok(Transition::Aborted(ABORTED.into()));
             }
-            // inject queued inputs at the request boundary
+            // inject queued inputs at the request boundary, then pending detaches
             for i in queued.drain(..) {
                 self.append(i.by, EntryKind::UserMessage { form: i.form, text: i.text, client_key: i.client_key })?;
             }
+            self.apply_detaches(&mut detaches)?;
             pending.inputs = 0;
             pending.urgent = 0;
             pending.results_since_request = 0;
             let step = StepId(pending.steps + 1);
             self.append(Principal::system("loop"), EntryKind::StepStart { step })?;
+            // Finished jobs land once the step has started: never while a request is in flight
+            // (a rate-limited request is retried without a `StepEnd`; its retry starts here).
+            if self.deliveries_open(pending.steps == 0, &mut awaiting)? {
+                self.deliver_jobs().await?;
+            }
             let prompt = self.fold().ok().and_then(|st| {
                 st.items.iter().rev().find_map(|(_, it)| match it {
                     aho_log::Item::User { form: Form::Prompt, text } => Some(text.clone()),
@@ -695,6 +749,7 @@ impl Session {
                     },
                 )?;
             }
+            awaiting.extend(self.job_waits(&uses));
             self.dispatch_calls(turn, uses, early).await?;
             let state = self.fold()?;
             pending.open_calls = state.open_calls.clone();
@@ -725,10 +780,12 @@ impl Session {
                     Next::Idle => break Some(Transition::Completed),
                     Next::MaxTurns => break Some(Transition::MaxTurns),
                     Next::Heartbeat => {
+                        // turn ops only: jobs run outside the turn
                         let running: Vec<String> = self
                             .ops
                             .running()
                             .into_iter()
+                            .filter(|(op, _, _)| !self.ops.is_detached(*op))
                             .map(|(op, call, age)| format!("{} (op {}, {}s)", call.0, op.0, age / 1000))
                             .collect();
                         self.append(
@@ -761,12 +818,22 @@ impl Session {
                     }
                     Some(i) = inbox.recv() => {
                         pending.inputs += 1;
+                        self.interrupt_ops();
                         if i.urgent {
                             pending.urgent += 1;
                             self.skip_unstarted();
                         }
                         queued.push(i);
                         wake = Wake::Input;
+                    }
+                    Some((op, cause)) = detaches.recv() => {
+                        // a released call is a landed result: the model hears about the job now
+                        if self.detach_now(op, cause)? {
+                            pending.results_since_request += 1;
+                            pending.open_calls = self.fold()?.open_calls;
+                            pending.graced_all_done = !issued.iter().any(|c| pending.open_calls.contains(c));
+                        }
+                        wake = Wake::Result;
                     }
                     _ = &mut grace, if pending.grace_armed => {
                         pending.grace_armed = false;
@@ -822,7 +889,18 @@ impl Session {
 
     fn tool_specs(&self) -> Vec<ToolSpec> {
         let world = lk(&self.policy).view().world;
-        let mut v: Vec<ToolSpec> = self.reg.tools.iter().map(|(_, d, _)| d.spec(&world)).collect();
+        let mut v: Vec<ToolSpec> = self
+            .reg
+            .tools
+            .iter()
+            .map(|(_, d, _)| {
+                let mut spec = d.spec(&world);
+                if self.jobs_cfg.rule(d, d.name).on_request() {
+                    jobs::with_background(&mut spec);
+                }
+                spec
+            })
+            .collect();
         v.extend(self.reg.dynamic_tools.iter().map(|(_, s, _)| s.clone()));
         v
     }

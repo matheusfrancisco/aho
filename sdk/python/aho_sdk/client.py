@@ -51,9 +51,9 @@ class Client:
         """Queues input for the running turn; injected at the next request boundary."""
         return cast("p.Empty", await self.connection.request("session.steer", params))
 
-    async def abort(self) -> p.Empty:
-        """Hard interrupt: cancels the running turn's operations."""
-        return cast("p.Empty", await self.connection.request("session.abort", {}))
+    async def abort(self, params: Optional[p.AbortParams] = None) -> p.Empty:
+        """Cancels by scope: the running turn's operations (default; jobs keep running), everything (`all`), or one operation (`op`)."""
+        return cast("p.Empty", await self.connection.request("session.abort", params or {}))
 
     async def subscribe(self, params: Optional[p.SubscribeParams] = None) -> p.SubscribeResult:
         """Replays entries after `from` as `entry` events, then streams live events on this connection."""
@@ -66,6 +66,18 @@ class Client:
     async def rewind(self, params: p.RewindParams) -> p.RewindResult:
         """Rewinds chat and/or code to a checkpoint."""
         return cast("p.RewindResult", await self.connection.request("session.rewind", params))
+
+    async def list_jobs(self) -> p.JobList:
+        """Open session jobs: running, or finished and waiting for delivery."""
+        return cast("p.JobList", await self.connection.request("job.list", {}))
+
+    async def kill_job(self, params: p.JobParams) -> p.Empty:
+        """Cancels one running job; its cancelled outcome is delivered like any other. A turn op is refused."""
+        return cast("p.Empty", await self.connection.request("job.kill", params))
+
+    async def detach_job(self, params: p.JobParams) -> p.Empty:
+        """Detaches a running turn op into a session job (its call is answered with the job id); refused when its tool cannot run as a job."""
+        return cast("p.Empty", await self.connection.request("job.detach", params))
 
     async def answer_approval(self, params: p.AnswerParams) -> p.AnswerResult:
         """Answers one approval card; a card is answered once."""

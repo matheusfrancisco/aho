@@ -380,9 +380,9 @@ async function refreshPanel(fetch = true) {
       ]));
     } else if (S.tab === "sidebar.jobs") {
       const j = (await api("session/jobs")).jobs;
-      fill(p, ...(j.length ? j.map((x) => el("div", {}, `op${x.op} ${x.tool}  `,
-        el("span", { class: x.status ? (x.status.status === "completed" ? "" : "err") : "warn" },
-          x.status ? (x.status.status === "completed" ? `✓ exit ${x.status.code}` : x.status.status) : "running")))
+      fill(p, ...(j.length ? j.map((x) => el("div", {}, el("span", { class: "scope " + x.scope }, x.scope), ` op${x.op} ${x.tool}  `,
+        el("span", { class: x.state === "running" ? "warn" : x.state === "done" ? "" : "err" },
+          x.state === "done" ? `✓ exit ${x.status.code}` : x.state)))
         : [el("div", { class: "notice" }, "no operations yet")]));
     } else if (S.tab === "sidebar.stats") {
       const st = (await api("session/stats")).stats;
@@ -427,7 +427,7 @@ function onFrame(f) {
       S.entries.set(p.id, p); if (S.tip === null || p.id >= S.tip) S.tip = p.id; S.last = Math.max(S.last ?? -1, p.id);
       if (p.kind.type === "assistant_message") S.live = { text: "", thinking: "", tools: [] };
       if (S.ready && ["cap_delta", "policy_epoch"].includes(p.kind.type)) { S.tree = null; loadPanels(); }
-      if (S.ready && S.tab === "sidebar.jobs" && ["op_started", "op_done", "tool_result"].includes(p.kind.type)) refreshPanel();
+      if (S.ready && S.tab === "sidebar.jobs" && ["op_started", "op_done", "op_detached", "job_delivered", "tool_result"].includes(p.kind.type)) refreshPanel();
       if (S.ready && S.tab === "sidebar.stats" && ["tool_result", "turn_end"].includes(p.kind.type)) refreshPanel();
       break;
     case "stream":
@@ -438,6 +438,7 @@ function onFrame(f) {
     case "idle": S.live = { text: "", thinking: "", tools: [] }; S.inflight = false; break;
     case "error": notice(p.message); break;
     case "approval": S.approvals.set(p.id, p); break;
+    case "job_finished": if (S.tab === "sidebar.jobs") refreshPanel(); break;
     case "approval_resolved": S.approvals.delete(p.id); break;
     case "ready": S.ready = true; break;
     default: break;

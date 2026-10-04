@@ -54,6 +54,8 @@ body.hud .hud-note { display: block; }
 .node .g.active { color: var(--green); } .node .g.unlocked { color: var(--blue); } .node .g.locked { color: var(--yellow); }
 .node .g.broken { color: var(--red); } .node .g.disabled { color: var(--dim); }
 .node .st { color: var(--dim); float: right; }
+.scope { border: 1px solid var(--line); border-radius: 8px; padding: 0 6px; font-size: 12px; color: var(--dim); }
+.scope.job { border-color: var(--magenta); color: var(--magenta); }
 .sub { color: var(--dim); padding-left: 2em; white-space: pre-wrap; }
 .warn { color: var(--yellow); }
 .err { color: var(--red); }

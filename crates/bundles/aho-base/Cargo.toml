@@ -44,6 +44,7 @@ tool-plan-mode = { path = "../../tools/tool-plan-mode" }
 hooks-claude-code = { path = "../../providers/hooks-claude-code" }
 subagent-acp = { path = "../../providers/subagent-acp" }
 telemetry = { path = "../../providers/telemetry" }
+jobs-digest = { path = "../../tools/jobs-digest" }
 
 [dev-dependencies]
 aho-compose.workspace = true

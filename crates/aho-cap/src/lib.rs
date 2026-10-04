@@ -49,7 +49,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use aho_config::{ConfigKey, Loadout, Origin};
-use aho_log::{CapState, CustomFold, OpKind, State};
+use aho_log::{CapState, CustomFold, DetachCause, OpKind, OpStatus, State};
 use aho_types::*;
 use serde::Serialize;
 
@@ -361,6 +361,12 @@ pub struct ToolDecl {
     /// Anything but an explicit `Safe` is a barrier.
     pub concurrency: fn(&Value) -> Concurrency,
     pub interrupt: Interrupt,
+    /// Whether a running call may become a session job (`OpDetached`); config `jobs.detach.<tool>`
+    /// narrows or widens it, except that `Never` stays `Never`.
+    pub detach: Detach,
+    /// A call to this tool waits on session jobs (`job_wait`): under `jobs.deliver = on_wait` it
+    /// releases the held job deliveries while it runs and at the boundary after its result.
+    pub awaits_jobs: bool,
     /// Spill threshold in chars; `None` = never spill (`read`).
     pub max_inline: Option<usize>,
     /// Tool's own opinion in the decision chain (step 3). `None` = passthrough.
@@ -379,6 +385,8 @@ pub struct ToolDefaults {
     pub schema: fn(&BoundWorld) -> RootSchema,
     pub concurrency: fn(&Value) -> Concurrency,
     pub interrupt: Interrupt,
+    pub detach: Detach,
+    pub awaits_jobs: bool,
     pub max_inline: Option<usize>,
     pub check: fn(&Value, &PolicyView) -> Option<Decision>,
     pub present: Present,
@@ -415,6 +423,8 @@ impl ToolDecl {
         schema: no_schema,
         concurrency: always_exclusive,
         interrupt: Interrupt::Block,
+        detach: Detach::Never,
+        awaits_jobs: false,
         max_inline: Some(50_000),
         check: passthrough,
         present: Present { call: generic_call, result: generic_result },
@@ -433,6 +443,8 @@ impl ToolDecl {
             schema: d.schema,
             concurrency: d.concurrency,
             interrupt: d.interrupt,
+            detach: d.detach,
+            awaits_jobs: d.awaits_jobs,
             max_inline: d.max_inline,
             check: d.check,
             present: d.present,
@@ -455,6 +467,21 @@ impl ToolDecl {
     }
     pub const fn cancel_on_interrupt(mut self) -> Self {
         self.interrupt = Interrupt::Cancel;
+        self
+    }
+    /// The model may run this call in the background (`background: true`); `jobs.detach.<tool>` may
+    /// change how (`always`, `after:<dur>`, `never`).
+    pub const fn detachable(mut self) -> Self {
+        self.detach = Detach::OnRequest;
+        self
+    }
+    pub const fn detach(mut self, d: Detach) -> Self {
+        self.detach = d;
+        self
+    }
+    /// See [`ToolDecl::awaits_jobs`].
+    pub const fn awaits_jobs(mut self) -> Self {
+        self.awaits_jobs = true;
         self
     }
     pub const fn max_inline(mut self, n: Option<usize>) -> Self {
@@ -498,6 +525,17 @@ pub enum Concurrency {
 pub enum Interrupt {
     Cancel,
     Block,
+}
+
+/// How a running call of a tool may leave its turn and become a session job.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum Detach {
+    /// Always turn-scoped; no config can detach it.
+    Never,
+    /// Detached when the model asks (`background: true`), by config, or by the operator.
+    OnRequest,
+    /// Detached at start.
+    Always,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -697,6 +735,9 @@ pub enum HookEvent {
     PostCompact,
     SubagentStart,
     SubagentStop,
+    /// A finished job is about to be delivered; the payload is the bounded [`JobView`]. Only
+    /// [`HookOutput::delivery`] counts here.
+    JobDone,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -704,7 +745,44 @@ pub struct HookOutput {
     pub decision: Option<Decision>,
     pub context: Vec<String>,
     pub stop: Option<String>,
+    /// `HookEvent::JobDone` only: what happens to the delivery.
+    pub delivery: Delivery,
 }
+
+/// One finished job about to be logged as `JobDelivered`, as [`Registrar::delivery`] callbacks
+/// see it (`HookEvent::JobDone` hooks get it as JSON with `content` cut to text).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JobView {
+    pub op: OpId,
+    pub call: CallId,
+    pub tool: String,
+    pub status: OpStatus,
+    pub cause: DetachCause,
+    /// What the model will see: the tool's content, after any earlier `Replace` in the chain.
+    pub content: Vec<ContentBlock>,
+    /// How many times this delivery was deferred before.
+    pub deferred: u32,
+    /// Every op offered at this delivery point, in offer order (this one included).
+    pub with: Vec<OpId>,
+}
+
+/// What a delivery callback or `JobDone` hook does with one delivery. The entry is always
+/// logged: suppressing delivers a marker, deferring offers it again later.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub enum Delivery {
+    /// Deliver as offered.
+    #[default]
+    Keep,
+    /// Deliver this content instead; later callbacks see it.
+    Replace(Vec<ContentBlock>),
+    /// Deliver a marker naming the capability instead of the content. Ends the chain.
+    Suppress,
+    /// Hold the delivery; from the first delivery point after `until`, the whole chain sees it
+    /// again. Ends the chain.
+    Defer { until: std::time::Instant },
+}
+
+pub type DeliveryFn = Arc<dyn Fn(&JobView) -> Delivery + Send + Sync>;
 
 /// Hooks are veto-`⊓`: an erroring hook never becomes Allow. Default Deny.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -723,6 +801,7 @@ pub struct Registry {
     pub guards: Vec<(CapabilityId, GuardFn)>,
     pub post: Vec<(CapabilityId, PostExecute)>,
     pub hooks: Vec<(CapabilityId, HookSpec)>,
+    pub deliveries: Vec<(CapabilityId, DeliveryFn)>,
     pub sections: Vec<(CapabilityId, i32, String, bool, SectionFn)>,
     pub contexts: Vec<(CapabilityId, ContextFn)>,
     pub panels: Vec<(CapabilityId, &'static str, &'static [&'static str])>,
@@ -783,6 +862,12 @@ impl<'a> Registrar<'a> {
     }
     pub fn hook(&mut self, spec: HookSpec) {
         self.reg.hooks.push((self.grant.cap, spec));
+    }
+    /// Sees every finished job before its `JobDelivered` is logged and may replace, suppress or
+    /// defer it. The chain: every `delivery` callback, then every `HookEvent::JobDone` hook, each
+    /// in registration order; `Suppress` or `Defer` ends it.
+    pub fn delivery(&mut self, f: DeliveryFn) {
+        self.reg.deliveries.push((self.grant.cap, f));
     }
     /// Static prompt section; `cache_break` marks the end of the cache-stable prefix.
     pub fn prompt_section(&mut self, order: i32, name: &str, cache_break: bool, f: SectionFn) {

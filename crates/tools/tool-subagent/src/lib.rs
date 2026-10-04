@@ -7,8 +7,11 @@
 //!   `preset` narrows, nothing widens; an `async` child cannot ask the operator unless `bubble`.
 //! * Lifecycle is recorded in the *parent* log: every result that closes a child run
 //!   carries `value.events = [{"kind": Subagent/Started}, {"kind": Subagent/Ended}]`, which the
-//!   session appends right after the `Tool/Result`. A run is always closed, even when it is
-//!   interrupted or fails, so no child row stays open forever.
+//!   session appends right after the `Tool/Result` (or a job's `JobDelivered`). A run is
+//!   always closed, even when it is interrupted or fails, so no child row stays open forever.
+//! * `subagent`, `subagent_fork` and `send_message` are detachable: as a session job the call's
+//!   wait outlives the turn. It watches only the call's own op token, which a turn abort no longer
+//!   fires for a job; job_kill, `AbortScope::All` and teardown do, and the child is interrupted.
 //!
 //! The classes are `ReadOnly`: a call grants nothing the child's own decision chain does not
 //! re-check: every child call is reviewed under the narrowed child policy.
@@ -85,20 +88,22 @@ declare_capability!(
 pub static TOOLS: &[ToolDecl] = &[
     ToolDecl::new(
         "subagent",
-        "Start a subagent: a fresh agent with its own conversation that works on `prompt` and returns its final message. It runs in the background like any tool call, so keep working; its result arrives when it finishes. It gets this session's policy narrowed by `preset` and only the `tools` you list (all when omitted). `async: true` marks a background agent that cannot ask the operator anything unless `bubble: true`.",
+        "Start a subagent: a fresh agent with its own conversation that works on `prompt` and returns its final message. It runs alongside your other calls like any tool call, so keep working; its result arrives when it finishes. It gets this session's policy narrowed by `preset` and only the `tools` you list (all when omitted). `async: true` marks a background agent that cannot ask the operator anything unless `bubble: true`.",
         Consequence::ReadOnly,
     )
     .safe()
     .schema(schema_subagent)
-    .op(OpKind::Remote, false, true),
+    .op(OpKind::Remote, false, true)
+    .detachable(),
     ToolDecl::new(
         "subagent_fork",
-        "Fork this conversation into a subagent that sees everything up to the end of the previous turn (never the current one) and works on `prompt`; returns its final message. Runs in the background like `subagent`.",
+        "Fork this conversation into a subagent that sees everything up to the end of the previous turn (never the current one) and works on `prompt`; returns its final message. Runs alongside your other calls like `subagent`.",
         Consequence::ReadOnly,
     )
     .safe()
     .schema(schema_fork)
-    .op(OpKind::Remote, false, true),
+    .op(OpKind::Remote, false, true)
+    .detachable(),
     ToolDecl::new(
         "send_message",
         "Send a follow-up to one of your subagents (by id or label). It continues its own conversation and this call returns its new final message; if it is still working, the text joins its current run.",
@@ -106,7 +111,8 @@ pub static TOOLS: &[ToolDecl] = &[
     )
     .safe()
     .schema(schema_send)
-    .op(OpKind::Remote, false, true),
+    .op(OpKind::Remote, false, true)
+    .detachable(),
     ToolDecl::new(
         "interrupt_agent",
         "Interrupt a running subagent (by id or label): its running tool calls are cancelled and it is told to stop; the call that started it returns with what it had.",
@@ -365,8 +371,9 @@ impl ToolSubagent {
         Ok(self.finish(child, &label, result))
     }
 
-    /// Waits for the child's run; when this call is cancelled (parent abort), interrupts the
-    /// child and still waits for it to wind down so the run is closed in the parent log.
+    /// Waits for the child's run. `cancel` is this call's op token: a turn abort fires it for a
+    /// turn call, only job_kill / `AbortScope::All` / teardown for a job. Then the child is
+    /// interrupted, and still waited for so the run is closed in the parent log.
     async fn wait_or_cancel(&self, child: SessionId, cancel: &CancelToken) -> Result<Result_, SubagentError> {
         let wait = self.provider.wait(child);
         tokio::pin!(wait);

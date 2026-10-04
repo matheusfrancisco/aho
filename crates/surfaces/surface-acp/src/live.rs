@@ -119,7 +119,7 @@ impl Live {
                     self.send(u);
                 }
             }
-            SessionEvent::Idle { .. } => {}
+            SessionEvent::Idle { .. } | SessionEvent::JobFinished { .. } => {}
             SessionEvent::Error(msg) => (self.diag)(&format!("session {}: {msg}", self.id)),
         }
     }

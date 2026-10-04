@@ -89,14 +89,18 @@ fn bare_machine_binds_the_host_world_and_locks_unconfigured_models() {
 fn opt_in_capabilities_wait_for_the_operator_and_an_operator_layer_turns_them_on() {
     let f = fx(None);
     let p = planned(&f, &[]);
-    for id in ["tool-terminal", "hooks-claude-code"] {
+    for id in ["tool-terminal", "hooks-claude-code", "jobs-digest"] {
         let row = p.plan.row(id).unwrap();
         assert_eq!(row.state, CapState::Unlocked, "{id} ships `○ Unlocked  enable: aho enable {id}`");
         assert!(matches!(row.because, aho_cap::Because::OptIn { .. }), "{id}: {:?}", row.because);
     }
-    let on = planned(&f, &[("caps.tool-terminal.enabled", "true"), ("caps.hooks-claude-code.enabled", "true")]);
+    let on = planned(
+        &f,
+        &[("caps.tool-terminal.enabled", "true"), ("caps.hooks-claude-code.enabled", "true"), ("caps.jobs-digest.enabled", "true")],
+    );
     assert_eq!(state(&on, "tool-terminal"), CapState::Active);
     assert_eq!(state(&on, "hooks-claude-code"), CapState::Active);
+    assert_eq!(state(&on, "jobs-digest"), CapState::Active);
     let acp = planned(&f, &[("seams.subagent", "subagent-acp")]);
     assert!(matches!(state(&acp, "subagent-inproc"), CapState::Unlocked), "switching the seam unbinds in-process subagents");
 }

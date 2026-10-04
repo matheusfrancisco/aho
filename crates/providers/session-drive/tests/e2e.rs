@@ -117,7 +117,7 @@ async fn a_schedule_the_agent_created_fires_as_a_real_turn_once_despite_missed_o
     // the host was down for three and a half minutes after that
     let clock = Arc::new(SteppedClock::new(Timestamp::now()));
     let drivers = host(&r.seed, r.session.clone(), clock.clone());
-    assert_eq!(drivers.running(), vec!["scheduler", "ralph"]);
+    assert_eq!(drivers.running(), vec!["scheduler", "ralph", "jobs"]);
     clock.advance(210_000);
     until(&r.session, "the Fired record", |es| !custom(es, "schedule", "Fired").is_empty()).await;
     let es = entries(&r.session);

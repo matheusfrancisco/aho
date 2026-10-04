@@ -119,6 +119,23 @@ pub(super) struct SessionParams {
     pub(super) session: SessionId,
 }
 
+/// `session.abort{session, scope?, op?}`: scope `turn` (default), `all`, or `op` with `op`.
+#[derive(Deserialize)]
+pub(super) struct AbortParams {
+    pub(super) session: SessionId,
+    #[serde(default)]
+    pub(super) scope: Option<String>,
+    #[serde(default)]
+    pub(super) op: Option<OpId>,
+}
+
+/// `job.kill{session, op}` / `job.detach{session, op}`.
+#[derive(Deserialize)]
+pub(super) struct JobParams {
+    pub(super) session: SessionId,
+    pub(super) op: OpId,
+}
+
 #[derive(Deserialize)]
 pub(super) struct AttachParams {
     pub(super) session: SessionId,
@@ -303,6 +320,7 @@ pub(super) async fn forward(
                 ServerFrame::event("idle", json!({ "session": sid, "turn": turn.0, "transition": transition }))
             }
             Ok(SessionEvent::Error(message)) => ServerFrame::event("error", json!({ "session": sid, "message": message })),
+            Ok(SessionEvent::JobFinished { op }) => ServerFrame::event("job.finished", json!({ "session": sid, "op": op })),
             Err(broadcast::error::RecvError::Lagged(_)) => {
                 for g in session.subscribe_from(last) {
                     if !sent(&mut last, &g) {
@@ -383,4 +401,21 @@ pub(super) fn running_jobs(s: &Session) -> Vec<String> {
             format!("job {}: {tool} (call {})", op.0, call.0)
         })
         .collect()
+}
+
+/// Finished jobs whose outcome only this process holds until a turn delivers it: a new boot over
+/// the log would report them as lost (`Uncertain`/`Failed`), so a mutation or reopen waits.
+pub(super) fn waiting_jobs(s: &Session) -> Vec<String> {
+    let waiting = s.jobs_waiting();
+    if waiting == 0 {
+        return Vec::new();
+    }
+    let named: Vec<String> = s
+        .jobs()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|j| j.status.is_some())
+        .map(|j| format!("job {}: {} (call {})", j.op.0, j.tool, j.call.0))
+        .collect();
+    if named.is_empty() { vec![format!("{waiting} finished job(s)")] } else { named }
 }

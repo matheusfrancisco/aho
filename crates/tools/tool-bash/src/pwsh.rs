@@ -106,6 +106,7 @@ pub static PWSH_TOOLS: &[ToolDecl] = &[
     .schema(schema_bash)
     .check(check_pwsh)
     .op(OpKind::Process, false, true)
+    .detachable()
     .present(PRESENT),
     ToolDecl::new(
         "bash_persistent",

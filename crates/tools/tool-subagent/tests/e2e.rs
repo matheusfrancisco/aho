@@ -5,6 +5,8 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 
 use aho_approval::{Approval, ChannelApproval, Decided, NeverApproval};
@@ -13,17 +15,35 @@ use aho_config::{FileSnapshot, Layer, ResolveInputs, Schema, resolve};
 use aho_llm::{LateResults, LlmRoute};
 use aho_log::{ApprovalOutcome, CustomFolds, Entry, EntryKind, GrantScope, JsonlLog, LogStore, OpKind, Transition};
 use aho_policy::{Operator, OperatorProof};
-use aho_session::{Boot, Session, verify_replay};
+use aho_session::{AbortScope, Boot, Session, verify_replay};
 use aho_types::*;
 use llm_scripted::{ScriptedLlm, Step};
 use serde_json::json;
 use subagent_inproc::{SubagentInproc, SubagentRuntime};
 use tool_subagent::ToolSubagent;
 
-// A cancel-aware slow tool, so a child can be caught mid-run.
+// A cancel-aware slow tool, so a child can be caught mid-run; `gate` waits for `GATE` instead.
 struct SlowTool;
-static SLOW: &[ToolDecl] =
-    &[ToolDecl::new("slow", "Sleeps until cancelled (test tool).", Consequence::ReadOnly).safe().op(OpKind::Timer, false, false)];
+static SLOW: &[ToolDecl] = &[
+    ToolDecl::new("slow", "Sleeps until cancelled (test tool).", Consequence::ReadOnly).safe().op(OpKind::Timer, false, false),
+    ToolDecl::new("gate", "Waits until the test opens the gate (test tool).", Consequence::ReadOnly).safe().op(OpKind::Timer, false, false),
+];
+/// Opened by the one test whose child waits at the gate.
+static GATE: AtomicBool = AtomicBool::new(false);
+
+async fn sleep_until(cancel: &CancelToken, open: impl Fn() -> bool, done: &str) -> ExecOutcome {
+    for _ in 0..1500 {
+        if cancel.is_cancelled() {
+            return ExecOutcome::Cancelled;
+        }
+        if open() {
+            return ExecOutcome::text(done);
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    ExecOutcome::text("slept")
+}
+
 impl Capability for SlowTool {
     const ID: CapabilityId = Self::ID_;
     const MANIFEST: &'static Manifest = &Self::MANIFEST_;
@@ -33,19 +53,10 @@ impl Capability for SlowTool {
         Ok(SlowTool)
     }
     fn register(&self, r: &mut Registrar<'_>) {
+        r.tool(&SLOW[0], Arc::new(|req: ExecRequest| Box::pin(async move { sleep_until(&req.cancel, || false, "").await })));
         r.tool(
-            &SLOW[0],
-            Arc::new(|req: ExecRequest| {
-                Box::pin(async move {
-                    for _ in 0..1500 {
-                        if req.cancel.is_cancelled() {
-                            return ExecOutcome::Cancelled;
-                        }
-                        tokio::time::sleep(Duration::from_millis(20)).await;
-                    }
-                    ExecOutcome::text("slept")
-                })
-            }),
+            &SLOW[1],
+            Arc::new(|req: ExecRequest| Box::pin(async move { sleep_until(&req.cancel, || GATE.load(SeqCst), "opened").await })),
         );
     }
 }
@@ -445,4 +456,99 @@ async fn an_unknown_role_is_refused_before_anything_starts() {
     assert_eq!(p.s.prompt("go", None).await.unwrap(), Transition::Completed);
     assert_eq!((p.parent_llm.remaining(), p.child_llm.remaining()), (0, 0));
     assert!(child_logs(&p.sessions.join("7")).is_empty(), "no child was started");
+}
+
+async fn eventually(what: &str, ok: impl Fn() -> bool) {
+    for _ in 0..500 {
+        if ok() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("timed out waiting for {what}");
+}
+
+fn job_status(s: &Session) -> Option<aho_log::OpStatus> {
+    s.jobs().unwrap()[0].status.clone()
+}
+
+fn delivered(es: &[Entry]) -> Vec<(OpId, String)> {
+    es.iter()
+        .filter_map(|e| match &e.kind {
+            EntryKind::JobDelivered { op, content, .. } => Some((*op, content.iter().filter_map(|b| b.as_text()).collect())),
+            _ => None,
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn a_background_subagent_outlives_a_turn_abort_and_its_result_is_delivered() {
+    let r = rig("");
+    let p = boot(
+        &r,
+        vec![
+            Step::tool_call("subagent", json!({"prompt": "work behind the gate", "label": "bg", "background": true})),
+            Step::tool_call("slow", json!({})).expect_tool_result("background as job"),
+            Step::text("the child says it is through").expect_user("through the gate"),
+        ],
+        vec![Step::tool_call("gate", json!({})), Step::text("through the gate").expect_tool_result("opened")],
+        Arc::new(NeverApproval),
+    )
+    .await;
+    let s = p.s.clone();
+    let turn = tokio::spawn(async move { s.prompt("go", None).await });
+    eventually("the parent to wait in `slow` with the subagent as a job", || {
+        p.parent_llm.remaining() == 1 && p.s.jobs().unwrap().len() == 1 && p.child_llm.remaining() == 1
+    })
+    .await;
+    p.s.abort_scope(AbortScope::Turn);
+    assert!(matches!(turn.await.unwrap().unwrap(), Transition::Aborted(_)));
+    assert_eq!(job_status(&p.s), None, "the turn abort did not reach the job's child");
+
+    GATE.store(true, SeqCst);
+    eventually("the child to finish", || job_status(&p.s).is_some()).await;
+    assert_eq!(p.s.prompt("what did it say?", None).await.unwrap(), Transition::Completed);
+    assert_eq!((p.parent_llm.remaining(), p.child_llm.remaining()), (0, 0));
+
+    let es = entries(&p.s);
+    let got = delivered(&es);
+    assert_eq!(got.len(), 1);
+    assert!(got[0].1.contains("finished: end_turn") && got[0].1.contains("through the gate"), "{}", got[0].1);
+    let at = es.iter().position(|e| matches!(e.kind, EntryKind::JobDelivered { .. })).unwrap();
+    assert!(
+        matches!(&es[at + 1].kind, EntryKind::SubagentStarted { .. }) && matches!(&es[at + 2].kind, EntryKind::SubagentEnded { .. }),
+        "the child's run is closed right after its delivery"
+    );
+    assert!(p.s.jobs().unwrap().is_empty());
+    assert!(verify_replay(&es, &CustomFolds::new(), LateResults::SameCallId).unwrap() >= 2);
+}
+
+#[tokio::test]
+async fn abort_all_interrupts_a_background_subagent_and_its_run_is_delivered() {
+    let r = rig("");
+    let p = boot(
+        &r,
+        vec![
+            Step::tool_call("subagent", json!({"prompt": "sleep", "label": "bg", "background": true})),
+            Step::text("it runs on").expect_tool_result("background as job"),
+            Step::text("it was stopped").expect_user("finished: aborted"),
+        ],
+        vec![Step::tool_call("slow", json!({})), Step::text("an interrupted child never reaches this")],
+        Arc::new(NeverApproval),
+    )
+    .await;
+    assert_eq!(p.s.prompt("go", None).await.unwrap(), Transition::Completed);
+    eventually("the child to sleep in `slow`", || p.child_llm.remaining() == 1).await;
+    assert_eq!(job_status(&p.s), None, "the turn ended; the job runs on");
+
+    assert!(p.s.abort_scope(AbortScope::All));
+    eventually("the child to wind down", || job_status(&p.s).is_some()).await;
+    assert_eq!(p.s.prompt("and?", None).await.unwrap(), Transition::Completed);
+    assert_eq!((p.parent_llm.remaining(), p.child_llm.remaining()), (0, 1), "the interrupted child never asks its model again");
+    let es = entries(&p.s);
+    assert!(
+        es.iter().any(|e| matches!(&e.kind, EntryKind::SubagentEnded { stop: StopReason::Aborted, .. })),
+        "the interrupted run is closed in the parent log"
+    );
+    assert!(verify_replay(&es, &CustomFolds::new(), LateResults::SameCallId).unwrap() >= 2);
 }

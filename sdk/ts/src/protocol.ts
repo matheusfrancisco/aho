@@ -450,7 +450,9 @@ export type CancelReason =
   | "sibling_failed"
   | "user_interrupted"
   | "rewind"
-  | "reload";
+  | "reload"
+  | "fork"
+  | "lease_expired";
 
 /** The resource an operation waits on. */
 export type OpKind =
@@ -486,6 +488,30 @@ export type OpStatus =
   | OpStatusFailed
   | OpStatusCancelled
   | OpStatusUncertain;
+
+export interface DetachCauseRequested {
+  cause: "requested";
+}
+
+export interface DetachCauseAfter {
+  cause: "after";
+  ms: number;
+}
+
+export interface DetachCauseOperator {
+  cause: "operator";
+}
+
+export interface DetachCauseModel {
+  cause: "model";
+}
+
+/** What detached a running operation into a session job; `after` = `jobs.detach.<tool> = after:<dur>` fired. */
+export type DetachCause =
+  | DetachCauseRequested
+  | DetachCauseAfter
+  | DetachCauseOperator
+  | DetachCauseModel;
 
 /** Crash-honest process identity: pids recycle, `(pid, start_time)` does not. */
 export interface ProcessIdentity {
@@ -819,6 +845,24 @@ export interface EntryKindOpDone {
   status: OpStatus;
 }
 
+export interface EntryKindOpDetached {
+  type: "op_detached";
+  op: OpId;
+  call: CallId;
+  cause: DetachCause;
+}
+
+export interface EntryKindJobDelivered {
+  type: "job_delivered";
+  op: OpId;
+  call: CallId;
+  tool: string;
+  status: OpStatus;
+  /** The job's output, shown to the model as a notice. */
+  content: Array<ContentBlock>;
+  spill_ref: Hash | null;
+}
+
 export interface EntryKindSurfaceReplace {
   type: "surface_replace";
   start: EntryId;
@@ -997,6 +1041,8 @@ export type EntryKind =
   | EntryKindToolResult
   | EntryKindOpStarted
   | EntryKindOpDone
+  | EntryKindOpDetached
+  | EntryKindJobDelivered
   | EntryKindSurfaceReplace
   | EntryKindCompactionStart
   | EntryKindCompactionEnd
@@ -1151,6 +1197,47 @@ export interface RewindParams {
 export interface RewindResult {
   /** The entry the rewound branch continues from. */
   entry: EntryId;
+}
+
+/** What `session.abort` cancels: `turn` (default; jobs keep running), `all` (the turn and every job), `op` (the operation named by `op`). */
+export type AbortScopeName =
+  | "turn"
+  | "all"
+  | "op";
+
+/** `session.abort` params; none = scope `turn`. */
+export interface AbortParams {
+  scope?: AbortScopeName | null;
+  /** With scope `op`: the operation to cancel. */
+  op?: OpId | null;
+}
+
+/** `job.kill` / `job.detach` params. */
+export interface JobParams {
+  op: OpId;
+}
+
+/** One open session job on the head branch. */
+export interface Job {
+  op: OpId;
+  /** The call the job detached from (already answered with the job id). */
+  call: CallId;
+  tool: string;
+  cause: DetachCause;
+  /** `null` while running; else finished, delivered at the next request boundary. */
+  status: OpStatus | null;
+  /** `null` when the serving process does not run it (left by a restart). */
+  started: Timestamp | null;
+}
+
+/** `job.list` result. */
+export interface JobList {
+  jobs: Array<Job>;
+}
+
+/** A job finished while no turn ran; its outcome is delivered when the next turn starts. */
+export interface JobFinished {
+  op: OpId;
 }
 
 /** `preset` writes the card's `preset_cut` as `policy.preset` (plan → apply) and allows the call for the session. */
@@ -1315,14 +1402,20 @@ export interface Methods {
   "session.prompt": { params: PromptParams; result: PromptResult };
   /** Queues input for the running turn; injected at the next request boundary. */
   "session.steer": { params: SteerParams; result: Empty };
-  /** Hard interrupt: cancels the running turn's operations. */
-  "session.abort": { params: Empty; result: Empty };
+  /** Cancels by scope: the running turn's operations (default; jobs keep running), everything (`all`), or one operation (`op`). */
+  "session.abort": { params: AbortParams; result: Empty };
   /** Replays entries after `from` as `entry` events, then streams live events on this connection. */
   "session.subscribe": { params: SubscribeParams; result: SubscribeResult };
   /** The folded session state. */
   "session.fold": { params: Empty; result: Fold };
   /** Rewinds chat and/or code to a checkpoint. */
   "session.rewind": { params: RewindParams; result: RewindResult };
+  /** Open session jobs: running, or finished and waiting for delivery. */
+  "job.list": { params: Empty; result: JobList };
+  /** Cancels one running job; its cancelled outcome is delivered like any other. A turn op is refused. */
+  "job.kill": { params: JobParams; result: Empty };
+  /** Detaches a running turn op into a session job (its call is answered with the job id); refused when its tool cannot run as a job. */
+  "job.detach": { params: JobParams; result: Empty };
   /** Answers one approval card; a card is answered once. */
   "approval.answer": { params: AnswerParams; result: AnswerResult };
   /** Inventory rows; shape owned by aho-inspect. */
@@ -1357,6 +1450,9 @@ export const METHODS: readonly Method[] = [
   "session.subscribe",
   "session.fold",
   "session.rewind",
+  "job.list",
+  "job.kill",
+  "job.detach",
   "approval.answer",
   "caps.list",
   "caps.tree",
@@ -1402,6 +1498,14 @@ export interface EventApproval {
   payload: ApprovalCard;
 }
 
+/** A job finished while no turn ran; `job.list` shows it until the next turn delivers it. */
+export interface EventJobFinished {
+  v: number;
+  reply_to: null;
+  event: "job_finished";
+  payload: JobFinished;
+}
+
 /** A failure outside any request (a lagging client, a log write that did not land). */
 export interface EventError {
   v: number;
@@ -1416,4 +1520,5 @@ export type Event =
   | EventStream
   | EventIdle
   | EventApproval
+  | EventJobFinished
   | EventError;

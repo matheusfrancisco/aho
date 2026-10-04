@@ -107,10 +107,35 @@
       },
       "v": 1
     },
+    "job.detach": {
+      "id": 21,
+      "method": "job.detach",
+      "params": {
+        "op": 7
+      },
+      "v": 1
+    },
+    "job.kill": {
+      "id": 20,
+      "method": "job.kill",
+      "params": {
+        "op": 7
+      },
+      "v": 1
+    },
+    "job.list": {
+      "id": 19,
+      "method": "job.list",
+      "params": null,
+      "v": 1
+    },
     "session.abort": {
       "id": 4,
       "method": "session.abort",
-      "params": null,
+      "params": {
+        "op": 7,
+        "scope": "op"
+      },
       "v": 1
     },
     "session.fold": {
@@ -251,6 +276,9 @@
           "session.subscribe",
           "session.fold",
           "session.rewind",
+          "job.list",
+          "job.kill",
+          "job.detach",
           "approval.answer",
           "caps.list",
           "caps.tree",
@@ -280,6 +308,34 @@
         "turn": 2
       },
       "reply_to": null,
+      "v": 1
+    },
+    "job_finished": {
+      "event": "job_finished",
+      "payload": {
+        "op": 7
+      },
+      "reply_to": null,
+      "v": 1
+    },
+    "jobs": {
+      "event": "result",
+      "payload": {
+        "jobs": [
+          {
+            "call": "c4",
+            "cause": {
+              "cause": "after",
+              "ms": 60000
+            },
+            "op": 7,
+            "started": 1700000000000,
+            "status": null,
+            "tool": "bash"
+          }
+        ]
+      },
+      "reply_to": 19,
       "v": 1
     },
     "result": {

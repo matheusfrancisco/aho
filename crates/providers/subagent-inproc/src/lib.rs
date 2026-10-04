@@ -7,11 +7,16 @@
 //!   an async child cannot reach a human unless bubbled. Operator rules survive into the child
 //!   because it resolves the same loadout.
 //! * The child log starts with `Subagent/Descriptor`; a fork then re-appends the parent's
-//!   completed-turn prefix in order (never the open turn); then
+//!   completed-turn prefix in order (never the open turn), closes the jobs that prefix still has
+//!   open (`OpDone Cancelled{Fork}`: a fork never inherits live jobs); then
 //!   `Policy/Epoch{by: System("delegation")}` so the child's fold is self-contained.
 //! * Depth is monotone: `max(inherited + 1, requested)`, capped by `subagent.max_depth`.
 //! * The parent log gets `Subagent/Started` / `Subagent/Ended`: `tool-subagent` returns them in
 //!   its result's `value.events`, which the session appends after the tool result.
+//! * A child stops with everything it runs, its own session jobs included
+//!   (`AbortScope::All`): when it is interrupted (`interrupt_agent`, or the parent call is
+//!   cancelled, e.g. a job killed or the parent's `AbortScope::All`), and when the provider is
+//!   dropped with the session that owns it. A child job never outlives its parent session.
 //!
 //! Embedders put a [`SubagentRuntime`] (composition, plan, loadout, model routes, operator
 //! factory, the session's log) into `Boot::seed` with [`SubagentRuntime::seed_into`]; every
@@ -27,9 +32,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use aho_approval::{Approval, ApprovalHandle, NeverApproval};
 use aho_cap::*;
 use aho_config::{ConfigKey, Layer, Loadout, Origin, Sourced, Ty, Where};
-use aho_log::{CapState, CustomFolds, Entry, EntryKind, JsonlLog, LogStore, MemoryLog, Transition};
+use aho_log::{CancelReason, CapState, CustomFolds, Entry, EntryKind, JsonlLog, LogStore, MemoryLog, OpStatus, Transition};
 use aho_policy::{Operator, SandboxPolicy};
-use aho_session::{Boot, Session};
+use aho_session::{AbortScope, Boot, Session};
 use aho_subagent::{ChildInfo, Features, Mode, Result_, SpawnRequest, SubagentError, SubagentProvider};
 use aho_types::*;
 use serde_json::json;
@@ -348,6 +353,17 @@ impl InProc {
     }
 }
 
+/// The provider lives as long as the session that owns it (its registry holds it, and a running
+/// parent op holds that session). Once it goes, every child stops with its own jobs: nothing is
+/// left to wait for their runs or receive their outcomes.
+impl Drop for InProc {
+    fn drop(&mut self) {
+        for c in lock(&self.children).iter() {
+            c.session.abort_scope(AbortScope::All);
+        }
+    }
+}
+
 impl SubagentProvider for InProc {
     fn features(&self) -> Features {
         Features { fork: true, persona: true, tool_filter: true, output_schema: false, max_depth: self.max_depth }
@@ -377,9 +393,10 @@ impl SubagentProvider for InProc {
             let c = self.get(child)?;
             if c.running() {
                 c.interrupted.store(true, Ordering::SeqCst);
-                // `abort` ends the child's turn with no further model request; a steer here would
-                // sit queued and reach the child's next run as a stale instruction.
-                c.session.abort();
+                // Abort ends the child's turn with no further model request (a steer here would
+                // sit queued and reach the child's next run as a stale instruction), and its jobs:
+                // nothing would be left to receive their outcomes.
+                c.session.abort_scope(AbortScope::All);
             }
             Ok(())
         })
@@ -413,14 +430,18 @@ struct Prefix {
     entries: Vec<Entry>,
     allowed: ConsequenceSet,
     epoch: Epoch,
+    /// Jobs still open at the fork point: the child closes them (a fork never inherits live jobs).
+    jobs: Vec<OpId>,
 }
 
+/// No turn, no open call, and no open op other than a session job.
 fn balanced(s: &aho_log::State) -> bool {
-    s.turn.is_none() && s.open_calls.is_empty() && s.open_ops.is_empty()
+    s.turn.is_none() && s.open_calls.is_empty() && s.open_ops.keys().all(|op| s.jobs.contains_key(op))
 }
 
 /// The parent's fork point: the last `Turn/End` on the head branch at which no turn, call, or
-/// operation is open. The in-flight turn is unbalanced and never inherited.
+/// turn operation is open (running jobs do not count). The in-flight turn is unbalanced and never
+/// inherited.
 pub fn fork_point(log: &dyn LogStore) -> Option<EntryId> {
     let entries = log.read_branch(log.head()?).ok()?;
     let folds = CustomFolds::new();
@@ -458,7 +479,7 @@ fn fork_prefix(log: &dyn LogStore, at: EntryId) -> Result<Prefix, SubagentError>
             at.0
         )));
     }
-    Ok(Prefix { entries: prefix, allowed: state.policy.allowed, epoch: state.policy.epoch })
+    Ok(Prefix { entries: prefix, allowed: state.policy.allowed, epoch: state.policy.epoch, jobs: state.jobs.keys().copied().collect() })
 }
 
 /// Descriptor first; then (fork) the parent's completed-turn prefix, re-appended in order, or
@@ -490,6 +511,10 @@ fn seed_child_log(
         Some(p) => {
             for e in &p.entries {
                 log.append(None, e.by.clone(), e.kind.clone()).map_err(io)?;
+            }
+            for op in &p.jobs {
+                let closed = EntryKind::OpDone { op: *op, status: OpStatus::Cancelled { reason: CancelReason::Fork } };
+                log.append(None, delegation.clone(), closed).map_err(io)?;
             }
             epoch = epoch.max(p.epoch.0);
         }

@@ -49,9 +49,9 @@ export class Client {
     return this.request("session.steer", params);
   }
 
-  /** Hard interrupt: cancels the running turn's operations. */
-  abort(): Promise<P.Empty> {
-    return this.request("session.abort", {});
+  /** Cancels by scope: the running turn's operations (default; jobs keep running), everything (`all`), or one operation (`op`). */
+  abort(params: P.AbortParams = {}): Promise<P.Empty> {
+    return this.request("session.abort", params);
   }
 
   /** Replays entries after `from` as `entry` events, then streams live events on this connection. */
@@ -67,6 +67,21 @@ export class Client {
   /** Rewinds chat and/or code to a checkpoint. */
   rewind(params: P.RewindParams): Promise<P.RewindResult> {
     return this.request("session.rewind", params);
+  }
+
+  /** Open session jobs: running, or finished and waiting for delivery. */
+  listJobs(): Promise<P.JobList> {
+    return this.request("job.list", {});
+  }
+
+  /** Cancels one running job; its cancelled outcome is delivered like any other. A turn op is refused. */
+  killJob(params: P.JobParams): Promise<P.Empty> {
+    return this.request("job.kill", params);
+  }
+
+  /** Detaches a running turn op into a session job (its call is answered with the job id); refused when its tool cannot run as a job. */
+  detachJob(params: P.JobParams): Promise<P.Empty> {
+    return this.request("job.detach", params);
   }
 
   /** Answers one approval card; a card is answered once. */

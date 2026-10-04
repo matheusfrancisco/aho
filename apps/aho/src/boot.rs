@@ -147,3 +147,27 @@ pub async fn stop_drivers(drivers: Option<Drivers>) {
         }
     }
 }
+
+/// An interactive host is leaving a session it ran (after its drivers stopped, so nothing wakes):
+/// jobs still running stop with this process, and outcomes not delivered yet stay undelivered.
+/// Says so on stderr; resuming the session reports those jobs (a re-runnable one runs again).
+pub fn stop_jobs(session: &Session) {
+    let running: Vec<_> = match session.jobs() {
+        Ok(jobs) => jobs.into_iter().filter(|j| j.status.is_none()).collect(),
+        Err(e) => {
+            eprintln!("aho: the session's jobs could not be read ({e}); any still running stop with this process");
+            Vec::new()
+        }
+    };
+    let waiting = session.jobs_waiting();
+    if !running.is_empty() {
+        eprintln!("aho: {} background job(s) still ran and stop now: {}", running.len(), session_drive::job_list(&running));
+        session.abort_scope(aho_session::AbortScope::All);
+    }
+    if waiting > 0 {
+        eprintln!("aho: {waiting} finished job outcome(s) were not delivered to the model yet");
+    }
+    if waiting > 0 || !running.is_empty() {
+        eprintln!("aho: resuming the session reports them (a re-runnable job runs again)");
+    }
+}

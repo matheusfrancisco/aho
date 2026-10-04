@@ -23,6 +23,9 @@ pub const METHODS: &[&str] = &[
     "session.subscribe",
     "session.fold",
     "session.rewind",
+    "job.list",
+    "job.kill",
+    "job.detach",
     "approval.answer",
     "caps.list",
     "caps.tree",
@@ -124,6 +127,22 @@ pub struct SteerParams {
     pub urgent: bool,
 }
 
+/// `session.abort`: `scope` is `turn` (default: the running turn; jobs keep running), `all` (the
+/// turn and every job), or `op` with `op` (one operation).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AbortParams {
+    #[serde(default)]
+    pub scope: Option<String>,
+    #[serde(default)]
+    pub op: Option<OpId>,
+}
+
+/// `job.kill` / `job.detach`: the operation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct JobParams {
+    pub op: OpId,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SubscribeParams {
     /// Replay entries appended after this id (`None` = from the first entry), then go live.
@@ -189,6 +208,11 @@ pub fn stream_payload(s: &StreamEvent) -> Value {
 
 pub fn idle_payload(turn: TurnId, transition: &Transition) -> Value {
     json!({ "turn": turn.0, "transition": transition })
+}
+
+/// A job finished while no turn ran; the next turn delivers its outcome.
+pub fn job_finished_payload(op: OpId) -> Value {
+    json!({ "op": op })
 }
 
 /// The approval card as data: the same fields every surface renders.

@@ -19,19 +19,22 @@ use aho_cap::BoundWorld;
 use aho_config::{Layer, Origin, Sourced, Where};
 use aho_llm::StreamEvent;
 use aho_log::{
-    ApprovalOutcome, CancelReason, CapDeltaOp, CapState, CheckMode, CheckpointCause, Entry, EntryKind, FormalKind, GrantScope, OpKind,
-    OpStatus, PolicyState, ProcessIdentity, RecoveryRole, RewindMode, State, Takeover, ToolOutcome, Transition, Verdict,
+    ApprovalOutcome, CancelReason, CapDeltaOp, CapState, CheckMode, CheckpointCause, DetachCause, Entry, EntryKind, FormalKind, GrantScope,
+    OpKind, OpStatus, PolicyState, ProcessIdentity, RecoveryRole, RewindMode, State, Takeover, ToolOutcome, Transition, Verdict,
 };
 use aho_policy::{ApprovalCard, DecisionReason};
 use aho_sdk::protocol::{PROTOCOL, Shape, Ty};
 use aho_sdk::validate::{check, check_client_frame, check_server_frame};
-use aho_sdk::{Event, Fold, Open, Sdk};
+use aho_sdk::{Event, Fold, Job, Open, Sdk};
+use aho_session::{AbortScope, JobInfo};
 use aho_types::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value, json};
 use surface_rpc::ServerFrame;
-use surface_rpc::wire::{self, AnswerParams, Hello, HelloOk, PromptParams, RewindParams, SteerParams, SubscribeParams};
+use surface_rpc::wire::{
+    self, AbortParams, AnswerParams, Hello, HelloOk, JobParams, PromptParams, RewindParams, SteerParams, SubscribeParams,
+};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 // ───────────────────────────── samples ─────────────────────────────
@@ -109,6 +112,8 @@ fn entry_tag(k: &EntryKind) -> &'static str {
         EntryKind::ToolResult { .. } => "tool_result",
         EntryKind::OpStarted { .. } => "op_started",
         EntryKind::OpDone { .. } => "op_done",
+        EntryKind::OpDetached { .. } => "op_detached",
+        EntryKind::JobDelivered { .. } => "job_delivered",
         EntryKind::SurfaceReplace { .. } => "surface_replace",
         EntryKind::CompactionStart { .. } => "compaction_start",
         EntryKind::CompactionEnd { .. } => "compaction_end",
@@ -297,11 +302,23 @@ fn samples() -> Vec<EntryKind> {
         CancelReason::UserInterrupted,
         CancelReason::Rewind,
         CancelReason::Reload,
+        CancelReason::Fork,
+        CancelReason::LeaseExpired,
     ];
     let statuses = [OpStatus::Completed { code: -2 }, OpStatus::Failed { err: s("e") }, OpStatus::Uncertain { last_seen: Timestamp(3) }];
     k.extend(
         statuses.into_iter().chain(reasons.map(|reason| OpStatus::Cancelled { reason })).map(|status| K::OpDone { op: OpId(1), status }),
     );
+    let causes = [DetachCause::Requested, DetachCause::After(60_000), DetachCause::Operator, DetachCause::Model];
+    k.extend(causes.into_iter().map(|cause| K::OpDetached { op: OpId(2), call: call(), cause }));
+    k.extend([Some(h), None].into_iter().map(|spill_ref| K::JobDelivered {
+        op: OpId(2),
+        call: call(),
+        tool: s("bash"),
+        status: OpStatus::Completed { code: 0 },
+        content: vec![ContentBlock::text("done")],
+        spill_ref,
+    }));
     let roles = [RecoveryRole::Initiator, RecoveryRole::InterruptedPeer, RecoveryRole::Headless];
     k.extend(roles.into_iter().map(|role| K::SessionRecoveryIntent { role, directive: s("resume") }));
     let causes = [CheckpointCause::ToolResult(call()), CheckpointCause::TurnEnd, CheckpointCause::Manual, CheckpointCause::PreRewind];
@@ -404,6 +421,7 @@ fn server_payloads() -> Vec<(&'static str, Value)> {
     out.extend(streams().iter().map(|s| ("stream", wire::stream_payload(s))));
     out.extend(transitions().iter().map(|t| ("idle", wire::idle_payload(TurnId(1), t))));
     out.extend(cards().into_iter().map(|c| ("approval", c)));
+    out.push(("job_finished", wire::job_finished_payload(OpId(3))));
     out
 }
 
@@ -487,6 +505,7 @@ fn every_frame_of_the_committed_wire_snapshot_validates() {
         let method = match name.as_str() {
             "result" => Some("session.prompt"),
             "fold" => Some("session.fold"),
+            "jobs" => Some("job.list"),
             _ => None,
         };
         check_server_frame(&PROTOCOL, frame, method).unwrap_or_else(|e| panic!("server frame `{name}`: {e}"));
@@ -556,6 +575,8 @@ fn the_params_the_server_decodes_agree_with_the_table() {
     params_agree("SubscribeParams", SubscribeParams { from: Some(EntryId(3)) }, true);
     params_agree("RewindParams", RewindParams { checkpoint: 2, mode: Some("code".into()) }, true);
     params_agree("AnswerParams", AnswerParams { id: 1, outcome: "allow".into(), scope: Some("session".into()) }, true);
+    params_agree("AbortParams", AbortParams { scope: Some("op".into()), op: Some(OpId(4)) }, true);
+    params_agree("JobParams", JobParams { op: OpId(4) }, true);
     let ok = HelloOk { version: 1, capabilities: vec!["session.prompt".into()], session: "ab".into(), head: Some(EntryId(1)) };
     params_agree("HelloOk", ok, false);
 }
@@ -577,6 +598,12 @@ fn every_enumerated_param_value_is_accepted_by_the_server_and_nothing_else() {
         assert!(wire::decided("allow", Some(s)).is_ok(), "scope {s}");
     }
     assert!(wire::decided("maybe", None).is_err());
+    for s in values("AbortScopeName") {
+        let op = (*s == "op").then_some(OpId(1));
+        assert!(AbortScope::from_wire(Some(s), op).is_ok(), "abort scope {s}");
+    }
+    assert!(AbortScope::from_wire(Some("everything"), None).is_err());
+    assert!(AbortScope::from_wire(Some("op"), None).is_err(), "scope `op` needs the op");
 }
 
 #[test]
@@ -601,6 +628,23 @@ fn the_rust_sdk_types_decode_every_payload_without_loss() {
     let fold = wire::state_payload(&state());
     assert_eq!(serde_json::to_value(serde_json::from_value::<Fold>(fold.clone()).unwrap()).unwrap(), fold);
     assert_eq!(Event::from_frame(ServerFrame::error(1, None, "lagging")), Event::Error("lagging".into()));
+    assert_eq!(
+        Event::from_frame(ServerFrame::new(1, None, "job_finished", wire::job_finished_payload(OpId(3)))),
+        Event::JobFinished(OpId(3))
+    );
+    for status in [None, Some(OpStatus::Cancelled { reason: CancelReason::Aborted })] {
+        let info = JobInfo {
+            op: OpId(3),
+            call: CallId("c1".into()),
+            tool: "bash".into(),
+            cause: DetachCause::After(60_000),
+            status,
+            started: Some(Timestamp(5)),
+        };
+        let job: Job = serde_json::from_value(info.to_json()).unwrap();
+        assert_eq!(serde_json::to_value(&job).unwrap(), info.to_json());
+        check(&PROTOCOL, &Ty::Ref("Job"), &info.to_json()).unwrap();
+    }
     let odd = ServerFrame::new(1, None, "teleport", json!({"to": "mars"}));
     assert_eq!(Event::from_frame(odd), Event::Unknown { event: "teleport".into(), payload: json!({"to": "mars"}) });
 }
@@ -694,8 +738,11 @@ async fn every_frame_of_a_live_session_validates() {
         raw.send(15, "caps.allow", json!({"id": "tool-bash"})).await;
         raw.send(16, "caps.preset", json!({"name": "dev"})).await;
         raw.send(17, "session.steer", json!({"text": "later", "urgent": false})).await;
-        raw.send(18, "session.abort", json!({})).await;
-        raw.until_replied(&[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]).await;
+        raw.send(18, "session.abort", json!({"scope": "all"})).await;
+        raw.send(20, "job.list", Value::Null).await;
+        raw.send(21, "job.kill", json!({"op": 999})).await;
+        raw.send(22, "job.detach", json!({"op": 999})).await;
+        raw.until_replied(&[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 21, 22]).await;
         let fold = raw.frames.iter().find(|(f, _)| f["reply_to"] == 5).map(|(f, _)| f["payload"].clone()).unwrap();
         let checkpoint = fold["checkpoints"][0]["id"].as_u64().expect("the write left a checkpoint");
         raw.send(19, "session.rewind", json!({"checkpoint": checkpoint, "mode": "code"})).await;
@@ -711,7 +758,13 @@ async fn every_frame_of_a_live_session_validates() {
     for (f, method) in &frames {
         check_server_frame(&PROTOCOL, f, *method).unwrap_or_else(|e| panic!("{e}\nframe: {f}"));
         if let Some(m) = method {
-            assert_ne!(f["event"], "error", "`{m}` failed: {}", f["payload"]);
+            if matches!(*m, "job.kill" | "job.detach") {
+                // The scripted session runs no job: these are refused, and the refusal validates.
+                assert_eq!(f["event"], "error", "`{m}` on an op that does not exist");
+                assert!(f["payload"]["message"].as_str().unwrap().contains("no operation 999"), "{m}: {}", f["payload"]);
+            } else {
+                assert_ne!(f["event"], "error", "`{m}` failed: {}", f["payload"]);
+            }
         }
         events.insert(f["event"].as_str().unwrap().to_string());
     }

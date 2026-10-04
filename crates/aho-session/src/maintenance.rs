@@ -147,6 +147,9 @@ impl Session {
     }
 
     /// PreRewind checkpoint first, so the rewind is itself reversible; then fork and/or restore.
+    /// Running ops are cancelled, except (`jobs.on_rewind = keep`) the jobs the target branch
+    /// still holds and this process still runs or holds an outcome for: they deliver into it. A
+    /// target job delivered after the target point (its outcome is gone) is closed like the rest.
     pub async fn rewind(&self, _op: &Operator, to: CheckpointId, mode: RewindMode) -> Result<EntryId, SessionError> {
         let state = self.fold()?;
         let (_, tree, at) = state
@@ -155,8 +158,17 @@ impl Session {
             .find(|c| c.0 == to)
             .copied()
             .ok_or_else(|| SessionError::NotFound(format!("no checkpoint c{}", to.0)))?;
+        let target: BTreeSet<OpId> = match (self.jobs_cfg.on_rewind, mode) {
+            (OnRewind::Cancel, _) => BTreeSet::new(),
+            (OnRewind::Keep, RewindMode::CodeOnly) => state.jobs.keys().copied().collect(),
+            (OnRewind::Keep, _) => aho_log::fold(&self.log.read_branch(at)?, &self.folds)?.jobs.keys().copied().collect(),
+        };
+        let keep: BTreeSet<OpId> =
+            target.into_iter().filter(|op| self.ops.status(*op) == Some(None) || self.outcome_waiting(*op)).collect();
         for (op, _, _) in self.ops.running() {
-            self.ops.cancel(op);
+            if !keep.contains(&op) {
+                self.cancel_op(op, CancelReason::Rewind);
+            }
         }
         let pre = self.checkpoint(CheckpointCause::PreRewind).await.unwrap_or(to);
         let (mut changed, mut deleted) = (vec![], vec![]);
@@ -171,7 +183,7 @@ impl Session {
         }
         if mode != RewindMode::CodeOnly {
             self.log.fork(at)?;
-            self.close_branch(CancelReason::Rewind)?;
+            self.close_branch(CancelReason::Rewind, &keep)?;
         }
         let e = self.append(
             Principal::Operator,
@@ -189,8 +201,9 @@ impl Session {
 
     /// After a fork into the middle of a turn: nothing may stay open on the new branch.
     /// Pending approvals are cancelled, open calls get a synthetic cancelled result, open ops are
-    /// closed, and the open turn ends, so the next turn folds and never waits on ghosts.
-    pub(crate) fn close_branch(&self, reason: CancelReason) -> Result<(), SessionError> {
+    /// closed (except the jobs in `keep`), and the open turn ends, so the next turn folds and
+    /// never waits on ghosts.
+    pub(crate) fn close_branch(&self, reason: CancelReason, keep: &BTreeSet<OpId>) -> Result<(), SessionError> {
         let state = self.fold()?;
         for req in state.pending_approvals.keys().copied() {
             self.append(
@@ -214,7 +227,7 @@ impl Session {
                 },
             )?;
         }
-        for op in state.open_ops.keys().copied() {
+        for op in state.open_ops.keys().copied().filter(|op| !keep.contains(op)) {
             self.append(Principal::system("rewind"), EntryKind::OpDone { op, status: OpStatus::Cancelled { reason } })?;
         }
         if let Some(turn) = state.turn {
@@ -284,9 +297,17 @@ impl Session {
         }
     }
 
-    /// Ops that were open at load: re-runnable → re-dispatch; external effect → Uncertain; else Failed.
+    /// Ops that were open at load: re-runnable → re-dispatch; external effect → Uncertain; else
+    /// Failed. Jobs: `recover_job`. New op ids start past every id the branch holds.
     pub(crate) async fn recover_open_ops(self: &Arc<Self>, state: &State) -> Result<(), SessionError> {
+        if let Some(max) = state.open_ops.keys().chain(state.op_status.keys()).max() {
+            self.ops.advance_past(*max);
+        }
         for (op, (call, rerunnable, external)) in &state.open_ops {
+            if let Some(job) = state.jobs.get(op) {
+                self.recover_job(state, *op, job, *external, *rerunnable)?;
+                continue;
+            }
             if *rerunnable
                 && let (Some((_, _, args)), Some((decl, name, exec))) =
                     (state.calls.get(call), state.calls.get(call).and_then(|c| self.lookup(&c.0)))
@@ -295,7 +316,7 @@ impl Session {
                     Principal::system("recovery"),
                     EntryKind::OpDone { op: *op, status: OpStatus::Failed { err: "re-dispatched after restart".into() } },
                 )?;
-                let s = self.spawn_exec(decl, name, exec, call.clone(), args.clone(), Principal::system("recovery"), vec![]);
+                let s = self.spawn_exec(decl, name, exec, call.clone(), args.clone(), Principal::system("recovery"), vec![], false);
                 self.log_op_started(&s, decl)?;
                 continue;
             }

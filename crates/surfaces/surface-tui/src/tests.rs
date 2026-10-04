@@ -326,7 +326,10 @@ fn enter_prompts_when_idle_and_steers_when_busy() {
     assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), Some(Action::Steer { text: "x".into(), urgent: false }));
     on_key(&mut ui, key(KeyCode::Char('y')));
     assert_eq!(on_key(&mut ui, KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT)), Some(Action::Steer { text: "y".into(), urgent: true }));
-    assert_eq!(on_key(&mut ui, KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)), Some(Action::Abort));
+    assert_eq!(
+        on_key(&mut ui, KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+        Some(Action::Abort(aho_session::AbortScope::All))
+    );
     assert_eq!(on_key(&mut ui, key(KeyCode::Enter)), None, "an empty draft sends nothing");
 }
 

@@ -36,7 +36,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::task::JoinHandle;
 
 pub use client::{Client, Events, Spawn, hello};
-pub use events::{Answer, Answered, ApprovalCard, Checkpoint, Event, Fold, Idle, InvariantState, Subscribed};
+pub use events::{Answer, Answered, ApprovalCard, Checkpoint, Event, Fold, Idle, InvariantState, Job, Subscribed};
 
 /// The product name; bundle defaults are attributed to it (`Layer::Bundle("aho-sdk-min")`).
 pub const NAME: &str = "aho-sdk-min";

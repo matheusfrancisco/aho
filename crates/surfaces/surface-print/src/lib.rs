@@ -397,6 +397,8 @@ impl<W: Write, E: Write> Printer<W, E> {
                 }
                 self.out.flush()
             }
+            // The job's outcome prints as its `JobDelivered` entry when a turn delivers it.
+            SessionEvent::JobFinished { .. } => Ok(()),
         }
     }
 

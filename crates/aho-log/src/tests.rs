@@ -90,6 +90,89 @@ mod core_tests {
         assert!(matches!(err, LogError::Invariant { rule: "tool.at_most_one_result", .. }));
     }
 
+    fn op_entry(log: &dyn LogStore, kind: EntryKind) {
+        log.append(None, Principal::system("ops"), kind).unwrap();
+    }
+
+    fn started(op: u64, id: &str) -> EntryKind {
+        EntryKind::OpStarted { op: OpId(op), call: call(id), kind: OpKind::Process, rerunnable: false, external_effect: true }
+    }
+
+    fn delivered(op: u64, id: &str) -> EntryKind {
+        EntryKind::JobDelivered {
+            op: OpId(op),
+            call: call(id),
+            tool: "bash".into(),
+            status: OpStatus::Completed { code: 0 },
+            content: vec![ContentBlock::text("built")],
+            spill_ref: None,
+        }
+    }
+
+    #[test]
+    fn a_job_is_shown_as_a_notice_and_closes_once() {
+        let log = MemoryLog::new();
+        turn(&log, 1, |l| {
+            assistant_calls(l, &["a"]);
+            op_entry(l, started(1, "a"));
+            op_entry(l, EntryKind::OpDetached { op: OpId(1), call: call("a"), cause: DetachCause::Requested });
+            result(l, "a", "running as job 1");
+        });
+        let st = state(&log);
+        assert!(st.open_calls.is_empty() && st.jobs.contains_key(&OpId(1)), "the call closed; the job stays open");
+        turn(&log, 2, |l| {
+            op_entry(l, delivered(1, "a"));
+            op_entry(l, EntryKind::OpDone { op: OpId(1), status: OpStatus::Completed { code: 0 } });
+        });
+        let st = state(&log);
+        assert!(st.jobs.is_empty() && st.open_ops.is_empty());
+        let last = derive_messages(&st).pop().unwrap();
+        assert_eq!(last.role, Role::User);
+        assert_eq!(last.content, vec![ContentBlock::text("Background job 1 (bash) completed:"), ContentBlock::text("built")]);
+
+        let twice = MemoryLog::new();
+        turn(&twice, 1, |l| {
+            assistant_calls(l, &["a"]);
+            op_entry(l, started(1, "a"));
+            op_entry(l, EntryKind::OpDetached { op: OpId(1), call: call("a"), cause: DetachCause::Operator });
+            result(l, "a", "running as job 1");
+            op_entry(l, delivered(1, "a"));
+            op_entry(l, delivered(1, "a"));
+        });
+        let err = fold(&twice.read_branch(twice.head().unwrap()).unwrap(), &CustomFolds::new()).unwrap_err();
+        assert!(matches!(err, LogError::Invariant { rule: "job.delivered_matches_detached", .. }), "{err}");
+    }
+
+    #[test]
+    fn only_a_started_op_under_its_own_call_can_be_detached_or_delivered() {
+        let cases: [(Vec<EntryKind>, &str); 3] = [
+            (
+                vec![started(1, "a"), EntryKind::OpDetached { op: OpId(1), call: call("b"), cause: DetachCause::Model }],
+                "op.detach_matches_started",
+            ),
+            (vec![started(1, "a"), delivered(1, "a")], "job.delivered_matches_detached"),
+            (
+                vec![
+                    started(1, "a"),
+                    EntryKind::OpDetached { op: OpId(1), call: call("a"), cause: DetachCause::Requested },
+                    EntryKind::OpDetached { op: OpId(1), call: call("a"), cause: DetachCause::After(5) },
+                ],
+                "job.detach_once",
+            ),
+        ];
+        for (kinds, rule) in cases {
+            let log = MemoryLog::new();
+            turn(&log, 1, |l| {
+                assistant_calls(l, &["a", "b"]);
+                for k in kinds {
+                    op_entry(l, k);
+                }
+            });
+            let err = fold(&log.read_branch(log.head().unwrap()).unwrap(), &CustomFolds::new()).unwrap_err();
+            assert!(matches!(err, LogError::Invariant { rule: r, .. } if r == rule), "{rule}: {err}");
+        }
+    }
+
     #[test]
     fn approval_outside_a_turn_is_rejected() {
         let log = MemoryLog::new();

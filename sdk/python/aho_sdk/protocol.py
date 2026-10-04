@@ -501,6 +501,8 @@ CancelReason = Literal[
     "user_interrupted",
     "rewind",
     "reload",
+    "fork",
+    "lease_expired",
 ]
 """The reason a call or operation was cancelled."""
 
@@ -542,6 +544,32 @@ OpStatus = Union[
     "OpStatusUncertain",
 ]
 """The final status of an operation; `uncertain` = the process died mid-dispatch and it may or may not have happened."""
+
+
+class DetachCauseRequested(TypedDict):
+    cause: Literal["requested"]
+
+
+class DetachCauseAfter(TypedDict):
+    cause: Literal["after"]
+    ms: int
+
+
+class DetachCauseOperator(TypedDict):
+    cause: Literal["operator"]
+
+
+class DetachCauseModel(TypedDict):
+    cause: Literal["model"]
+
+
+DetachCause = Union[
+    "DetachCauseRequested",
+    "DetachCauseAfter",
+    "DetachCauseOperator",
+    "DetachCauseModel",
+]
+"""What detached a running operation into a session job; `after` = `jobs.detach.<tool> = after:<dur>` fired."""
 
 
 class ProcessIdentity(TypedDict):
@@ -899,6 +927,24 @@ class EntryKindOpDone(TypedDict):
     status: OpStatus
 
 
+class EntryKindOpDetached(TypedDict):
+    type: Literal["op_detached"]
+    op: OpId
+    call: CallId
+    cause: DetachCause
+
+
+class EntryKindJobDelivered(TypedDict):
+    type: Literal["job_delivered"]
+    op: OpId
+    call: CallId
+    tool: str
+    status: OpStatus
+    content: list[ContentBlock]
+    """The job's output, shown to the model as a notice."""
+    spill_ref: Optional[Hash]
+
+
 class EntryKindSurfaceReplace(TypedDict):
     type: Literal["surface_replace"]
     start: EntryId
@@ -1080,6 +1126,8 @@ EntryKind = Union[
     "EntryKindToolResult",
     "EntryKindOpStarted",
     "EntryKindOpDone",
+    "EntryKindOpDetached",
+    "EntryKindJobDelivered",
     "EntryKindSurfaceReplace",
     "EntryKindCompactionStart",
     "EntryKindCompactionEnd",
@@ -1259,6 +1307,54 @@ class RewindResult(TypedDict):
     """The entry the rewound branch continues from."""
 
 
+AbortScopeName = Literal[
+    "turn",
+    "all",
+    "op",
+]
+"""What `session.abort` cancels: `turn` (default; jobs keep running), `all` (the turn and every job), `op` (the operation named by `op`)."""
+
+
+class AbortParams(TypedDict):
+    """`session.abort` params; none = scope `turn`."""
+
+    scope: NotRequired[Optional[AbortScopeName]]
+    op: NotRequired[Optional[OpId]]
+    """With scope `op`: the operation to cancel."""
+
+
+class JobParams(TypedDict):
+    """`job.kill` / `job.detach` params."""
+
+    op: OpId
+
+
+class Job(TypedDict):
+    """One open session job on the head branch."""
+
+    op: OpId
+    call: CallId
+    """The call the job detached from (already answered with the job id)."""
+    tool: str
+    cause: DetachCause
+    status: Optional[OpStatus]
+    """`null` while running; else finished, delivered at the next request boundary."""
+    started: Optional[Timestamp]
+    """`null` when the serving process does not run it (left by a restart)."""
+
+
+class JobList(TypedDict):
+    """`job.list` result."""
+
+    jobs: list[Job]
+
+
+class JobFinished(TypedDict):
+    """A job finished while no turn ran; its outcome is delivered when the next turn starts."""
+
+    op: OpId
+
+
 AnswerOutcome = Literal[
     "allow",
     "allow_once",
@@ -1436,6 +1532,9 @@ METHODS: tuple[str, ...] = (
     "session.subscribe",
     "session.fold",
     "session.rewind",
+    "job.list",
+    "job.kill",
+    "job.detach",
     "approval.answer",
     "caps.list",
     "caps.tree",
@@ -1487,6 +1586,15 @@ class EventApproval(TypedDict):
     payload: ApprovalCard
 
 
+class EventJobFinished(TypedDict):
+    """A job finished while no turn ran; `job.list` shows it until the next turn delivers it."""
+
+    v: int
+    reply_to: None
+    event: Literal["job_finished"]
+    payload: JobFinished
+
+
 class EventError(TypedDict):
     """A failure outside any request (a lagging client, a log write that did not land)."""
 
@@ -1501,6 +1609,7 @@ Event = Union[
     "EventStream",
     "EventIdle",
     "EventApproval",
+    "EventJobFinished",
     "EventError",
 ]
 """A server-initiated frame: what `Client.events()` yields."""

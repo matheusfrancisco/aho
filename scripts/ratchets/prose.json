@@ -1,12 +1,15 @@
 {
   "ratchet": "prose",
-  "total": 5546,
+  "total": 6527,
   "files": {
-    "crates/aho-session/prompts/async-preamble.md": 801,
+    "crates/aho-log/prompts/job-delivered.md": 39,
+    "crates/aho-session/prompts/async-preamble.md": 969,
     "crates/aho-session/prompts/compaction.md": 329,
     "crates/aho-session/prompts/contract.md": 1889,
     "crates/aho-session/prompts/identity.md": 164,
+    "crates/aho-session/prompts/jobs.md": 556,
     "crates/tools/context-files/prompts/context.md": 102,
+    "crates/tools/jobs-digest/prompts/digest.md": 218,
     "crates/tools/tool-lsp/prompts/write-diagnostics.md": 198,
     "crates/tools/tool-subagent/prompts/reviewer.md": 1106,
     "crates/tools/tool-subagent/prompts/scout.md": 922,

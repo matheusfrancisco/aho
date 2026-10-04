@@ -33,7 +33,13 @@ pub const CODING_PROFILE: &str = include_str!("../profiles/coding.toml");
 /// `tool-terminal` stays Unlocked until `aho enable tool-terminal`; Claude Code hooks run
 /// commands a repository ships, so they also wait for the operator's `aho enable hooks-claude-code`;
 /// telemetry is opt-in the same way (`aho enable telemetry`) and additionally needs an endpoint.
-pub fn defaults() -> [(&'static str, serde_json::Value); 8] {
+/// The job digest (`jobs-digest`: outcomes arriving close together reach the model as one
+/// notice) is opt-in the same way (`aho enable jobs-digest`).
+/// Jobs: the model may send a subagent run (`subagent`, `subagent_fork`, `send_message`) or a
+/// program (`run_code`) to the background, and a `bash` command still running after 60 s becomes
+/// a job by itself. `run_code` is never promoted on a timer: a job's nested calls cannot ask the
+/// operator, so a program detached mid-run would start failing the asks it was written to make.
+pub fn defaults() -> [(&'static str, serde_json::Value); 14] {
     [
         ("policy.preset", json!("workspace")),
         ("seams.world", json!("host")),
@@ -43,6 +49,12 @@ pub fn defaults() -> [(&'static str, serde_json::Value); 8] {
         ("caps.tool-terminal.enabled", json!(false)),
         ("caps.hooks-claude-code.enabled", json!(false)),
         ("caps.telemetry.enabled", json!(false)),
+        ("caps.jobs-digest.enabled", json!(false)),
+        ("jobs.detach.subagent", json!("on_request")),
+        ("jobs.detach.subagent_fork", json!("on_request")),
+        ("jobs.detach.send_message", json!("on_request")),
+        ("jobs.detach.bash", json!("after:60s")),
+        ("jobs.detach.run_code", json!("on_request")),
     ]
 }
 
@@ -86,7 +98,8 @@ pub fn spine() -> Composition {
         .provide::<hooks_claude_code::ClaudeCodeHooks>()
         .provide::<verify_gate::VerifyGate>()
         .profile("coding", CODING_PROFILE)
-        .provide::<telemetry::Telemetry>();
+        .provide::<telemetry::Telemetry>()
+        .provide::<jobs_digest::JobsDigest>();
     defaults().into_iter().fold(c, |c, (k, v)| c.default(k, v))
 }
 

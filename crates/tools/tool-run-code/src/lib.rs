@@ -156,6 +156,7 @@ pub static TOOLS: &[ToolDecl] = &[ToolDecl::new(
 .schema(schema)
 .check(check_run_code)
 .op(OpKind::Process, false, true)
+.detachable()
 .present(PRESENT)];
 
 fn schema(_: &BoundWorld) -> RootSchema {
@@ -480,11 +481,13 @@ impl ToolRunCode {
                     }
                 }
             }
-            if done {
-                return Ended::Complete;
-            }
+            // A cancel first: cancelling the op also kills the program, and the exit that kill
+            // causes must still read as a cancel.
             if req.cancel.is_cancelled() {
                 return Ended::Cancelled;
+            }
+            if done {
+                return Ended::Complete;
             }
             if tokio::time::Instant::now() >= deadline {
                 return Ended::TimedOut;

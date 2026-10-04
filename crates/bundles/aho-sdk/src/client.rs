@@ -14,17 +14,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use aho_log::{RewindMode, Transition};
+use aho_session::AbortScope;
 use aho_types::*;
 use serde::de::DeserializeOwned;
 use serde_json::json;
-use surface_rpc::wire::{PromptParams, RewindParams, SteerParams, SubscribeParams};
+use surface_rpc::wire::{AbortParams, JobParams, PromptParams, RewindParams, SteerParams, SubscribeParams};
 use surface_rpc::{ClientFrame, Hello, HelloOk, ServerFrame};
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, Lines};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::SdkError;
-use crate::events::{Answer, Answered, Event, Fold, PromptReply, RewindReply, Subscribed};
+use crate::events::{Answer, Answered, Event, Fold, Job, JobList, PromptReply, RewindReply, Subscribed};
 
 type Writer = Box<dyn AsyncWrite + Send + Unpin>;
 
@@ -285,9 +286,37 @@ impl Client {
         self.request("session.steer", params).await.map(|_| ())
     }
 
-    /// Hard interrupt: cancels the running turn's operations.
+    /// Cancels the running turn's operations; session jobs keep running ([`Client::abort_scope`]).
     pub async fn abort(&self) -> Result<(), SdkError> {
         self.request("session.abort", json!({})).await.map(|_| ())
+    }
+
+    /// Cancels by scope: the turn (jobs keep running), everything including jobs, or one op.
+    pub async fn abort_scope(&self, scope: AbortScope) -> Result<(), SdkError> {
+        let p = match scope {
+            AbortScope::Turn => AbortParams { scope: Some("turn".into()), op: None },
+            AbortScope::All => AbortParams { scope: Some("all".into()), op: None },
+            AbortScope::Op(op) => AbortParams { scope: Some("op".into()), op: Some(op) },
+        };
+        let params = Self::encode("session.abort", &p)?;
+        self.request("session.abort", params).await.map(|_| ())
+    }
+
+    /// Open session jobs: running, or finished and waiting for delivery.
+    pub async fn list_jobs(&self) -> Result<Vec<Job>, SdkError> {
+        self.call::<JobList>("job.list", json!({})).await.map(|l| l.jobs)
+    }
+
+    /// Cancels one running job; a turn op is refused.
+    pub async fn kill_job(&self, op: OpId) -> Result<(), SdkError> {
+        let params = Self::encode("job.kill", &JobParams { op })?;
+        self.request("job.kill", params).await.map(|_| ())
+    }
+
+    /// Detaches a running turn op into a session job; refused when its tool cannot run as one.
+    pub async fn detach_job(&self, op: OpId) -> Result<(), SdkError> {
+        let params = Self::encode("job.detach", &JobParams { op })?;
+        self.request("job.detach", params).await.map(|_| ())
     }
 
     /// Replays entries after `from` (all when `None`) as [`Event::Entry`], then streams live events.

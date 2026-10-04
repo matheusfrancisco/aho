@@ -1,10 +1,11 @@
 //! The terminal surface. One interactive owner per session; the only state it keeps is
-//! surface-local (draft, cursor, the `/` menu, open overlays, HUD); the transcript, tree,
-//! inventory, jobs and invariants are folds of the session log and plan.
+//! surface-local (draft, cursor, the `/` menu, open overlays, HUD, the `tui.keys.*` bindings);
+//! the transcript, tree, inventory, jobs and invariants are folds of the session log and plan.
 //!
-//! One column: the transcript, the prompt box (its border is the status line), the `/` menu,
-//! one row of hints. `/tree`, `/inventory`, `/jobs`, `/invariants`, `/rewind`, `/help` and long
-//! command answers open closable overlays in front of the transcript. Colours come from a
+//! One column: the transcript, the jobs panel (only while a session job runs), the prompt box
+//! (its border is the status line), the `/` menu, one row of hints. `/tree`, `/inventory`,
+//! `/jobs`, `/invariants`, `/rewind`, `/help` and long command answers open closable overlays
+//! in front of the transcript. Colours come from a
 //! [`Theme`] detected from the terminal. Inline by default: finished blocks are written to the
 //! terminal's scrollback ([`InlineScreen`]) and only the bottom is redrawn.
 //!
@@ -17,6 +18,7 @@
 
 mod frames;
 mod inline;
+mod jobs;
 mod keys;
 mod markdown;
 mod menu;
@@ -31,7 +33,7 @@ use aho_config::{ConfigKey, Ty};
 
 pub use frames::{Frame, FrameCapture, LAYOUT_OSCILLATION, Probe, buffer_lines};
 pub use inline::{InlineScreen, Reopen};
-pub use keys::{Action, on_key, open_rewind};
+pub use keys::{Action, KeySpec, Keymap, on_key, open_rewind};
 pub use menu::{MENU_ROWS, Suggestion, VIEWS, suggestions};
 pub use model::{
     ApprovalView, Block, Body, CheckpointItem, CheckpointList, Local, MODES, Notice, Overlay, Panel, PanelBody, PlanInfo, ResultStatus,
@@ -53,16 +55,30 @@ impl Config for TuiConfig {
     const PREFIX: &'static str = "tui";
 
     fn keys() -> Vec<ConfigKey> {
-        vec![ConfigKey::new(
-            "tui.thinking",
-            Ty::Bool,
-            Some(serde_json::json!(true)),
-            "Show model reasoning in the TUI transcript; `/thinking` toggles it for one run.",
-        )]
+        vec![
+            ConfigKey::new(
+                "tui.thinking",
+                Ty::Bool,
+                Some(serde_json::json!(true)),
+                "Show model reasoning in the TUI transcript; `/thinking` toggles it for one run.",
+            ),
+            ConfigKey::new(
+                Keymap::ABORT_TURN,
+                Ty::String,
+                Some(serde_json::json!("esc")),
+                "Key that aborts the running turn (its ops); background jobs keep running. Esc first closes the approval card, the panel in front or the `/` menu.",
+            ),
+            ConfigKey::new(
+                Keymap::ABORT_ALL,
+                Ty::String,
+                Some(serde_json::json!("ctrl+c")),
+                "Key that aborts the turn and every background job, wherever the focus is.",
+            ),
+        ]
     }
 
-    fn from_loadout(_: &aho_config::Loadout) -> Result<Self, ConfigError> {
-        Ok(TuiConfig)
+    fn from_loadout(l: &aho_config::Loadout) -> Result<Self, ConfigError> {
+        Keymap::from_loadout(l).map(|_| TuiConfig)
     }
 }
 

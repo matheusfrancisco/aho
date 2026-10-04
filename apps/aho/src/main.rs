@@ -17,6 +17,7 @@ mod ctx;
 mod history;
 #[allow(clippy::disallowed_methods, reason = "authority: cli-invariants")]
 mod invariants;
+mod jobs;
 #[allow(clippy::disallowed_methods, reason = "authority: cli-net")]
 mod net;
 #[allow(clippy::disallowed_methods, reason = "authority: cli-ops")]
@@ -90,6 +91,7 @@ async fn dispatch(cli: Cli) -> Result<(), Fail> {
         Verb::Sandbox { sub, session, json } => sandbox::run(&ctx, sub, session.as_deref(), *json).await,
         Verb::Export { src, dst, session } => sandbox::export(&ctx, src, dst, session.as_deref()).await,
         Verb::Net { sub, session, json } => net::run(&ctx, sub, session.as_deref(), *json).await,
+        Verb::Jobs { sub, session, json } => jobs::run(&ctx, sub, session.as_deref(), *json).await,
         Verb::Checkpoints { session } => session::checkpoints(&ctx, session.as_deref()),
         Verb::Rewind { checkpoint, chat, code, session } => session::rewind(&ctx, checkpoint, *chat, *code, session.as_deref()).await,
         Verb::Shell { session, cmd } => session::shell(&ctx, session.as_deref(), cmd).await,

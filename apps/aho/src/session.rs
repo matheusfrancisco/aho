@@ -104,6 +104,7 @@ fn write_preset(writer: &surface_rpc::CapsContext, name: &str) -> Result<Vec<Str
 
 /// Renders events in order; approval cards are shown and answered inline, so a card never
 /// interleaves with streaming text. Stops at `done`, after draining what is already queued.
+/// `notify_jobs` (`jobs.wake = operator`): a job that finished while idle gets a line.
 async fn print_loop(
     mut p: Out,
     mut events: broadcast::Receiver<SessionEvent>,
@@ -111,11 +112,16 @@ async fn print_loop(
     mut done: oneshot::Receiver<()>,
     caps: BTreeMap<String, String>,
     writer: surface_rpc::CapsContext,
+    notify_jobs: bool,
 ) -> std::io::Result<()> {
     loop {
         tokio::select! {
             biased;
             ev = events.recv() => match ev {
+                Ok(SessionEvent::JobFinished { op }) if notify_jobs => {
+                    p.finish()?;
+                    println!("\njob {} finished; its outcome reaches the model with your next prompt", op.0);
+                }
                 Ok(ev) => p.event(&ev)?,
                 Err(broadcast::error::RecvError::Lagged(n)) => p.event(&SessionEvent::Error(format!("the display fell {n} events behind; `aho session show` has the full transcript")))?,
                 Err(broadcast::error::RecvError::Closed) => break,
@@ -234,13 +240,19 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
         let brief = aho_inspect::catch_up(&o.session.fold()?);
         println!("{}", aho_inspect::render_catch_up(&brief));
     }
+    let repl = a.prompt.is_none() && stdin_tty() && !a.json;
+    // `jobs.wake = operator`: the interactive loop says when a job finished while it waits for input.
+    let notify = repl && o.session.jobs_config().wake == aho_session::WakeMode::Operator;
     let (done_tx, done_rx) = oneshot::channel();
     let printer_task =
-        tokio::spawn(print_loop(printer, events, o.approvals, done_rx, tool_caps(o.session.registry()), ctx.caps(inputs.clone())));
+        tokio::spawn(print_loop(printer, events, o.approvals, done_rx, tool_caps(o.session.registry()), ctx.caps(inputs.clone()), notify));
+    // Ctrl-C aborts the running turn, and stops print mode's wait for jobs.
+    let (interrupt_tx, interrupt) = tokio::sync::watch::channel(false);
     let aborter = {
         let s = o.session.clone();
         tokio::spawn(async move {
             while tokio::signal::ctrl_c().await.is_ok() {
+                interrupt_tx.send_replace(true);
                 s.abort();
             }
         })
@@ -248,11 +260,13 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
 
     let mut last = Transition::Completed;
     let mut ran = 0;
-    let repl = a.prompt.is_none() && stdin_tty() && !a.json;
     if let Some(p) = &a.prompt {
         last = o.session.prompt(p.clone(), None).await?;
         ran += 1;
     } else if repl {
+        // A job that finishes while the loop waits for input gets a wake turn (`jobs.wake = idle`);
+        // a line typed meanwhile runs after it.
+        let jobs = session_drive::host_jobs(o.session.clone());
         loop {
             print!("› ");
             std::io::stdout().flush()?;
@@ -260,9 +274,11 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
             if line.trim().is_empty() {
                 continue;
             }
-            last = o.session.prompt(line.trim_end().to_string(), None).await?;
+            last = session_drive::prompt_when_idle(&o.session, line.trim_end().to_string()).await?;
             ran += 1;
         }
+        crate::boot::stop_drivers(Some(jobs)).await;
+        crate::boot::stop_jobs(&o.session);
     } else {
         let mut text = String::new();
         std::io::stdin().read_to_string(&mut text)?;
@@ -271,6 +287,16 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
             ran += 1;
         }
     }
+    // Print mode: the answer accounts for the jobs it started before the process exits.
+    let settled = if repl || ran == 0 {
+        None
+    } else {
+        let s = session_drive::settle(&o.session, o.session.jobs_config().settle_timeout, interrupt).await.map_err(err)?;
+        if let Some(t) = s.wakes.last() {
+            last = t.clone();
+        }
+        Some(s)
+    };
     aborter.abort();
     // The printer drains what is queued and stops; if it already stopped, there is nothing to drain.
     if done_tx.send(()).is_err() {
@@ -289,11 +315,37 @@ pub async fn run(ctx: &Ctx, a: &RunArgs) -> Result<(), Fail> {
             ))
         );
     }
+    let report = settled.as_ref().and_then(|s| unsettled(s, o.session.jobs_config()));
+    if let Some(r) = &report {
+        eprintln!("aho: {r}");
+    }
     match last {
         _ if ran == 0 && !repl => Err(err("no prompt was given; pass -p <prompt> or pipe one on stdin")),
         Transition::Aborted(_) | Transition::PromptTooLong | Transition::MaxTurns => Err(Fail::Reported),
+        _ if report.is_some() => Err(Fail::Reported),
         _ => Ok(()),
     }
+}
+
+/// What print mode's settle left out of the answer, for stderr; `None` when every job was delivered.
+fn unsettled(s: &session_drive::Settled, cfg: &aho_session::JobsConfig) -> Option<String> {
+    let why = if s.interrupted {
+        "interrupted".to_string()
+    } else if s.timed_out {
+        format!("`jobs.settle_timeout_s` ({}s) passed", cfg.settle_timeout.as_secs())
+    } else if s.budget_spent {
+        format!("`jobs.wake_budget` ({}) is spent", cfg.wake_budget)
+    } else {
+        return None;
+    };
+    let mut left = Vec::new();
+    if !s.cancelled.is_empty() {
+        left.push(format!("{} running job(s) were cancelled ({})", s.cancelled.len(), session_drive::job_list(&s.cancelled)));
+    }
+    if s.undelivered > 0 {
+        left.push(format!("{} finished job outcome(s) were not delivered", s.undelivered));
+    }
+    Some(format!("{why}: {}; they are not in this answer, and resuming the session reports them", left.join(" and ")))
 }
 
 // ───────────────────────────── session list / show / verify ─────────────────────────────

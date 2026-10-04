@@ -5,10 +5,16 @@
 //!   interrupted; a key the log already holds runs nothing and reports the earlier turn.
 //! * [`DriverSeed`]: the services to seed *before* `Session::boot`. `tool-schedule` and
 //!   `tool-workflow` build only when a driver will run for the session.
-//! * [`host`]: after boot, spawns the scheduler, the ralph loop driver, and the forwarder that
-//!   wakes them (a `schedule/*` entry wakes the scheduler, every turn end wakes the loop driver).
+//! * [`host`]: after boot, spawns the scheduler, the ralph loop driver, the forwarder that
+//!   wakes them (a `schedule/*` entry wakes the scheduler, every turn end wakes the loop driver),
+//!   and the jobs wake driver (`jobs.wake = idle`); [`host_jobs`] spawns the jobs driver alone.
+//! * [`settle`]: print mode waits for the session's jobs and runs their wake turns before exit.
 
 #![forbid(unsafe_code)]
+
+mod jobs;
+
+pub use jobs::{Settled, job_list, prompt_when_idle, settle};
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,7 +31,7 @@ use tool_workflow::{LoopLink, Looper};
 
 /// Wait this long for an `Idle` before trying a busy session again anyway (covers an `Idle`
 /// sent before we started listening, while the finishing turn still held the session).
-const BUSY_RETRY: Duration = Duration::from_millis(500);
+pub(crate) const BUSY_RETRY: Duration = Duration::from_millis(500);
 
 pub struct SessionSink {
     session: Arc<Session>,
@@ -115,7 +121,7 @@ pub struct Drivers {
 }
 
 impl Drivers {
-    /// Names of the drivers running (`scheduler`, `ralph`), for status lines.
+    /// Names of the drivers running (`scheduler`, `ralph`, `jobs`), for status lines.
     pub fn running(&self) -> Vec<&'static str> {
         self.tasks.iter().filter(|(n, t)| *n != "forwarder" && !t.is_finished()).map(|(n, _)| *n).collect()
     }
@@ -145,7 +151,8 @@ async fn stopped(mut rx: watch::Receiver<bool>) {
 }
 
 /// Spawns the drivers for `session`: the scheduler when `tool-schedule` is active in it, the
-/// ralph loop driver when `tool-workflow` is, and the forwarder that wakes them.
+/// ralph loop driver when `tool-workflow` is, the forwarder that wakes them, and the jobs wake
+/// driver when `jobs.wake = idle`.
 pub fn host(seed: &DriverSeed, session: Arc<Session>, clock: Arc<dyn Clock>) -> Drivers {
     let (stop, stop_rx) = watch::channel(false);
     let sink: Arc<dyn PromptSink> = Arc::new(SessionSink::new(session.clone()));
@@ -163,6 +170,7 @@ pub fn host(seed: &DriverSeed, session: Arc<Session>, clock: Arc<dyn Clock>) -> 
         let rx = stop_rx.clone();
         tasks.push(("ralph", tokio::spawn(async move { l.run(stopped(rx)).await })));
     }
+    spawn_jobs(&mut tasks, &session, &stop_rx);
     let (sched, looper) = (seed.schedule.clone(), seed.workflow.clone());
     let mut events = session.subscribe();
     tasks.push((
@@ -192,4 +200,19 @@ pub fn host(seed: &DriverSeed, session: Arc<Session>, clock: Arc<dyn Clock>) -> 
         }),
     ));
     Drivers { stop, tasks }
+}
+
+/// The jobs wake driver alone, for hosts that run no schedules or workflows (`aho run`'s
+/// interactive loop). Nothing runs unless `jobs.wake = idle`.
+pub fn host_jobs(session: Arc<Session>) -> Drivers {
+    let (stop, stop_rx) = watch::channel(false);
+    let mut tasks = Vec::new();
+    spawn_jobs(&mut tasks, &session, &stop_rx);
+    Drivers { stop, tasks }
+}
+
+fn spawn_jobs(tasks: &mut Vec<(&'static str, JoinHandle<Result<(), String>>)>, session: &Arc<Session>, stop: &watch::Receiver<bool>) {
+    if session.jobs_config().wake == aho_session::WakeMode::Idle {
+        tasks.push(("jobs", tokio::spawn(jobs::wake_driver(session.clone(), stopped(stop.clone())))));
+    }
 }

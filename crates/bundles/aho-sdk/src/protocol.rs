@@ -204,6 +204,18 @@ const ENTRY_KINDS: &[Variant] = &[
         &[req("op", Ref("OpId")), req("call", CALL_ID), req("kind", Ref("OpKind")), req("rerunnable", Bool), req("external_effect", Bool)],
     ),
     var("op_done", &[req("op", Ref("OpId")), req("status", Ref("OpStatus"))]),
+    var("op_detached", &[req("op", Ref("OpId")), req("call", CALL_ID), req("cause", Ref("DetachCause"))]),
+    var(
+        "job_delivered",
+        &[
+            req("op", Ref("OpId")),
+            req("call", CALL_ID),
+            req("tool", Str),
+            req("status", Ref("OpStatus")),
+            req("content", List(&Ref("ContentBlock"))).doc("The job's output, shown to the model as a notice."),
+            req("spill_ref", Opt(&HASH)),
+        ],
+    ),
     var(
         "surface_replace",
         &[req("start", ENTRY_ID), req("end", ENTRY_ID), req("shadow_price", UInt), req("summary", Opt(&Str)), req("by_cap", Str)],
@@ -411,7 +423,7 @@ pub static DEFS: &[Def] = &[
     ),
     strs(
         "CancelReason",
-        &["aborted", "before_dispatch", "sibling_failed", "user_interrupted", "rewind", "reload"],
+        &["aborted", "before_dispatch", "sibling_failed", "user_interrupted", "rewind", "reload", "fork", "lease_expired"],
         "The reason a call or operation was cancelled.",
     ),
     strs("OpKind", &["process", "io", "timer", "remote", "compute"], "The resource an operation waits on."),
@@ -425,6 +437,12 @@ pub static DEFS: &[Def] = &[
             var("uncertain", &[req("last_seen", TIMESTAMP)]),
         ],
         "The final status of an operation; `uncertain` = the process died mid-dispatch and it may or may not have happened.",
+    ),
+    union(
+        "DetachCause",
+        "cause",
+        &[var("requested", &[]), var("after", &[req("ms", UInt)]), var("operator", &[]), var("model", &[])],
+        "What detached a running operation into a session job; `after` = `jobs.detach.<tool> = after:<dur>` fired.",
     ),
     obj(
         "ProcessIdentity",
@@ -580,6 +598,32 @@ pub static DEFS: &[Def] = &[
     strs("RewindModeName", &["both", "chat", "code", "chat_only", "code_only"], "The scope `session.rewind` restores; default `both`."),
     obj("RewindParams", &[req("checkpoint", Ref("CheckpointId")), opt("mode", Opt(&Ref("RewindModeName")))], "`session.rewind` params."),
     obj("RewindResult", &[req("entry", ENTRY_ID).doc("The entry the rewound branch continues from.")], "`session.rewind` result."),
+    // ── jobs ──
+    strs(
+        "AbortScopeName",
+        &["turn", "all", "op"],
+        "What `session.abort` cancels: `turn` (default; jobs keep running), `all` (the turn and every job), `op` (the operation named by `op`).",
+    ),
+    obj(
+        "AbortParams",
+        &[opt("scope", Opt(&Ref("AbortScopeName"))), opt("op", Opt(&Ref("OpId"))).doc("With scope `op`: the operation to cancel.")],
+        "`session.abort` params; none = scope `turn`.",
+    ),
+    obj("JobParams", &[req("op", Ref("OpId"))], "`job.kill` / `job.detach` params."),
+    obj(
+        "Job",
+        &[
+            req("op", Ref("OpId")),
+            req("call", CALL_ID).doc("The call the job detached from (already answered with the job id)."),
+            req("tool", Str),
+            req("cause", Ref("DetachCause")),
+            req("status", Opt(&Ref("OpStatus"))).doc("`null` while running; else finished, delivered at the next request boundary."),
+            req("started", Opt(&TIMESTAMP)).doc("`null` when the serving process does not run it (left by a restart)."),
+        ],
+        "One open session job on the head branch.",
+    ),
+    obj("JobList", &[req("jobs", List(&Ref("Job")))], "`job.list` result."),
+    obj("JobFinished", &[req("op", Ref("OpId"))], "A job finished while no turn ran; its outcome is delivered when the next turn starts."),
     // ── approvals ──
     strs(
         "AnswerOutcome",
@@ -683,7 +727,13 @@ pub static METHODS: &[Method] = &[
         Ref("Empty"),
         "Queues input for the running turn; injected at the next request boundary.",
     ),
-    method("session.abort", "abort", None, Ref("Empty"), "Hard interrupt: cancels the running turn's operations."),
+    method(
+        "session.abort",
+        "abort",
+        Some("AbortParams"),
+        Ref("Empty"),
+        "Cancels by scope: the running turn's operations (default; jobs keep running), everything (`all`), or one operation (`op`).",
+    ),
     method(
         "session.subscribe",
         "subscribe",
@@ -693,6 +743,21 @@ pub static METHODS: &[Method] = &[
     ),
     method("session.fold", "fold", None, Ref("Fold"), "The folded session state."),
     method("session.rewind", "rewind", Some("RewindParams"), Ref("RewindResult"), "Rewinds chat and/or code to a checkpoint."),
+    method("job.list", "list_jobs", None, Ref("JobList"), "Open session jobs: running, or finished and waiting for delivery."),
+    method(
+        "job.kill",
+        "kill_job",
+        Some("JobParams"),
+        Ref("Empty"),
+        "Cancels one running job; its cancelled outcome is delivered like any other. A turn op is refused.",
+    ),
+    method(
+        "job.detach",
+        "detach_job",
+        Some("JobParams"),
+        Ref("Empty"),
+        "Detaches a running turn op into a session job (its call is answered with the job id); refused when its tool cannot run as a job.",
+    ),
     method(
         "approval.answer",
         "answer_approval",
@@ -735,6 +800,11 @@ pub static EVENTS: &[Event] = &[
     Event { name: "stream", payload: Ref("StreamPayload"), doc: "A live model stream chunk." },
     Event { name: "idle", payload: Ref("Idle"), doc: "The session went idle after a turn." },
     Event { name: "approval", payload: Ref("ApprovalCard"), doc: "A tool call waits for a human; answer it with `approval.answer`." },
+    Event {
+        name: "job_finished",
+        payload: Ref("JobFinished"),
+        doc: "A job finished while no turn ran; `job.list` shows it until the next turn delivers it.",
+    },
     Event {
         name: "error",
         payload: Ref("ErrorPayload"),

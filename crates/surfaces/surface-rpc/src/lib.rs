@@ -22,9 +22,9 @@ use std::sync::{Arc, Mutex};
 
 use aho_approval::{ApprovalRequest, Decided};
 use aho_cap::{BuildError, Capability, CapabilityId, Kind, Manifest, Registrar};
-use aho_log::{EntryKind, Takeover};
+use aho_log::{DetachCause, EntryKind, Takeover};
 use aho_policy::{Operator, OperatorProof};
-use aho_session::{Session, SessionEvent};
+use aho_session::{AbortScope, JobInfo, Session, SessionEvent};
 use aho_types::*;
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
@@ -268,6 +268,7 @@ impl Conn {
             SessionEvent::Stream(s) => ServerFrame::new(self.v, None, "stream", wire::stream_payload(s)),
             SessionEvent::Idle { turn, transition } => ServerFrame::new(self.v, None, "idle", wire::idle_payload(*turn, transition)),
             SessionEvent::Error(m) => ServerFrame::error(self.v, None, m.clone()),
+            SessionEvent::JobFinished { op } => ServerFrame::new(self.v, None, "job_finished", wire::job_finished_payload(*op)),
         })
     }
 
@@ -324,10 +325,23 @@ impl Conn {
                 self.session.steer(p.text, p.urgent);
                 json!({})
             }),
-            "session.abort" => {
-                self.session.abort();
-                Ok(json!({}))
-            }
+            "session.abort" => params::<wire::AbortParams>(&frame.params)
+                .and_then(|p| AbortScope::from_wire(p.scope.as_deref(), p.op))
+                .and_then(|scope| match (self.session.abort_scope(scope), scope) {
+                    (false, AbortScope::Op(op)) => Err(format!("there is no running operation {}; nothing was cancelled", op.0)),
+                    _ => Ok(json!({})),
+                }),
+            "job.list" => self
+                .session
+                .jobs()
+                .map(|js| json!({ "jobs": js.iter().map(JobInfo::to_json).collect::<Vec<_>>() }))
+                .map_err(|e| e.to_string()),
+            "job.kill" => params::<wire::JobParams>(&frame.params)
+                .and_then(|p| self.session.kill_job(p.op).map_err(|e| e.to_string()))
+                .map(|_| json!({})),
+            "job.detach" => params::<wire::JobParams>(&frame.params)
+                .and_then(|p| self.session.detach(p.op, DetachCause::Operator).map_err(|e| e.to_string()))
+                .map(|_| json!({})),
             "session.subscribe" => match params::<wire::SubscribeParams>(&frame.params) {
                 Ok(p) => {
                     let rx = self.session.subscribe();

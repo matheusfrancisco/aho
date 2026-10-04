@@ -17,6 +17,7 @@ use aho_policy::{ApprovalCard, DecisionReason};
 use aho_proc::OpInfo;
 use aho_types::*;
 
+use crate::keys::Keymap;
 use crate::slash::CommandInfo;
 use crate::theme::Theme;
 
@@ -613,11 +614,22 @@ pub struct Local {
     pub menu_selected: usize,
     /// Esc closed the menu for this draft; editing reopens it.
     pub menu_dismissed: bool,
+    /// The configurable keys (`tui.keys.*`).
+    pub keys: Keymap,
 }
 
 impl Default for Local {
     fn default() -> Self {
-        Local { draft: String::new(), cursor: 0, scroll: 0, hud: false, show_thinking: true, menu_selected: 0, menu_dismissed: false }
+        Local {
+            draft: String::new(),
+            cursor: 0,
+            scroll: 0,
+            hud: false,
+            show_thinking: true,
+            menu_selected: 0,
+            menu_dismissed: false,
+            keys: Keymap::default(),
+        }
     }
 }
 
@@ -649,7 +661,11 @@ pub struct UiState {
     pub transcript: Transcript,
     pub tree: Vec<TreeNode>,
     pub inventory: Vec<InvCard>,
+    /// Every op of the session (`OpTable::list`); set through [`UiState::set_jobs`].
     pub jobs: Vec<OpInfo>,
+    /// What the jobs panel names each running job by (`""`: nothing to name it by), from its
+    /// call's arguments in the fold; kept for the running jobs only.
+    pub job_labels: BTreeMap<OpId, String>,
     /// The approval card: above every overlay, and answered first.
     pub approval: Option<ApprovalView>,
     /// Cards waiting behind the one shown.
@@ -673,7 +689,9 @@ pub struct UiState {
 
 impl UiState {
     /// Builds the projection-only part from the plan; the log part is folded by [`UiState::refold`].
-    pub fn new(label: &str, plan: &Plan, loadout: &Loadout, tool_caps: BTreeMap<String, String>) -> UiState {
+    /// Refuses a `tui.keys.*` value that is not a key spec.
+    pub fn new(label: &str, plan: &Plan, loadout: &Loadout, tool_caps: BTreeMap<String, String>) -> Result<UiState, String> {
+        let keys = Keymap::from_loadout(loadout).map_err(|e| e.to_string())?;
         let mut ui = UiState {
             plan: PlanInfo {
                 label: label.to_string(),
@@ -684,12 +702,12 @@ impl UiState {
                 ..PlanInfo::default()
             },
             tool_caps,
-            local: Local { show_thinking: loadout.get("tui.thinking").and_then(|v| v.as_bool()).unwrap_or(true), ..Local::default() },
+            local: Local { show_thinking: loadout.get("tui.thinking").and_then(|v| v.as_bool()).unwrap_or(true), keys, ..Local::default() },
             ..UiState::default()
         };
         ui.refresh_tree(plan, loadout);
         ui.model_facts(&aho_session::SessionConfig::from_loadout(loadout, std::path::PathBuf::new()));
-        ui
+        Ok(ui)
     }
 
     /// The status line's model name, list price and context budget, from the config the session
@@ -752,6 +770,23 @@ impl UiState {
         }
         self.meter_context(e);
         Ok(())
+    }
+
+    /// Replaces the ops list; labels are looked up (in the fold's calls) only when it changed and
+    /// only for running jobs not labelled yet.
+    pub fn set_jobs(&mut self, jobs: Vec<OpInfo>) {
+        if jobs == self.jobs {
+            return;
+        }
+        let running = |j: &OpInfo| j.detached && j.status.is_none();
+        self.job_labels.retain(|op, _| jobs.iter().any(|j| j.op == *op && running(j)));
+        for j in jobs.iter().filter(|j| running(j)) {
+            if !self.job_labels.contains_key(&j.op) {
+                let label = self.state.calls.get(&j.call).and_then(|(_, _, args)| crate::jobs::label(args)).unwrap_or_default();
+                self.job_labels.insert(j.op, label);
+            }
+        }
+        self.jobs = jobs;
     }
 
     /// Whether anything covers the transcript (then the full screen is drawn).

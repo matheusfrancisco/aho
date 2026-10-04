@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use aho_llm::StreamEvent;
-use aho_log::{CapState, Entry, GrantScope, PolicyState, Transition, Verdict};
+use aho_log::{CapState, DetachCause, Entry, GrantScope, OpStatus, PolicyState, Transition, Verdict};
 use aho_types::*;
 use serde::{Deserialize, Serialize};
 use surface_rpc::ServerFrame;
@@ -23,6 +23,8 @@ pub enum Event {
     Idle(Idle),
     /// A tool call waits for a human; answer it with [`crate::Client::approve`].
     Approval(Box<ApprovalCard>),
+    /// A session job finished while no turn ran; the next turn delivers its outcome.
+    JobFinished(OpId),
     /// A failure outside any request (a lagging client, a log write that did not land).
     Error(String),
     /// A frame this client cannot type: a newer server's event kind, or a payload that does not
@@ -38,6 +40,7 @@ impl Event {
             "idle" => serde_json::from_value::<Idle>(f.payload.clone()).map(Event::Idle),
             "approval" => serde_json::from_value::<ApprovalCard>(f.payload.clone()).map(|c| Event::Approval(Box::new(c))),
             "error" => serde_json::from_value::<ErrorPayload>(f.payload.clone()).map(|e| Event::Error(e.message)),
+            "job_finished" => serde_json::from_value::<JobFinishedWire>(f.payload.clone()).map(|j| Event::JobFinished(j.op)),
             _ => return Event::Unknown { event: f.event, payload: f.payload },
         };
         typed.unwrap_or(Event::Unknown { event: f.event, payload: f.payload })
@@ -78,6 +81,11 @@ struct ErrorPayload {
     message: String,
 }
 
+#[derive(Deserialize)]
+struct JobFinishedWire {
+    op: OpId,
+}
+
 /// `stream` payload as surface-rpc projects [`StreamEvent`].
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -111,6 +119,25 @@ pub(crate) struct PromptReply {
 #[derive(Deserialize)]
 pub(crate) struct RewindReply {
     pub entry: EntryId,
+}
+
+/// One open session job (`job.list`): running, or finished and waiting for delivery.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Job {
+    pub op: OpId,
+    /// The call the job detached from (already answered with the job id).
+    pub call: CallId,
+    pub tool: String,
+    pub cause: DetachCause,
+    /// `None` while running; else finished, delivered at the next request boundary.
+    pub status: Option<OpStatus>,
+    /// `None` when the serving process does not run it (left by a restart).
+    pub started: Option<Timestamp>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct JobList {
+    pub jobs: Vec<Job>,
 }
 
 /// `session.subscribe`: the number of entries replayed before the reply, and the log head.

@@ -566,7 +566,7 @@ fn run_event(shared: &Shared, groups: &[HookGroup], event: CcEvent, payload: &Va
         return HookOutput::default();
     }
     let c = run_all(cmds, event, &shared.project, &p);
-    let mut out = HookOutput { decision: None, context: c.context, stop: c.stop };
+    let mut out = HookOutput { context: c.context, stop: c.stop, ..HookOutput::default() };
     out.context.extend(c.notes);
     if !c.deny.is_empty() {
         let reason = c.deny.join("; ");

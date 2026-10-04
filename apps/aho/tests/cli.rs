@@ -267,6 +267,75 @@ fn ctrl_c_stops_a_foreground_daemon() {
     assert!(!socket.exists(), "the daemon removes its socket when it stops");
 }
 
+/// `aho jobs` reaches the jobs of a session the daemon runs: a background `bash` outlives its
+/// turn, `list` shows it running, `kill` cancels it once. A session nothing runs has no job to
+/// act on.
+#[test]
+fn aho_jobs_lists_and_kills_a_daemon_sessions_job() {
+    let p = project();
+    let script = p.root.join("jobs.json");
+    std::fs::write(
+        &script,
+        r#"{"steps": [
+            {"tool_calls": [{"id": "c1", "name": "bash", "args": {"command": "sleep 30", "background": true}}], "stop": "tool_use"},
+            {"expect_tool_result_contains": "job", "text": "it runs in the background"}
+        ]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        p.root.join("aho.toml"),
+        format!(
+            "[model]\nprovider = \"scripted\"\nname = \"s\"\n[provider.scripted]\nscript = \"{}\"\n[policy]\npreset = \"dev\"\n[jobs]\nwake = \"never\"\n",
+            script.display()
+        ),
+    )
+    .unwrap();
+    let up = aho(&p, &["serve", "--detach", "--idle-exit", "60"], "");
+    assert_eq!(up.status.code(), Some(0), "{}\n{}", text(&up.stdout), text(&up.stderr));
+    let daemon_pid = text(&up.stdout).split_whitespace().skip_while(|w| *w != "pid").nth(1).unwrap().to_string();
+    let list = || {
+        let out = aho(&p, &["jobs", "list", "--json"], "");
+        assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let checks = || {
+        let run = aho(&p, &["run", "-p", "sleep in the background"], "");
+        assert_eq!(run.status.code(), Some(0), "stdout: {}\nstderr: {}", text(&run.stdout), text(&run.stderr));
+        let listed = list();
+        assert_eq!(listed["live"], true, "{listed}");
+        let job = listed["jobs"][0].clone();
+        assert_eq!((&job["tool"], &job["status"]), (&serde_json::json!("bash"), &serde_json::Value::Null), "running: {listed}");
+        let op = format!("op{}", job["op"]);
+        let killed = aho(&p, &["jobs", "kill", &op], "");
+        assert_eq!(killed.status.code(), Some(0), "{}", text(&killed.stderr));
+        assert!(text(&killed.stdout).contains(&format!("cancelled job {op}")), "{}", text(&killed.stdout));
+        // `jobs.wake = never`: no turn starts by itself, so the outcome waits for delivery.
+        let cancelled = (0..100).any(|_| {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            list()["jobs"][0]["status"]["status"] == "cancelled"
+        });
+        assert!(cancelled, "the killed job shows as cancelled, waiting for delivery: {}", list());
+        let again = aho(&p, &["jobs", "kill", &op], "");
+        assert_eq!(again.status.code(), Some(1));
+        assert!(text(&again.stderr).contains("already finished"), "{}", text(&again.stderr));
+        op
+    };
+    let op = std::panic::catch_unwind(std::panic::AssertUnwindSafe(checks));
+    let stopped = aho(&p, &["serve", "--stop"], "");
+    let op = op.unwrap_or_else(|e| std::panic::resume_unwind(e));
+    assert_eq!(stopped.status.code(), Some(0), "{}", text(&stopped.stderr));
+    // `--stop` returns once the shutdown is accepted; the daemon still owns the log while it
+    // winds down. Only after it exits does no process run the session.
+    let exited = (0..300).any(|_| {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        !Command::new("kill").args(["-0", &daemon_pid]).stderr(Stdio::null()).status().unwrap().success()
+    });
+    assert!(exited, "daemon pid {daemon_pid} still runs 30 s after `serve --stop`");
+    let idle = aho(&p, &["jobs", "kill", &op], "");
+    assert_eq!(idle.status.code(), Some(1));
+    assert!(text(&idle.stderr).contains("is not running"), "{}", text(&idle.stderr));
+}
+
 #[test]
 fn discovered_skills_are_opt_in_and_disable_overrides_enable() {
     let p = project();

@@ -5,8 +5,10 @@
 //!
 //! * `hello` → the daemon opens the session and decides the takeover (a refusal ends the
 //!   connection, as in-process); `hello_ok{version, capabilities, session, head}`.
-//! * `session.prompt` → `session.prompt{wait}` (the reply is the turn's end); `steer`, `abort` 1:1;
-//!   `session.subscribe{from}` → `session.subscribe` (the replay first, then the reply).
+//! * `session.prompt` → `session.prompt{wait}` (the reply is the turn's end); `steer`,
+//!   `abort{scope?, op?}`, `job.list`, `job.kill{op}`, `job.detach{op}` 1:1 (the daemon's
+//!   `job.finished` event becomes `job_finished`); `session.subscribe{from}` →
+//!   `session.subscribe` (the replay first, then the reply).
 //! * `session.fold`, `session.rewind`, `caps.*` → the daemon's `session.call`; approval cards
 //!   arrive as `approval` events and `approval.answer` (including `preset`) goes back through it.
 
@@ -180,7 +182,15 @@ async fn call(conn: &Conn, sid: SessionId, cards: &Cards, method: &str, params: 
             let p: wire::SteerParams = serde_json::from_value(params).map_err(|e| format!("bad params: {e}"))?;
             conn.request("session.steer", json!({ "session": sid, "text": p.text, "urgent": p.urgent })).await.map(|_| json!({}))
         }
-        "session.abort" => conn.request("session.abort", json!({ "session": sid })).await.map(|_| json!({})),
+        "session.abort" => {
+            let p: wire::AbortParams = serde_json::from_value(params).map_err(|e| format!("bad params: {e}"))?;
+            conn.request("session.abort", json!({ "session": sid, "scope": p.scope, "op": p.op })).await.map(|_| json!({}))
+        }
+        "job.list" => conn.request("job.list", json!({ "session": sid })).await.map(|f| json!({ "jobs": f.payload["jobs"] })),
+        "job.kill" | "job.detach" => {
+            let p: wire::JobParams = serde_json::from_value(params).map_err(|e| format!("bad params: {e}"))?;
+            conn.request(method, json!({ "session": sid, "op": p.op })).await.map(|_| json!({}))
+        }
         "session.subscribe" => {
             let p: wire::SubscribeParams = serde_json::from_value(params).map_err(|e| format!("bad params: {e}"))?;
             let f = conn.request("session.subscribe", json!({ "session": sid, "from": p.from })).await?;
@@ -250,6 +260,7 @@ fn event(v: u16, f: &DaemonFrame, cards: &Cards) -> Option<ServerFrame> {
             cards_of(cards).insert(id, card.clone());
             ServerFrame::new(v, None, "approval", card)
         }
+        "job.finished" => ServerFrame::new(v, None, "job_finished", wire::job_finished_payload(OpId(p["op"].as_u64()?))),
         "owner.lost" => ServerFrame::error(
             v,
             None,

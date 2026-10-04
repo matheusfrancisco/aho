@@ -24,12 +24,16 @@ pub struct Rig {
 }
 
 pub fn rig() -> Rig {
+    rig_with(Composition::new("t"))
+}
+
+/// [`rig`] over `comp` (e.g. with a test tool).
+pub fn rig_with(comp: Composition) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().join("ws");
     let home = dir.path().join("home");
     std::fs::create_dir_all(&root).unwrap();
     std::fs::create_dir_all(&home).unwrap();
-    let comp = Composition::new("t");
     let mut schema = Schema::default();
     for k in comp.config_keys() {
         schema.add(k);
@@ -86,20 +90,26 @@ pub async fn boot(
 
 /// Stands in for the app: sessions under `dir`, all booted with one scripted model. `journal`
 /// records every hook the daemon calls (`boot <id>`, `closing <id>`, `before_exec`,
-/// `exec_failed`, `call <method>`), in order.
+/// `exec_failed`, `call <method>`), in order; `booted` the sessions, weakly (a host never keeps
+/// a session the daemon closed alive).
 pub struct Host {
     pub rig: Rig,
     pub llm: Arc<ScriptedLlm>,
     pub dir: PathBuf,
     pub journal: Mutex<Vec<String>>,
+    pub booted: Mutex<Vec<std::sync::Weak<Session>>>,
 }
 
 impl Host {
     pub fn new(rig: Rig, llm: Arc<ScriptedLlm>, dir: PathBuf) -> Host {
-        Host { rig, llm, dir, journal: Mutex::new(Vec::new()) }
+        Host { rig, llm, dir, journal: Mutex::new(Vec::new()), booted: Mutex::new(Vec::new()) }
     }
     pub fn journal(&self) -> Vec<String> {
         self.journal.lock().unwrap_or_else(|p| p.into_inner()).clone()
+    }
+    /// The session booted last, while the daemon still holds it.
+    pub fn latest(&self) -> Option<Arc<Session>> {
+        self.booted.lock().unwrap_or_else(|p| p.into_inner()).iter().rev().find_map(std::sync::Weak::upgrade)
     }
     fn note(&self, what: String) {
         self.journal.lock().unwrap_or_else(|p| p.into_inner()).push(what);
@@ -112,7 +122,11 @@ impl SessionHost for Host {
     }
     fn boot(&self, id: SessionId, log: Arc<dyn LogStore>, approval: Arc<dyn Approval>) -> BoxFuture<'_, Result<Arc<Session>, String>> {
         self.note(format!("boot {}", id.0));
-        Box::pin(boot(&self.rig, id, self.llm.clone(), log, approval))
+        Box::pin(async move {
+            let s = boot(&self.rig, id, self.llm.clone(), log, approval).await?;
+            self.booted.lock().unwrap_or_else(|p| p.into_inner()).push(Arc::downgrade(&s));
+            Ok(s)
+        })
     }
     /// `echo` answers its params with the session id; any other method is refused.
     fn call<'a>(&'a self, session: &'a Arc<Session>, method: &'a str, params: Value) -> BoxFuture<'a, Result<Value, String>> {

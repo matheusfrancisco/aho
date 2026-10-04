@@ -1,5 +1,6 @@
 //! The operator's side of the VM lab: `aho lease grant|revoke|status` (what a
-//! session's machines may use; the agent can only request), `aho media import|list` and
+//! session's machines may use, or with `--jobs` how many background jobs it may run; the agent
+//! can only request), `aho media import|list` and
 //! `aho add recipe` (the library machines are built from; no agent tool writes it), and the
 //! `vm` world under `aho sandbox` and `aho export`. None of them opens the session's network.
 
@@ -56,13 +57,17 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
     let p = ctx.load(&ctx.inputs(&[], false)?)?;
     let dir = ctx.session_dir(&p);
     let s = find_session(&dir, session)?;
-    let state = state_dir(ctx, &p)?;
     let (_, entries) = branch(&s.path)?;
     let live = world_vm::lease_of(&entries);
     match sub {
         LeaseVerb::Status => {
+            let jobs = aho_session::jobs_lease(&entries);
+            let now = Timestamp::now();
             if json_out {
-                println!("{}", serde_json::to_string_pretty(&json!({"session": hex(s.id), "lease": live}))?);
+                let jobs = jobs.map(|j| {
+                    json!({"id": j.lease.0, "max": j.max, "expires_at_ms": j.expires.0, "live": j.live(now), "granted_ref": j.granted.0})
+                });
+                println!("{}", serde_json::to_string_pretty(&json!({"session": hex(s.id), "lease": live, "jobs_lease": jobs}))?);
                 return Ok(());
             }
             match live {
@@ -80,9 +85,41 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
                     );
                 }
             }
+            let max = p.loadout.get("jobs.max").map_or_else(|| aho_session::JobsConfig::default().max.to_string(), |v| v.to_string());
+            match jobs.filter(|j| j.live(now)) {
+                Some(j) => println!(
+                    "session {}: jobs lease {} · up to {} background job(s) at once · expires in {} min (granted at entry #{})",
+                    hex(s.id),
+                    j.lease.0,
+                    j.max,
+                    j.expires.0.saturating_sub(now.0) / 60_000,
+                    j.granted.0
+                ),
+                None => println!(
+                    "session {} holds no live jobs lease, so `jobs.max` ({max}) applies; `aho lease grant --jobs <n>` gives it one",
+                    hex(s.id)
+                ),
+            }
             Ok(())
         }
-        LeaseVerb::Grant { machines, disk, cpu, expires } => {
+        LeaseVerb::Grant { jobs: Some(max), expires, .. } => {
+            let ttl = duration_ms(expires).ok_or_else(|| err(format!("--expires `{expires}` is a duration (e.g. 6h)")))?;
+            let next = next_lease(&entries);
+            let w = writer(ctx, &dir, &s, &entries, "the jobs lease was not granted").await?;
+            let subject = aho_session::jobs_lease_subject(*max);
+            let appended =
+                w.append(EntryKind::LeaseGranted { lease: LeaseId(next), subject, expires: Timestamp(Timestamp::now().0 + ttl) }).await;
+            let via = w.finish(false).await.map_err(err)?;
+            let at = appended.map_err(|e| err(format!("{e}; the jobs lease was not granted")))?;
+            let via = via.map(|v| format!(" {v}")).unwrap_or_default();
+            println!(
+                "granted jobs lease {next} to session {} (by Operator{via}, entry #{}): up to {max} background job(s) at once, for {expires}. When it ends, its running jobs are cancelled and `jobs.max` applies again.",
+                hex(s.id),
+                at.0
+            );
+            Ok(())
+        }
+        LeaseVerb::Grant { jobs: None, machines, disk, cpu, expires } => {
             let terms = LeaseTerms {
                 max_machines: *machines,
                 max_disk_bytes: bytes(disk, "--disk")?,
@@ -92,15 +129,7 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
             if terms.max_machines == 0 {
                 return Err(err("--machines must be at least 1 (the sandbox VM counts)"));
             }
-            let next = entries
-                .iter()
-                .filter_map(|e| match &e.kind {
-                    EntryKind::LeaseGranted { lease, .. } => Some(lease.0),
-                    _ => None,
-                })
-                .max()
-                .unwrap_or(0)
-                + 1;
+            let next = next_lease(&entries);
             let expires_at = Timestamp(Timestamp::now().0 + ttl);
             let w = writer(ctx, &dir, &s, &entries, "the lease was not granted").await?;
             let appended = w.append(EntryKind::LeaseGranted { lease: LeaseId(next), subject: terms.subject(), expires: expires_at }).await;
@@ -115,7 +144,7 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
                 max_cpu_s: terms.max_cpu_s,
                 revoked: false,
             };
-            world_vm::set_lease(&state, &session_name(s.id), &limits)
+            world_vm::set_lease(&state_dir(ctx, &p)?, &session_name(s.id), &limits)
                 .map_err(|e| err(format!("the grant is logged (entry #{}) but the VM state was not updated: {e}", at.0)))?;
             let via = via.map(|v| format!(" {v}")).unwrap_or_default();
             println!(
@@ -125,7 +154,24 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
             );
             Ok(())
         }
-        LeaseVerb::Revoke => {
+        LeaseVerb::Revoke { jobs: true } => {
+            let Some(l) = aho_session::jobs_lease(&entries) else {
+                println!("session {} holds no jobs lease; nothing to revoke", hex(s.id));
+                return Ok(());
+            };
+            let w = writer(ctx, &dir, &s, &entries, "the jobs lease was not revoked").await?;
+            let appended = w.append(EntryKind::LeaseRevoked { lease: l.lease, proof_next_attempt: None }).await;
+            let via = w.finish(false).await.map_err(err)?;
+            appended.map_err(|e| err(format!("{e}; the jobs lease was not revoked")))?;
+            let via = via.map(|v| format!(" {v}")).unwrap_or_default();
+            println!(
+                "revoked jobs lease {} of session {} (by Operator{via}); its running jobs are cancelled and `jobs.max` applies again",
+                l.lease.0,
+                hex(s.id)
+            );
+            Ok(())
+        }
+        LeaseVerb::Revoke { jobs: false } => {
             let Some(l) = live else {
                 println!("session {} holds no VM lease; nothing to revoke", hex(s.id));
                 return Ok(());
@@ -135,7 +181,7 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
             let appended = w.append(EntryKind::LeaseRevoked { lease, proof_next_attempt: None }).await;
             let via = w.finish(false).await.map_err(err)?;
             appended.map_err(|e| err(format!("{e}; the lease was not revoked")))?;
-            world_vm::revoke_lease(&state, &session_name(s.id))
+            world_vm::revoke_lease(&state_dir(ctx, &p)?, &session_name(s.id))
                 .map_err(|e| err(format!("the revocation is logged but the VM state was not updated: {e}")))?;
             let via = via.map(|v| format!(" {v}")).unwrap_or_default();
             println!(
@@ -146,6 +192,19 @@ pub async fn lease(ctx: &Ctx, sub: &LeaseVerb, session: Option<&str>, json_out: 
             Ok(())
         }
     }
+}
+
+/// The next `LeaseId` of a session: past every grant, VM or jobs.
+fn next_lease(entries: &[aho_log::Entry]) -> u64 {
+    entries
+        .iter()
+        .filter_map(|e| match &e.kind {
+            EntryKind::LeaseGranted { lease, .. } => Some(lease.0),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0)
+        + 1
 }
 
 async fn writer(ctx: &Ctx, dir: &Path, s: &SessionFile, entries: &[aho_log::Entry], what: &str) -> Result<Writer, Fail> {

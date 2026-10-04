@@ -110,10 +110,27 @@ async fn clients_attach_and_prompt_over_the_socket_and_a_stranger_is_read_only()
         ("session.prompt", json!({ "session": sid, "text": "mine now" })),
         ("session.steer", json!({ "session": sid, "text": "mine now", "urgent": true })),
         ("session.abort", json!({ "session": sid })),
+        ("session.abort", json!({ "session": sid, "scope": "all" })),
+        ("job.kill", json!({ "session": sid, "op": 1 })),
+        ("job.detach", json!({ "session": sid, "op": 1 })),
     ] {
         let r = b.request(method, params).await.unwrap();
         assert!(r.is_error() && r.message().unwrap().contains("does not drive"), "{method}: {r:?}");
     }
+    // Listing jobs only reads: a watcher may. Kill and detach pass the owner check for A and
+    // then refuse what does not exist.
+    let jobs = b.request("job.list", json!({ "session": sid })).await.unwrap();
+    assert_eq!(jobs.payload["jobs"], json!([]), "{jobs:?}");
+    for (method, params, says) in [
+        ("job.kill", json!({ "session": sid, "op": 999 }), "no operation 999"),
+        ("job.detach", json!({ "session": sid, "op": 999 }), "no operation 999"),
+        ("session.abort", json!({ "session": sid, "scope": "op", "op": 999 }), "no running operation 999"),
+        ("session.abort", json!({ "session": sid, "scope": "everything" }), "not one of turn, all, op"),
+    ] {
+        let r = a.request(method, params).await.unwrap();
+        assert!(r.is_error() && r.message().unwrap().contains(says), "{method}: {r:?}");
+    }
+    assert_eq!(a.request("session.abort", json!({ "session": sid, "scope": "all" })).await.unwrap().event, "result");
 
     let listed = a.request("session.list", Value::Null).await.unwrap();
     let row = &listed.payload["sessions"][0];

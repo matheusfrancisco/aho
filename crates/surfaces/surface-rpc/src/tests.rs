@@ -18,8 +18,41 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream, Lines, 
 use super::*;
 
 fn composition() -> Composition {
-    Composition::new("rpc-test").provide::<world_host::HostWorld>().consume::<tool_fs::ToolFs>().consume::<Fetch>()
+    Composition::new("rpc-test").provide::<world_host::HostWorld>().consume::<tool_fs::ToolFs>().consume::<Fetch>().consume::<Slow>()
 }
+
+/// `slow`: sleeps until cancelled; may run as a session job.
+static SLOW: &[aho_cap::ToolDecl] = &[aho_cap::ToolDecl::new("slow", "Sleeps until cancelled.", Consequence::ReadOnly)
+    .safe()
+    .detachable()
+    .op(aho_log::OpKind::Timer, false, false)];
+struct Slow;
+impl Capability for Slow {
+    const ID: CapabilityId = Self::ID_;
+    const MANIFEST: &'static Manifest = &Self::MANIFEST_;
+    type Deps = ();
+    type Config = ();
+    fn build(_: (), _: ()) -> Result<Self, BuildError> {
+        Ok(Slow)
+    }
+    fn register(&self, r: &mut Registrar<'_>) {
+        r.tool(
+            &SLOW[0],
+            Arc::new(|req: aho_cap::ExecRequest| {
+                Box::pin(async move {
+                    for _ in 0..1500 {
+                        if req.cancel.is_cancelled() {
+                            return aho_cap::ExecOutcome::Cancelled;
+                        }
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                    }
+                    aho_cap::ExecOutcome::text("slept")
+                })
+            }),
+        );
+    }
+}
+aho_cap::declare_capability!(Slow, "slow-test", kind = Kind::Tool, provides = [], requires = [], tools = SLOW);
 
 /// A network tool for the preset path: its class (NetworkEgress) is outside `workspace`, so the
 /// chain asks and the card's smallest cut is a preset. The egress handle is the host world's.
@@ -338,4 +371,76 @@ async fn caps_set_plans_before_it_writes() {
     c.send(json!({"v": 1, "id": 5, "method": "caps.set", "params": {"key": "polcy.preset", "value": "x"}})).await;
     let err = c.until(is_reply(5)).await.pop().unwrap();
     assert!(err.payload["message"].as_str().unwrap().contains("not a setting"), "{err:?}");
+}
+
+/// A turn that started `slow` in the background, over a subscribed connection; returns the job's op.
+async fn with_a_job(c: &mut Client) -> Value {
+    c.hello("cli", false, false).await;
+    c.send(json!({"v": 1, "id": 2, "method": "session.subscribe", "params": {}})).await;
+    c.until(is_reply(2)).await;
+    c.send(json!({"v": 1, "id": 3, "method": "session.prompt", "params": {"text": "sleep in the background"}})).await;
+    let done = c.until(is_reply(3)).await.pop().unwrap();
+    assert_eq!(done.payload["transition"]["transition"], "completed", "the turn ends while its job runs: {done:?}");
+    c.send(json!({"v": 1, "id": 4, "method": "job.list"})).await;
+    let jobs = c.until(is_reply(4)).await.pop().unwrap().payload["jobs"].clone();
+    assert_eq!(jobs.as_array().map(Vec::len), Some(1), "{jobs}");
+    assert_eq!((&jobs[0]["tool"], &jobs[0]["status"], &jobs[0]["cause"]), (&json!("slow"), &Value::Null, &json!({"cause": "requested"})));
+    assert!(jobs[0]["started"].is_u64(), "a running job has a start time: {jobs}");
+    jobs[0]["op"].clone()
+}
+
+fn job_steps() -> Vec<Step> {
+    vec![Step::tool_call("slow", json!({"background": true})).with_stop(ScriptedStop::ToolUse), Step::text("started")]
+}
+
+#[tokio::test]
+async fn a_turn_abort_leaves_jobs_running_and_job_kill_cancels_one() {
+    let r = rig(job_steps(), "", Arc::new(NeverApproval)).await;
+    let ctx = RpcContext::new(&r.session, None, None);
+    let (mut c, _) = Client::connect(&r, &ctx);
+    let op = with_a_job(&mut c).await;
+
+    c.send(json!({"v": 1, "id": 5, "method": "session.abort"})).await;
+    assert_eq!(c.until(is_reply(5)).await.pop().unwrap().event, "result");
+    c.send(json!({"v": 1, "id": 6, "method": "job.list"})).await;
+    assert_eq!(c.until(is_reply(6)).await.pop().unwrap().payload["jobs"][0]["status"], Value::Null, "abort (turn) keeps jobs running");
+    c.send(json!({"v": 1, "id": 7, "method": "job.detach", "params": {"op": op}})).await;
+    let again = c.until(is_reply(7)).await.pop().unwrap();
+    assert!(again.payload["message"].as_str().unwrap().contains("already a job"), "{again:?}");
+
+    c.send(json!({"v": 1, "id": 8, "method": "job.kill", "params": {"op": op}})).await;
+    assert_eq!(c.until(is_reply(8)).await.pop().unwrap().event, "result");
+    let finished = c.until(|f| f.event == "job_finished").await.pop().unwrap();
+    assert_eq!(finished.payload, json!({"op": op}), "the idle session announces the finished job");
+    c.send(json!({"v": 1, "id": 9, "method": "job.list"})).await;
+    let status = c.until(is_reply(9)).await.pop().unwrap().payload["jobs"][0]["status"].clone();
+    assert_eq!(status, json!({"status": "cancelled", "reason": "aborted"}), "it waits for delivery at the next turn");
+    c.send(json!({"v": 1, "id": 10, "method": "job.kill", "params": {"op": op}})).await;
+    let twice = c.until(is_reply(10)).await.pop().unwrap();
+    assert!(twice.payload["message"].as_str().unwrap().contains("already finished"), "{twice:?}");
+}
+
+#[tokio::test]
+async fn abort_all_cancels_jobs_and_bad_scopes_cancel_nothing() {
+    let r = rig(job_steps(), "", Arc::new(NeverApproval)).await;
+    let ctx = RpcContext::new(&r.session, None, None);
+    let (mut c, _) = Client::connect(&r, &ctx);
+    let op = with_a_job(&mut c).await;
+
+    for (id, params, says) in [
+        (5, json!({"scope": "op", "op": 999}), "no running operation 999"),
+        (6, json!({"scope": "op"}), "needs `op`"),
+        (7, json!({"scope": "turn", "op": 1}), "scope `op` only"),
+        (8, json!({"scope": "session"}), "not one of turn, all, op"),
+    ] {
+        c.send(json!({"v": 1, "id": id, "method": "session.abort", "params": params})).await;
+        let r = c.until(is_reply(id)).await.pop().unwrap();
+        assert!(r.event == "error" && r.payload["message"].as_str().unwrap().contains(says), "{params}: {r:?}");
+    }
+    c.send(json!({"v": 1, "id": 9, "method": "job.list"})).await;
+    assert_eq!(c.until(is_reply(9)).await.pop().unwrap().payload["jobs"][0]["status"], Value::Null, "a refused abort cancels nothing");
+
+    c.send(json!({"v": 1, "id": 10, "method": "session.abort", "params": {"scope": "all"}})).await;
+    assert_eq!(c.until(is_reply(10)).await.pop().unwrap().event, "result");
+    assert_eq!(c.until(|f| f.event == "job_finished").await.pop().unwrap().payload["op"], op);
 }

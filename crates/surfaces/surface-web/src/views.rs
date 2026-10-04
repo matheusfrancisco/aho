@@ -6,7 +6,7 @@ use aho_cap::{CapabilityId, Registry};
 use aho_compose::Planned;
 use aho_fs::SnapshotHandle;
 use aho_llm::StreamEvent;
-use aho_log::{CapState, CheckpointCause, Entry, EntryKind, RewindMode, State, Verdict};
+use aho_log::{CapState, CheckpointCause, Entry, EntryKind, OpStatus, RewindMode, State, Verdict};
 use aho_policy::{ApprovalCard, DecisionReason};
 use aho_proc::OpTable;
 use aho_session::Session;
@@ -175,11 +175,34 @@ pub fn tree_json(planned: &Planned, state: &State, label: &str) -> Value {
     })
 }
 
+/// Every op in the table, oldest first. `scope` is `job` for a detached op (it outlives its turn)
+/// and `turn` otherwise; `state` is `running` until `status` is set.
 pub fn jobs_json(ops: &OpTable) -> Vec<Value> {
     ops.list()
         .into_iter()
-        .map(|i| json!({ "op": i.op, "call": i.call, "tool": i.tool, "kind": i.kind, "status": i.status, "started": i.started }))
+        .map(|i| {
+            json!({
+                "op": i.op,
+                "call": i.call,
+                "tool": i.tool,
+                "kind": i.kind,
+                "scope": if i.detached { "job" } else { "turn" },
+                "state": op_state(i.status.as_ref()),
+                "status": i.status,
+                "started": i.started,
+            })
+        })
         .collect()
+}
+
+fn op_state(status: Option<&OpStatus>) -> &'static str {
+    match status {
+        None => "running",
+        Some(OpStatus::Completed { .. }) => "done",
+        Some(OpStatus::Failed { .. }) => "failed",
+        Some(OpStatus::Cancelled { .. }) => "cancelled",
+        Some(OpStatus::Uncertain { .. }) => "uncertain",
+    }
 }
 
 /// Panels whose capability is Active in the fold (a disabled capability ships no panel).

@@ -1,15 +1,148 @@
 //! Key handling is pure: a key edits surface-local state and may yield one [`Action`] the runtime
-//! performs against the session. The approval card answers first, then the top overlay, then the
-//! `/` menu while it is open, then the prompt.
+//! performs against the session. The abort-all key acts anywhere; then the approval card answers,
+//! then the top overlay, then the `/` menu while it is open; only then does the abort-turn key
+//! abort a running turn; the prompt gets the rest.
 
 use aho_approval::Decided;
+use aho_cap::ConfigError;
+use aho_config::Loadout;
 use aho_log::{GrantScope, RewindMode};
+use aho_session::AbortScope;
 use aho_types::CheckpointId;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use crate::menu;
 use crate::model::{CheckpointList, MODES, Notice, Overlay, Panel, RewindPicker, UiState, View};
 use crate::slash::{HELP, Parsed, parse_line};
+
+/// One key as a `tui.keys.*` value names it: `esc`, `ctrl+c`, `ctrl+x`, `alt+k`, `f2`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct KeySpec {
+    code: KeyCode,
+    mods: KeyModifiers,
+}
+
+impl KeySpec {
+    pub const fn new(code: KeyCode, mods: KeyModifiers) -> KeySpec {
+        KeySpec { code, mods }
+    }
+
+    /// `None` for anything that is not `[ctrl+][alt+][shift+]<key>` with a known key name or a
+    /// single character (shift only with named keys: a shifted character is its own character).
+    pub fn parse(spec: &str) -> Option<KeySpec> {
+        let spec = spec.trim().to_ascii_lowercase();
+        let mut parts: Vec<&str> = spec.split('+').collect();
+        let key = parts.pop()?;
+        let mut mods = KeyModifiers::NONE;
+        for m in parts {
+            let bit = match m {
+                "ctrl" | "control" => KeyModifiers::CONTROL,
+                "alt" | "meta" | "option" => KeyModifiers::ALT,
+                "shift" => KeyModifiers::SHIFT,
+                _ => return None,
+            };
+            if mods.contains(bit) {
+                return None;
+            }
+            mods |= bit;
+        }
+        let code = match key {
+            "esc" | "escape" => KeyCode::Esc,
+            "enter" | "return" => KeyCode::Enter,
+            "tab" => KeyCode::Tab,
+            "backspace" => KeyCode::Backspace,
+            "delete" | "del" => KeyCode::Delete,
+            "insert" | "ins" => KeyCode::Insert,
+            "up" => KeyCode::Up,
+            "down" => KeyCode::Down,
+            "left" => KeyCode::Left,
+            "right" => KeyCode::Right,
+            "home" => KeyCode::Home,
+            "end" => KeyCode::End,
+            "pageup" => KeyCode::PageUp,
+            "pagedown" => KeyCode::PageDown,
+            "space" => KeyCode::Char(' '),
+            f if f.len() > 1 && f.starts_with('f') => KeyCode::F(f[1..].parse().ok().filter(|n| (1..=24).contains(n))?),
+            _ => {
+                let mut chars = key.chars();
+                let c = chars.next()?;
+                if chars.next().is_some() {
+                    return None;
+                }
+                KeyCode::Char(c)
+            }
+        };
+        if mods.contains(KeyModifiers::SHIFT) && matches!(code, KeyCode::Char(_)) {
+            return None;
+        }
+        Some(KeySpec { code, mods })
+    }
+
+    /// Ctrl and Alt must match exactly; Shift only for named keys (a character carries its case).
+    pub fn matches(&self, key: &KeyEvent) -> bool {
+        let (code, relevant) = match key.code {
+            KeyCode::Char(c) => (KeyCode::Char(c.to_ascii_lowercase()), KeyModifiers::CONTROL | KeyModifiers::ALT),
+            c => (c, KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SHIFT),
+        };
+        code == self.code && key.modifiers.intersection(relevant) == self.mods
+    }
+
+    /// How the hints and `/help` name it: `esc`, `ctrl-c`, `alt-f2`.
+    pub fn label(&self) -> String {
+        let mut s = String::new();
+        for (bit, name) in [(KeyModifiers::CONTROL, "ctrl-"), (KeyModifiers::ALT, "alt-"), (KeyModifiers::SHIFT, "shift-")] {
+            if self.mods.contains(bit) {
+                s.push_str(name);
+            }
+        }
+        match self.code {
+            KeyCode::Char(' ') => s.push_str("space"),
+            KeyCode::Char(c) => s.push(c),
+            KeyCode::F(n) => s.push_str(&format!("f{n}")),
+            KeyCode::PageUp => s.push_str("pageup"),
+            KeyCode::PageDown => s.push_str("pagedown"),
+            c => s.push_str(&format!("{c:?}").to_ascii_lowercase()),
+        }
+        s
+    }
+}
+
+/// The configurable keys (`tui.keys.*`), parsed once from the loadout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Keymap {
+    /// Aborts the running turn; its ops are cancelled, session jobs keep running. Default Esc,
+    /// after the card, the overlay and the menu had their use of it.
+    pub abort_turn: KeySpec,
+    /// Aborts the turn and every session job, wherever the focus is. Default Ctrl+C.
+    pub abort_all: KeySpec,
+}
+
+impl Default for Keymap {
+    fn default() -> Self {
+        Keymap {
+            abort_turn: KeySpec::new(KeyCode::Esc, KeyModifiers::NONE),
+            abort_all: KeySpec::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        }
+    }
+}
+
+impl Keymap {
+    pub const ABORT_TURN: &'static str = "tui.keys.abort_turn";
+    pub const ABORT_ALL: &'static str = "tui.keys.abort_all";
+
+    /// Unset keys keep their default; a value that is not a key spec is refused, naming the key.
+    pub fn from_loadout(l: &Loadout) -> Result<Keymap, ConfigError> {
+        let d = Keymap::default();
+        let read = |key: &str, default: KeySpec| match l.get(key) {
+            None | Some(serde_json::Value::Null) => Ok(default),
+            Some(v) => v.as_str().and_then(KeySpec::parse).ok_or_else(|| ConfigError::Type {
+                key: key.to_string(),
+                expected: "a key such as \"esc\", \"ctrl+c\", \"ctrl+x\", \"alt+k\" or \"f2\"",
+            }),
+        };
+        Ok(Keymap { abort_turn: read(Self::ABORT_TURN, d.abort_turn)?, abort_all: read(Self::ABORT_ALL, d.abort_all)? })
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Action {
@@ -23,7 +156,8 @@ pub enum Action {
         text: String,
         urgent: bool,
     },
-    Abort,
+    /// Cancel by scope: `Turn` (the abort-turn key while a turn runs) or `All` (the abort-all key).
+    Abort(AbortScope),
     /// Answer the card on screen.
     Answer(Decided),
     /// `[p]`: write the suggested preset, then allow this class for the session.
@@ -46,8 +180,8 @@ pub fn on_key(ui: &mut UiState, key: KeyEvent) -> Option<Action> {
     }
     let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
     let alt = key.modifiers.contains(KeyModifiers::ALT);
-    if ctrl && key.code == KeyCode::Char('c') {
-        return Some(Action::Abort);
+    if ui.local.keys.abort_all.matches(&key) {
+        return Some(Action::Abort(AbortScope::All));
     }
     if ctrl && key.code == KeyCode::Char('q') {
         return Some(Action::Quit);
@@ -66,6 +200,9 @@ pub fn on_key(ui: &mut UiState, key: KeyEvent) -> Option<Action> {
         && let Some(done) = menu_key(ui, key, &items, selected)
     {
         return done;
+    }
+    if ui.is_busy() && ui.local.keys.abort_turn.matches(&key) {
+        return Some(Action::Abort(AbortScope::Turn));
     }
     input_key(ui, key, ctrl, alt)
 }

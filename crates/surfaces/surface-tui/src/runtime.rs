@@ -17,7 +17,7 @@ use aho_compose::Planned;
 use aho_fs::SnapshotHandle;
 use aho_log::{CustomFolds, EntryKind, GrantScope, RewindMode, Transition};
 use aho_policy::{Operator, OperatorProof};
-use aho_session::{Session, SessionError, SessionEvent};
+use aho_session::{AbortScope, Session, SessionError, SessionEvent};
 use aho_types::{CheckpointId, EntryId, Usage};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
@@ -43,14 +43,14 @@ pub const FRAME_RING: usize = 256;
 pub fn ui_from_session(session: &Session, planned: &Planned) -> Result<UiState, String> {
     let id = format!("{:x}", session.id.0);
     let short = if id.len() > 8 { format!("{}…", &id[..8]) } else { id };
-    let mut ui = UiState::new(&format!("aho · session {short}"), &planned.plan, &planned.loadout, tool_caps(session.registry()));
+    let mut ui = UiState::new(&format!("aho · session {short}"), &planned.plan, &planned.loadout, tool_caps(session.registry()))?;
     let branch = match session.log().head() {
         Some(h) => session.log().read_branch(h).map_err(|e| format!("could not read the session log: {e}"))?,
         None => Vec::new(),
     };
     ui.refold(&branch, &session.registry().entry_kinds)?;
     ui.refresh_tree(&planned.plan, &planned.loadout);
-    ui.jobs = session.ops().list();
+    ui.set_jobs(session.ops().list());
     ui.model_facts(session.config());
     // Abandoned branches were paid for too.
     ui.spent = session.log().read_from(None).iter().fold(Usage::default(), |sum, e| match &e.kind {
@@ -385,9 +385,11 @@ impl Runtime {
                     EntryKind::CapDelta { .. } | EntryKind::ConfigResolved { .. } | EntryKind::PolicyEpoch { .. } => {
                         self.ui.refresh_tree(&self.planned.plan, &self.planned.loadout)
                     }
-                    EntryKind::OpStarted { .. } | EntryKind::OpDone { .. } | EntryKind::ToolResult { .. } => {
-                        self.ui.jobs = self.session.ops().list()
-                    }
+                    EntryKind::OpStarted { .. }
+                    | EntryKind::OpDone { .. }
+                    | EntryKind::ToolResult { .. }
+                    | EntryKind::OpDetached { .. }
+                    | EntryKind::JobDelivered { .. } => self.ui.set_jobs(self.session.ops().list()),
                     _ => {}
                 }
             }
@@ -399,6 +401,14 @@ impl Runtime {
                 }
             }
             SessionEvent::Error(msg) => self.ui.notice = Some(Notice::error(msg)),
+            SessionEvent::JobFinished { op } => {
+                self.ui.set_jobs(self.session.ops().list());
+                // `jobs.wake = operator`: no turn starts by itself, so the operator is told.
+                if self.session.jobs_config().wake == aho_session::WakeMode::Operator {
+                    self.ui.notice =
+                        Some(Notice::info(format!("job op{} finished; its outcome reaches the model with your next prompt", op.0)));
+                }
+            }
         }
     }
 
@@ -440,10 +450,7 @@ impl Runtime {
         let Some(action) = on_key(&mut self.ui, k) else { return };
         match action {
             Action::Quit => self.quit = true,
-            Action::Abort => {
-                self.session.abort();
-                self.ui.notice = Some(Notice::info("abort requested: running operations of this turn are being cancelled"));
-            }
+            Action::Abort(scope) => self.abort(scope),
             Action::Prompt(text) => {
                 self.ui.busy = true;
                 let s = self.session.clone();
@@ -542,8 +549,25 @@ impl Runtime {
         }
     }
 
+    /// Cancels by scope and says what was cancelled and what keeps running.
+    fn abort(&mut self, scope: AbortScope) {
+        self.ui.set_jobs(self.session.ops().list());
+        let jobs = crate::jobs::running(&self.ui).count();
+        let cancelled = self.session.abort_scope(scope);
+        let text = match scope {
+            AbortScope::Turn if jobs > 0 => {
+                format!("abort: this turn's running operations are being cancelled; {jobs} background job(s) keep running")
+            }
+            AbortScope::Turn => "abort: this turn's running operations are being cancelled".to_string(),
+            AbortScope::All => format!("abort all: the turn and {jobs} background job(s) are being cancelled"),
+            AbortScope::Op(op) if cancelled => format!("abort: op{} is being cancelled", op.0),
+            AbortScope::Op(op) => format!("op{} is not running; nothing was cancelled", op.0),
+        };
+        self.ui.notice = Some(Notice::info(text));
+    }
+
     fn tick(&mut self) {
-        self.ui.jobs = self.session.ops().list();
+        self.ui.set_jobs(self.session.ops().list());
         let before = self.queue.len();
         self.queue.retain(|(_, reply)| !reply.is_closed());
         if self.queue.len() != before {

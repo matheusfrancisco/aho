@@ -10,7 +10,7 @@ use aho_approval::NeverApproval;
 use aho_cap::*;
 use aho_config::{FileSnapshot, Layer, ResolveInputs, Schema, resolve};
 use aho_llm::LlmRoute;
-use aho_log::{CapState, EntryKind, LogStore, MemoryLog, OpKind};
+use aho_log::{CancelReason, CapState, EntryKind, LogStore, MemoryLog, OpKind, OpStatus, Transition};
 use aho_policy::{Operator, OperatorProof, SandboxPolicy};
 use aho_subagent::{Mode, SpawnRequest, SubagentError, SubagentProvider};
 use aho_types::*;
@@ -22,7 +22,7 @@ use subagent_inproc::{InProc, SubagentInproc, SubagentRuntime, child_plan, descr
 
 struct SlowTools;
 static SLOW_TOOLS: &[ToolDecl] = &[
-    ToolDecl::new("slow", "Sleeps until cancelled.", Consequence::ReadOnly).safe().op(OpKind::Timer, false, false),
+    ToolDecl::new("slow", "Sleeps until cancelled.", Consequence::ReadOnly).safe().detachable().op(OpKind::Timer, false, false),
     ToolDecl::new("quick", "Returns at once.", Consequence::ReadOnly).safe(),
 ];
 impl Capability for SlowTools {
@@ -223,6 +223,56 @@ async fn fork_inherits_completed_turns_only() {
 }
 
 #[tokio::test]
+async fn a_fork_while_a_job_runs_starts_the_child_with_no_open_job() {
+    let r = rig("");
+    let parent_llm = Arc::new(ScriptedLlm::from_steps(vec![
+        Step::tool_call("slow", json!({"background": true})),
+        Step::text("the job runs on").expect_tool_result("background as job"),
+    ]));
+    let mut seed = Registry::default();
+    seed.services.insert("llm:scripted".into(), Arc::new(LlmRoute(parent_llm)));
+    let parent = aho_session::Session::boot(aho_session::Boot {
+        id: SessionId(1),
+        composition: &r.comp,
+        plan: &r.plan,
+        loadout: &r.loadout,
+        bootstrap: vec![EntryKind::PolicyEpoch {
+            epoch: Epoch(1),
+            allowed: r.plan.allowed,
+            preset: "workspace".into(),
+            approval_ref: None,
+        }],
+        log: Arc::new(MemoryLog::new()),
+        approval: Arc::new(NeverApproval),
+        operator: Operator::authenticate(OperatorProof::local_tty()),
+        workspace: r.dir.path().display().to_string(),
+        home: r.dir.path().display().to_string(),
+        spill_dir: r.dir.path().join("spill"),
+        seed,
+    })
+    .await
+    .unwrap();
+    assert_eq!(parent.prompt("start a job", None).await.unwrap(), Transition::Completed);
+    let job = parent.jobs().unwrap()[0].op;
+
+    let llm = Arc::new(ScriptedLlm::from_steps(vec![Step::text("forked")]));
+    let p = InProc::new(runtime(&r, &llm, parent.log().clone(), 0), Arc::new(NeverApproval), 3);
+    let last_end = parent.log().read_from(None).iter().rev().find(|e| matches!(e.kind, EntryKind::TurnEnd { .. })).unwrap().id;
+    assert_eq!(p.fork_point(), Some(last_end), "a turn that ended with only a job running is a fork point");
+    let mut req = request("go on");
+    req.fork_at = p.fork_point();
+    let id = p.spawn(req, parent_policy(&r)).await.unwrap();
+    assert_eq!(p.wait(id).await.unwrap().last_message.as_deref(), Some("forked"));
+    let es = child_entries(&p, id);
+    let st = aho_log::fold(&es, &Default::default()).unwrap();
+    assert!(st.open_ops.is_empty() && st.jobs.is_empty(), "the child inherits no live job");
+    assert!(es.iter().any(|e| matches!(&e.kind,
+        EntryKind::OpDone { op, status: OpStatus::Cancelled { reason: CancelReason::Fork } } if *op == job)));
+    assert_eq!(parent.jobs().unwrap()[0].status, None, "the parent's job keeps running");
+    parent.abort_scope(aho_session::AbortScope::All);
+}
+
+#[tokio::test]
 async fn spawned_child_runs_to_idle_under_the_delegated_policy() {
     let r = rig("");
     let llm = Arc::new(ScriptedLlm::from_steps(vec![Step::text("done: read-only")]));
@@ -363,4 +413,29 @@ async fn filtered_child_sees_only_the_named_tools() {
         .unwrap();
     assert!(!header_tools.contains(&"lonely".to_string()), "{header_tools:?}");
     assert!(header_tools.contains(&"slow".to_string()));
+}
+
+#[tokio::test]
+async fn a_childs_jobs_stop_when_the_provider_goes_with_its_session() {
+    let r = rig("");
+    let llm = Arc::new(ScriptedLlm::from_steps(vec![
+        Step::tool_call("slow", json!({"background": true})),
+        Step::text("left it running").expect_tool_result("background as job"),
+    ]));
+    let p = InProc::new(runtime(&r, &llm, Arc::new(MemoryLog::new()), 0), Arc::new(NeverApproval), 3);
+    let id = p.spawn(request("start something slow"), parent_policy(&r)).await.unwrap();
+    assert_eq!(p.wait(id).await.unwrap().last_message.as_deref(), Some("left it running"));
+    let child = p.child_session(id).unwrap();
+    assert_eq!(child.jobs().unwrap()[0].status, None, "the child's run ended; its job runs on");
+
+    drop(p);
+    let mut status = None;
+    for _ in 0..250 {
+        status = child.jobs().unwrap()[0].status.clone();
+        if status.is_some() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(status, Some(OpStatus::Cancelled { reason: CancelReason::Aborted }), "no child job outlives its parent session");
 }

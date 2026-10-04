@@ -139,6 +139,16 @@ pub enum Verb {
         #[arg(long, global = true)]
         json: bool,
     },
+    /// A session's background jobs: `list`, `kill <op>`, `detach <op>` (through the daemon
+    /// when it holds the session).
+    Jobs {
+        #[command(subcommand)]
+        sub: JobsVerb,
+        #[arg(long, value_name = "ID", global = true)]
+        session: Option<String>,
+        #[arg(long, global = true)]
+        json: bool,
+    },
     /// Copy a file or directory out of the session's sandbox (or ssh world) to the host;
     /// nothing on the host is overwritten.
     Export {
@@ -149,7 +159,8 @@ pub enum Verb {
         #[arg(long, value_name = "ID")]
         session: Option<String>,
     },
-    /// VM leases: what a session's machines may use, granted and revoked by the operator.
+    /// Operator leases: what a session's VM machines may use, or (`--jobs`) how many background
+    /// jobs it may run at once; granted and revoked by the operator.
     Lease {
         #[command(subcommand)]
         sub: LeaseVerb,
@@ -362,10 +373,14 @@ pub enum Verb {
 
 #[derive(Subcommand, Debug)]
 pub enum LeaseVerb {
-    /// The session's live VM lease.
+    /// The session's live VM lease and jobs lease.
     Status,
-    /// Grant the session a VM lease (logged as the operator).
+    /// Grant the session a VM lease, or with `--jobs <n>` a jobs lease (logged as the operator).
     Grant {
+        /// A jobs lease instead of a VM lease: up to this many background jobs at once until it
+        /// expires (replaces `jobs.max`); when it ends, running jobs are cancelled.
+        #[arg(long, value_name = "N", conflicts_with_all = ["machines", "disk", "cpu"])]
+        jobs: Option<u32>,
         /// Machines at once, the sandbox VM included.
         #[arg(long, default_value_t = 2)]
         machines: u32,
@@ -379,8 +394,12 @@ pub enum LeaseVerb {
         #[arg(long, default_value = "6h")]
         expires: String,
     },
-    /// End the session's lease now: its machines stop, no VM effect runs.
-    Revoke,
+    /// End the session's lease now: its machines stop, no VM effect runs. With `--jobs`, the jobs
+    /// lease: its running jobs are cancelled and `jobs.max` applies again.
+    Revoke {
+        #[arg(long)]
+        jobs: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -451,6 +470,28 @@ pub enum SandboxVerb {
         #[arg(long)]
         yes: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum JobsVerb {
+    /// Open jobs: running, or finished and waiting for delivery at the next turn.
+    List,
+    /// Cancel one running job; its cancelled outcome is delivered like any other.
+    Kill {
+        /// `op7` or `7`.
+        #[arg(value_parser = op_id)]
+        op: aho_types::OpId,
+    },
+    /// Move a call the running turn waits on into the background as a job.
+    Detach {
+        /// `op7` or `7`.
+        #[arg(value_parser = op_id)]
+        op: aho_types::OpId,
+    },
+}
+
+fn op_id(s: &str) -> Result<aho_types::OpId, String> {
+    s.strip_prefix("op").unwrap_or(s).parse().map(aho_types::OpId).map_err(|_| format!("`{s}` is not an operation id; write `op7` or `7`"))
 }
 
 #[derive(Subcommand, Debug)]

@@ -2,8 +2,9 @@
 //!
 //! * `Subprocess` / `Child` are the seam a world provides (`world-host`, `world-ns`, …).
 //! * `OpTable` is the operations manager the session owns: one row per started tool call, a
-//!   bounded output ring with cursors, `AHO_PROGRESS` / `AHO_CHECKPOINT` markers, `wait`, and
-//!   `cancel` that fires the op's token and kills an attached child's whole process group.
+//!   bounded output ring with cursors, `AHO_PROGRESS` / `AHO_CHECKPOINT` markers, `wait`,
+//!   `cancel` that fires the op's token and kills an attached child's whole process group, and
+//!   the ordered events of session jobs (finished, delivered) that `job_wait` returns on.
 //! * Crash-honest child receipts: every child attached to a live op is announced
 //!   through [`OpTable::on_attach`]; the session appends it as `Child/Spawned` ([`spawned`]) so
 //!   `aho gc` can reap it by `(pid, start_time)` once the owner that started it is gone.
@@ -274,6 +275,10 @@ pub struct OpInfo {
     pub status: Option<OpStatus>,
     pub started: Timestamp,
     pub identity: Option<ProcessIdentity>,
+    /// A session job (`OpDetached`): it no longer follows its turn's cancellation.
+    pub detached: bool,
+    /// A finished job whose outcome the session logged (`JobDelivered`).
+    pub delivered: bool,
 }
 
 /// The event `OpTable::wait` resolved on.
@@ -284,6 +289,15 @@ pub enum OpWait {
     /// Text after `AHO_CHECKPOINT`, trimmed (may be empty).
     Checkpoint(String),
     Done(OpStatus),
+}
+
+/// What happened to a job (a detached op), in table order ([`OpTable::next_job_event`]).
+#[derive(Clone, Debug, PartialEq)]
+pub enum JobEvent {
+    /// It finished; the session delivers the outcome at a request boundary.
+    Finished(OpStatus),
+    /// The session logged its outcome (`JobDelivered`).
+    Delivered,
 }
 
 /// One cursor read of an op's output.
@@ -312,12 +326,46 @@ struct OpEntry {
 /// the table's lock is released, so the hook may read the table.
 pub type AttachHook = Arc<dyn Fn(&OpInfo) + Send + Sync>;
 
-#[derive(Default)]
 struct Ops {
     next: u64,
     ops: BTreeMap<OpId, OpEntry>,
     by_call: BTreeMap<CallId, OpId>,
     on_attach: Option<AttachHook>,
+    /// Every job event so far; `job_tx` counts them.
+    job_events: Vec<(OpId, JobEvent)>,
+    job_tx: watch::Sender<u64>,
+}
+
+impl Default for Ops {
+    fn default() -> Ops {
+        Ops {
+            next: 0,
+            ops: BTreeMap::new(),
+            by_call: BTreeMap::new(),
+            on_attach: None,
+            job_events: Vec::new(),
+            job_tx: watch::channel(0).0,
+        }
+    }
+}
+
+impl Ops {
+    fn job_event(&mut self, op: OpId, ev: JobEvent) {
+        self.job_events.push((op, ev));
+        self.job_tx.send_modify(|n| *n += 1);
+    }
+
+    /// The first job event at or after `*at` about an op other than `skip`; `*at` moves past
+    /// every event looked at.
+    fn job_event_after(&self, at: &mut usize, skip: Option<OpId>) -> Option<(usize, OpId, JobEvent)> {
+        while let Some((op, ev)) = self.job_events.get(*at) {
+            *at += 1;
+            if Some(*op) != skip {
+                return Some((*at, *op, ev.clone()));
+            }
+        }
+        None
+    }
 }
 
 /// The session's operations manager. Cheap to clone; all clones share one table.
@@ -347,7 +395,17 @@ impl OpTable {
         let op = OpId(g.next);
         let cancel = CancelToken::new();
         let (tx, _) = watch::channel(0u64);
-        let info = OpInfo { op, call: call.clone(), tool: tool.to_string(), kind, status: None, started: Timestamp::now(), identity: None };
+        let info = OpInfo {
+            op,
+            call: call.clone(),
+            tool: tool.to_string(),
+            kind,
+            status: None,
+            started: Timestamp::now(),
+            identity: None,
+            detached: false,
+            delivered: false,
+        };
         g.ops.insert(
             op,
             OpEntry {
@@ -366,8 +424,19 @@ impl OpTable {
         (op, cancel)
     }
 
+    /// Later ids start after `op`: a resumed log already holds ids up to it, and a new op must
+    /// never reuse one (a job left open across a restart keeps its id).
+    pub fn advance_past(&self, op: OpId) {
+        let mut g = self.lock();
+        g.next = g.next.max(op.0);
+    }
+
     pub fn op_for_call(&self, call: &CallId) -> Option<OpId> {
         self.lock().by_call.get(call).copied()
+    }
+
+    pub fn is_detached(&self, op: OpId) -> bool {
+        self.lock().ops.get(&op).is_some_and(|e| e.info.detached)
     }
 
     /// `(rerunnable, external_effect)` as registered: what resume folds on.
@@ -431,16 +500,74 @@ impl OpTable {
         }
     }
 
-    /// Terminal status; the first one wins. Wakes every waiter.
-    pub fn finish(&self, op: OpId, status: OpStatus) {
+    /// Terminal status; the first one wins. Wakes every waiter (and, for a job, every
+    /// [`next_job_event`](OpTable::next_job_event)). Returns whether the op was detached when it
+    /// finished: the session delivers a job's outcome, not its call's result.
+    pub fn finish(&self, op: OpId, status: OpStatus) -> bool {
         let mut g = self.lock();
-        let Some(e) = g.ops.get_mut(&op) else { return };
+        let Some(e) = g.ops.get_mut(&op) else { return false };
         if e.info.status.is_some() {
-            return;
+            return e.info.detached;
         }
+        let detached = e.info.detached;
+        let event = detached.then(|| JobEvent::Finished(status.clone()));
         e.info.status = Some(status);
         e.child = None;
         e.tx.send_modify(|n| *n += 1);
+        if let Some(ev) = event {
+            g.job_event(op, ev);
+        }
+        detached
+    }
+
+    /// The session logged a finished job's outcome (`JobDelivered`). `false` unless `op` is a
+    /// finished job not marked yet.
+    pub fn delivered(&self, op: OpId) -> bool {
+        let mut g = self.lock();
+        match g.ops.get_mut(&op) {
+            Some(e) if e.info.detached && e.info.status.is_some() && !e.info.delivered => e.info.delivered = true,
+            _ => return false,
+        }
+        g.job_event(op, JobEvent::Delivered);
+        true
+    }
+
+    /// The number of job events so far: the cursor a later
+    /// [`next_job_event`](OpTable::next_job_event) starts from to see only what happens next.
+    pub fn job_cursor(&self) -> usize {
+        self.lock().job_events.len()
+    }
+
+    /// Resolves on the first job event at or after `cursor` about an op other than `skip`, with
+    /// the cursor past it. Pending until one happens: race it against a deadline.
+    pub fn next_job_event(&self, cursor: usize, skip: Option<OpId>) -> BoxFuture<'static, (usize, OpId, JobEvent)> {
+        let table = self.clone();
+        Box::pin(async move {
+            let mut rx = table.lock().job_tx.subscribe();
+            let mut at = cursor;
+            loop {
+                if let Some(hit) = table.lock().job_event_after(&mut at, skip) {
+                    return hit;
+                }
+                if rx.changed().await.is_err() {
+                    // Unreachable while `table` (holding the sender) lives; never spin.
+                    std::future::pending::<()>().await;
+                }
+            }
+        })
+    }
+
+    /// Marks a running op detached. `false` if it is unknown, already finished or already
+    /// detached: whichever of `finish` and `detach` takes the table's lock first decides.
+    pub fn detach(&self, op: OpId) -> bool {
+        let mut g = self.lock();
+        match g.ops.get_mut(&op) {
+            Some(e) if e.info.status.is_none() && !e.info.detached => {
+                e.info.detached = true;
+                true
+            }
+            _ => false,
+        }
     }
 
     /// `None` = no such op; `Some(None)` = running.

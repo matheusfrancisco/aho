@@ -65,6 +65,7 @@ pub async fn tui(ctx: &Ctx, session: Option<&str>, headless: bool, fullscreen: b
     };
     let ran = surface_tui::run(o.session.clone(), approvals, p, commands, options).await;
     stop_drivers(o.drivers).await;
+    crate::boot::stop_jobs(&o.session);
     ran.map_err(err)?;
     println!("session {} · {}  (resume: aho tui --session {})", hex(o.id), o.path.display(), &hex(o.id)[..12.min(hex(o.id).len())]);
     Ok(())
@@ -111,6 +112,7 @@ pub async fn web(
         _ = tokio::signal::ctrl_c() => Ok(()),
     };
     stop_drivers(o.drivers).await;
+    crate::boot::stop_jobs(&o.session);
     served.map_err(err)
 }
 
@@ -187,6 +189,7 @@ pub async fn webhook(ctx: &Ctx, session: Option<&str>, insecure_loopback: bool) 
         _ = tokio::signal::ctrl_c() => Ok(()),
     };
     stop_drivers(o.drivers).await;
+    crate::boot::stop_jobs(&o.session);
     served.map_err(err)
 }
 

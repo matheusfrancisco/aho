@@ -77,7 +77,7 @@ impl Session {
         if self.pre_execute(&self.view(call, &name, decl.class, args, by.clone())) != PreDecision::Allow {
             return None;
         }
-        Some(self.spawn_exec(decl, name, exec, call.clone(), args.clone(), by, vec![]))
+        Some(self.spawn_exec(decl, name, exec, call.clone(), args.clone(), by, vec![], false))
     }
 
     pub(crate) fn pre_execute(&self, view: &ExecView) -> PreDecision {
@@ -112,7 +112,9 @@ impl Session {
             self.append(by.clone(), EntryKind::ToolCall { call: call.clone(), tool: name.clone(), args: args.clone(), class: decl.class })?;
             if let Some(s) = early.remove(&call) {
                 self.log_op_started(&s, decl)?;
-                since_barrier.push(s.done);
+                if !self.detach_at_start(decl, &name, s.op, &args)? {
+                    since_barrier.push(s.done);
+                }
                 continue;
             }
             let outcome = self.review(decl, &name, &call, &args, &by);
@@ -150,8 +152,12 @@ impl Session {
             let exclusive = (decl.concurrency)(&args) == aho_cap::Concurrency::Exclusive;
             let deps: Vec<watch::Receiver<bool>> =
                 if exclusive { barrier.iter().chain(since_barrier.iter()).cloned().collect() } else { barrier.clone() };
-            let s = self.spawn_exec(decl, name, exec, call.clone(), args.clone(), by.clone(), deps);
+            let s = self.spawn_exec(decl, name.clone(), exec, call.clone(), args.clone(), by.clone(), deps, false);
             self.log_op_started(&s, decl)?;
+            // a job started in the background holds back no sibling call
+            if self.detach_at_start(decl, &name, s.op, &args)? {
+                continue;
+            }
             if exclusive {
                 barrier = vec![s.done];
                 since_barrier.clear();
@@ -296,8 +302,18 @@ impl Session {
         outcome
     }
 
-    /// `None` = approved; else the outcome the program gets instead of running the call.
+    /// `None` = approved; else the outcome the program gets instead of running the call. A job
+    /// cannot ask: it runs outside any turn the approval would belong to.
     async fn nested_approval(&self, decl: &ToolDecl, name: &str, parent: &CallId, args: &Value, o: &ChainOutcome) -> Option<ExecOutcome> {
+        if let Some(op) = self.ops.op_for_call(parent).filter(|op| self.ops.is_detached(*op)) {
+            return Some(ExecOutcome::err(
+                "JOB_CANNOT_ASK",
+                format!(
+                    "`{name}` needs the operator's approval, and background job {} cannot ask for it; the call did not run. Run it in the foreground, or ask the operator to widen the policy first.",
+                    op.0
+                ),
+            ));
+        }
         match self.ask_operator(decl, name, parent, args, o).await {
             Ok(None) => None,
             Ok(Some(refused)) => Some(ExecOutcome::err("APPROVAL", aho_policy::render_outcome(refused, name))),
@@ -305,6 +321,8 @@ impl Session {
         }
     }
 
+    /// Starts `exec` as an op. `detached`: a job from the start (recovery re-dispatch), so its
+    /// outcome can never reach the turn's result channel.
     #[allow(clippy::too_many_arguments)] // one call site per dispatch path; a struct would only rename the list
     pub(crate) fn spawn_exec(
         self: &Arc<Self>,
@@ -315,8 +333,13 @@ impl Session {
         args: Value,
         by: Principal,
         deps: Vec<watch::Receiver<bool>>,
+        detached: bool,
     ) -> Started {
+        let args = self.exec_args(decl, &name, args);
         let (op, cancel) = self.ops.register(call.clone(), &name, decl.op_kind, decl.rerunnable, decl.external_effect);
+        if detached {
+            self.ops.detach(op);
+        }
         let turn_token = lk(&self.turn_cancel).clone();
         let (done_tx, done_rx) = watch::channel(false);
         let me = self.clone();
@@ -330,7 +353,8 @@ impl Session {
                 let _ = d.wait_for(|x| *x).await;
             }
             let _permit = sem.acquire_owned().await;
-            let outcome = if cancel.is_cancelled() || turn_token.is_cancelled() {
+            // A job no longer follows its turn's token: only its own (abort All/Op, rewind) stops it.
+            let outcome = if cancel.is_cancelled() || (turn_token.is_cancelled() && !ops.is_detached(op)) {
                 ExecOutcome::Cancelled
             } else {
                 let child = cancel.clone();
@@ -342,7 +366,7 @@ impl Session {
                         o = &mut fut => break o,
                         _ = tokio::time::sleep(Duration::from_millis(50)) => {
                             for line in progress.drain() { ops.progress(op, line); }
-                            if tt.is_cancelled() && !child.is_cancelled() { child.cancel(); }
+                            if tt.is_cancelled() && !child.is_cancelled() && !ops.is_detached(op) { child.cancel(); }
                         }
                     }
                 }
@@ -363,7 +387,15 @@ impl Session {
                     }
                 }
             }
-            let _ = me.results_tx.send(Finished { call: call2, op, outcome, post_context });
+            let status = me.status_of(op, &outcome);
+            let f = Finished { call: call2, op, outcome, post_context, status: status.clone() };
+            // The table decides atomically against `detach`: a job's outcome waits for a request
+            // boundary; a turn op's goes to the driver as the call's result.
+            if ops.finish(op, status) {
+                me.job_finished(f);
+            } else {
+                let _ = me.results_tx.send(f);
+            }
             let _ = done_tx.send(true);
         });
         Started { op, done: done_rx }
@@ -378,12 +410,11 @@ impl Session {
         Ok(())
     }
 
-    /// Urgent input (point C): calls not yet started are skipped with a synthetic result.
-    /// Urgent input (point C): calls whose ops have not started are cancelled; each yields a
-    /// synthetic `Cancelled` result when its task observes the token.
+    /// Urgent input (point C): turn calls whose ops have not started are cancelled; each yields a
+    /// synthetic `Cancelled` result when its task observes the token. Jobs are never skipped.
     pub(crate) fn skip_unstarted(&self) {
         for info in self.ops.list() {
-            if info.status.is_none() && info.identity.is_none() {
+            if info.status.is_none() && info.identity.is_none() && !info.detached {
                 self.ops.cancel(info.op);
             }
         }
@@ -398,25 +429,47 @@ impl Session {
         Ok(())
     }
 
+    /// A turn op's outcome as its call's `ToolResult`, or a job's as `JobDelivered` (the driver
+    /// calls this for jobs at request boundaries only); then the tool's events and `OpDone`.
     pub(crate) async fn record_result(&self, f: Finished) -> Result<(), SessionError> {
         let state = self.fold()?;
         let (tool, class) = state.calls.get(&f.call).map(|c| (c.0.clone(), c.1)).unwrap_or_default_pair();
         let late = state.last_request_after_call(&f.call);
         let decl = self.lookup(&tool).map(|(d, _, _)| d);
-        let (outcome, value, content, meta) = split_outcome(f.outcome.clone());
-        let (content, spill_ref) = self.spill(&tool, content, decl.and_then(|d| d.max_inline));
-        let status = match &f.outcome {
-            ExecOutcome::Done { .. } => OpStatus::Completed { code: 0 },
-            ExecOutcome::Err { reason, .. } => OpStatus::Failed { err: reason.clone() },
-            ExecOutcome::Cancelled => OpStatus::Cancelled { reason: CancelReason::Aborted },
+        let status = f.status;
+        let outcome = match (&status, f.outcome) {
+            // Operator input stopped an `Interrupt::Cancel` op: a plain result, not an error.
+            (OpStatus::Cancelled { reason: CancelReason::UserInterrupted }, ExecOutcome::Cancelled) => {
+                ExecOutcome::text(jobs::template("interrupted"))
+            }
+            (_, o) => o,
         };
-        self.ops.finish(f.op, status.clone());
-        if state.open_calls.contains(&f.call) {
-            let events = tool_events(&value);
+        let (mut outcome, value, content, meta) = split_outcome(outcome);
+        if let (ToolOutcome::Cancelled { reason }, OpStatus::Cancelled { reason: why }) = (&mut outcome, &status) {
+            *reason = *why;
+        }
+        let job = state.jobs.get(&f.op).is_some_and(|j| j.delivered.is_none());
+        // A job shows what the delivery chain decided (`delivery.rs`), spilled like any result.
+        let content = if job { lk(&self.jobs).decided.remove(&f.op).unwrap_or(content) } else { content };
+        let (content, spill_ref) = self.spill(&tool, content, decl.and_then(|d| d.max_inline));
+        let events = tool_events(&value);
+        let shown = if job {
+            self.append(
+                Principal::system("jobs"),
+                EntryKind::JobDelivered { op: f.op, call: f.call.clone(), tool: tool.clone(), status: status.clone(), content, spill_ref },
+            )?;
+            self.ops.delivered(f.op);
+            true
+        } else if state.open_calls.contains(&f.call) {
             self.append(
                 Principal::system("tool"),
                 EntryKind::ToolResult { call: f.call.clone(), outcome, value, content, spill_ref, meta, late },
             )?;
+            true
+        } else {
+            false
+        };
+        if shown {
             for kind in events {
                 self.append(Principal::system(&tool), kind)?;
             }
@@ -424,7 +477,8 @@ impl Session {
         if state.open_ops.contains_key(&f.op) {
             self.append(Principal::system("ops"), EntryKind::OpDone { op: f.op, status })?;
         }
-        for c in f.post_context {
+        let note = lk(&self.job_notes).remove(&f.op);
+        for c in f.post_context.into_iter().chain(note) {
             self.append(Principal::system("post-execute"), EntryKind::UserMessage { form: Form::Notice, text: c, client_key: None })?;
         }
         self.run_hooks(HookEvent::ToolPost, serde_json::json!({ "tool": tool, "call": f.call.0 })).await;
@@ -450,7 +504,7 @@ impl Session {
         let hash = Hash::of(text.as_bytes());
         let path = self.cfg.spill_dir.join(format!("{}.txt", hash.to_hex()));
         if let Err(e) = std::fs::create_dir_all(&self.cfg.spill_dir).and_then(|_| std::fs::write(&path, &text)) {
-            let _ = self.events.send(SessionEvent::Error(format!("spill failed ({e}); keeping {tool} output inline")));
+            self.emit(SessionEvent::Error(format!("spill failed ({e}); keeping {tool} output inline")));
             return (content, None);
         }
         let half = limit / 2;
@@ -541,7 +595,7 @@ impl Approval for LoggedApproval {
 }
 
 pub(crate) struct Started {
-    op: OpId,
+    pub(crate) op: OpId,
     done: watch::Receiver<bool>,
 }
 

@@ -97,6 +97,10 @@ declare_capability!(
     doc = "Shell commands in the bound world, with the blast-radius classifier as the tool's own check. `caps.tool-bash.shell` selects the shell: `bash` (POSIX /bin/sh, the default) or `pwsh` (PowerShell 7; Locked until `pwsh` is on PATH). The classifier understands POSIX shells only, so under pwsh every command is held at the most conservative level: Catastrophic matches are denied and every other command asks the operator (a justification does not skip the ask)."
 );
 
+/// `bash` may run as a session job (`background: true`, `jobs.detach.bash`); `bash_persistent`
+/// never does: its calls share one shell behind a lock, so a backgrounded command would hold the
+/// shell and every later `bash_persistent` call would wait on the job, with its `cd`/`export`
+/// landing at an unpredictable point in the sequence.
 pub static TOOLS: &[ToolDecl] = &[
     ToolDecl::new(
         "bash",
@@ -106,6 +110,7 @@ pub static TOOLS: &[ToolDecl] = &[
     .schema(schema_bash)
     .check(check_command)
     .op(OpKind::Process, false, true)
+    .detachable()
     .present(PRESENT),
     ToolDecl::new(
         "bash_persistent",
@@ -286,7 +291,9 @@ enum Ended {
 }
 
 /// Pump `child` output into `lines` until it is done (or the sentinel arrived), the call is
-/// cancelled, or `deadline` passes. Returns the next cursor.
+/// cancelled, or `deadline` passes. Returns the next cursor. A cancel is checked first: cancelling
+/// an op (`job_kill`, an abort) kills its process group too, and the exit that kill causes must
+/// still read as a cancel, not as the command's own end.
 async fn pump(
     child: &dyn Child,
     mut cursor: u64,
@@ -298,15 +305,15 @@ async fn pump(
         let (bytes, next, done) = child.output(cursor);
         cursor = next;
         lines.feed(&bytes);
+        if cancel.is_cancelled() {
+            return (Ended::Cancelled, cursor);
+        }
         if lines.status.is_some() {
             return (Ended::Complete, cursor);
         }
         if done {
             lines.finish();
             return (Ended::Complete, cursor);
-        }
-        if cancel.is_cancelled() {
-            return (Ended::Cancelled, cursor);
         }
         if tokio::time::Instant::now() >= deadline {
             return (Ended::TimedOut, cursor);

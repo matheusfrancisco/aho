@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::frames::{Frame as Captured, Probe, buffer_lines};
+use crate::jobs;
 use crate::markdown;
 use crate::menu::{self, MENU_ROWS, VIEWS};
 use crate::model::{
@@ -67,20 +68,30 @@ pub fn render_frame_json(ui: &UiState, w: u16, h: u16) -> Value {
         "anomalies": frame.anomalies,
         "overlay": front(ui),
         "menu": menu::open(ui).map(|(items, sel)| json!({"selected": sel, "items": items.iter().map(|s| s.label.clone()).collect::<Vec<_>>()})),
+        "jobs": jobs::panel_json(ui, Timestamp::now()),
     })
 }
 
 // ───────────────────────────── layout ─────────────────────────────
 
-/// Rows below the transcript: the prompt box, the menu, the hint row.
-fn chrome_heights(ui: &UiState, width: u16) -> (u16, u16, u16) {
+/// Rows below the transcript: the jobs panel, the prompt box, the menu, the hint row.
+fn chrome_heights(ui: &UiState, width: u16) -> [u16; 4] {
     let notice = ui.notice.as_ref().map_or(1, |n| wrap(&n.text, (width as usize).saturating_sub(1)).len().clamp(1, NOTICE_MAX));
-    (3, menu::height(ui), notice as u16)
+    [jobs::panel_height(ui), 3, menu::height(ui), notice as u16]
 }
 
-fn split_bottom(ui: &UiState, area: Rect) -> (Rect, Rect, Rect, Rect) {
-    let (input_h, menu_h, footer_h) = chrome_heights(ui, area.width);
-    let chrome = (input_h + menu_h + footer_h).min(area.height);
+/// The transcript area, then the chrome under it top to bottom.
+struct Bottom {
+    top: Rect,
+    jobs: Rect,
+    input: Rect,
+    menu: Rect,
+    footer: Rect,
+}
+
+fn split_bottom(ui: &UiState, area: Rect) -> Bottom {
+    let [jobs_h, input_h, menu_h, footer_h] = chrome_heights(ui, area.width);
+    let chrome = (jobs_h + input_h + menu_h + footer_h).min(area.height);
     let top = Rect { height: area.height - chrome, ..area };
     let mut y = area.y + top.height;
     let mut take = |h: u16| {
@@ -88,10 +99,11 @@ fn split_bottom(ui: &UiState, area: Rect) -> (Rect, Rect, Rect, Rect) {
         y += r.height;
         r
     };
+    let jobs = take(jobs_h);
     let input = take(input_h);
     let menu = take(menu_h);
     let footer = take(footer_h);
-    (top, input, menu, footer)
+    Bottom { top, jobs, input, menu, footer }
 }
 
 /// Draws the whole screen; returns the terminal cursor position (in the prompt) if it should show.
@@ -100,10 +112,11 @@ pub fn draw(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Op
         area.width >= MIN_WIDTH && area.height >= MIN_HEIGHT,
         format!("terminal is {}x{}, smaller than {MIN_WIDTH}x{MIN_HEIGHT}; panes are clipped", area.width, area.height),
     );
-    let (top, input, menu_area, footer) = split_bottom(ui, area);
+    let b = split_bottom(ui, area);
+    let top = b.top;
     probe.area("transcript", top);
     draw_transcript(ui, top, buf);
-    let cursor = draw_chrome(ui, input, menu_area, footer, buf, probe);
+    let cursor = draw_chrome(ui, &b, buf, probe);
     // Only the top overlay shows; the ones under it come back as it closes.
     match ui.overlays.last() {
         Some(Overlay::Panel(p)) => draw_panel(ui, p, top, buf, probe),
@@ -124,22 +137,22 @@ pub fn draw(ui: &UiState, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Op
 /// Inline: the live part of the transcript (blocks from `from` on, plus the stream) above the
 /// prompt, sized to what it holds. Everything before `from` is already in the scrollback.
 pub fn draw_inline(ui: &UiState, from: usize, area: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
-    let (top, input, menu_area, footer) = split_bottom(ui, area);
-    let rows = live_rows(ui, from, top.width as usize);
-    probe.area("live", top);
-    let skip = rows.len().saturating_sub(top.height as usize);
+    let b = split_bottom(ui, area);
+    let rows = live_rows(ui, from, b.top.width as usize);
+    probe.area("live", b.top);
+    let skip = rows.len().saturating_sub(b.top.height as usize);
     for (y, line) in rows.iter().skip(skip).enumerate() {
-        set_row(buf, top, y as u16, line);
+        set_row(buf, b.top, y as u16, line);
     }
-    draw_chrome(ui, input, menu_area, footer, buf, probe)
+    draw_chrome(ui, &b, buf, probe)
 }
 
 /// The inline viewport height for the current state: the prompt chrome plus the live rows,
 /// within `max` (a live part taller than that shows its tail).
 pub fn inline_height(ui: &UiState, from: usize, width: u16, max: u16) -> u16 {
-    let (a, b, c) = chrome_heights(ui, width);
+    let chrome: u16 = chrome_heights(ui, width).iter().sum();
     let live = u16::try_from(live_rows(ui, from, width as usize).len()).unwrap_or(u16::MAX);
-    (a + b + c).saturating_add(live).min(max)
+    chrome.saturating_add(live).min(max)
 }
 
 fn set_row(buf: &mut Buffer, area: Rect, y: u16, line: &Line<'_>) {
@@ -365,15 +378,21 @@ fn draw_transcript(ui: &UiState, area: Rect, buf: &mut Buffer) {
 
 // ───────────────────────────── prompt, menu, hints ─────────────────────────────
 
-fn draw_chrome(ui: &UiState, input: Rect, menu_area: Rect, footer: Rect, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
-    probe.area("input", input);
-    let cursor = draw_input(ui, input, buf, probe);
-    if menu_area.height > 0 {
-        probe.area("menu", menu_area);
-        draw_menu(ui, menu_area, buf);
+fn draw_chrome(ui: &UiState, b: &Bottom, buf: &mut Buffer, probe: &mut Probe) -> Option<(u16, u16)> {
+    if b.jobs.height > 0 {
+        probe.area("jobs", b.jobs);
+        for (y, line) in jobs::panel_lines(ui, b.jobs.width as usize, Timestamp::now()).iter().enumerate() {
+            set_row(buf, b.jobs, y as u16, line);
+        }
     }
-    probe.area("footer", footer);
-    draw_footer(ui, footer, buf);
+    probe.area("input", b.input);
+    let cursor = draw_input(ui, b.input, buf, probe);
+    if b.menu.height > 0 {
+        probe.area("menu", b.menu);
+        draw_menu(ui, b.menu, buf);
+    }
+    probe.area("footer", b.footer);
+    draw_footer(ui, b.footer, buf);
     cursor
 }
 
@@ -585,23 +604,24 @@ fn draw_footer(ui: &UiState, area: Rect, buf: &mut Buffer) {
         }
         return;
     }
-    let keys: &[(&str, &str)] = if ui.approval.is_some() {
-        &[("a", "allow"), ("s", "session"), ("r", "reject"), ("esc", "cancel")]
+    let (turn, all) = (ui.local.keys.abort_turn.label(), ui.local.keys.abort_all.label());
+    let keys: Vec<(&str, &str)> = if ui.approval.is_some() {
+        vec![("a", "allow"), ("s", "session"), ("r", "reject"), ("esc", "cancel")]
     } else if !ui.overlays.is_empty() {
-        &[("esc", "close"), ("↑↓", "move"), ("enter", "choose"), ("ctrl-q", "quit")]
+        vec![("esc", "close"), ("↑↓", "move"), ("enter", "choose"), ("ctrl-q", "quit")]
     } else if menu::open(ui).is_some() {
-        &[("↑↓", "select"), ("tab", "complete"), ("enter", "run"), ("esc", "close")]
+        vec![("↑↓", "select"), ("tab", "complete"), ("enter", "run"), ("esc", "close")]
     } else if ui.is_busy() {
-        &[("enter", "steer"), ("alt-enter", "urgent steer"), ("ctrl-c", "abort"), ("/", "commands")]
+        vec![("enter", "steer"), ("alt-enter", "urgent steer"), (&turn, "abort turn"), (&all, "abort all"), ("/", "commands")]
     } else {
-        &[("enter", "send"), ("/", "commands"), ("alt-h", "HUD"), ("ctrl-c", "abort"), ("ctrl-q", "quit")]
+        vec![("enter", "send"), ("/", "commands"), ("alt-h", "HUD"), (&all, "abort all"), ("ctrl-q", "quit")]
     };
     let mut spans = vec![Span::raw(" ")];
     for (i, (k, what)) in keys.iter().enumerate() {
         if i > 0 {
             spans.push(Span::styled(" · ", t.dim));
         }
-        spans.push(Span::styled(*k, t.muted.add_modifier(Modifier::BOLD)));
+        spans.push(Span::styled(k.to_string(), t.muted.add_modifier(Modifier::BOLD)));
         spans.push(Span::styled(format!(" {what}"), t.dim));
     }
     set_row(buf, area, 0, &Line::from(spans));
@@ -685,18 +705,20 @@ fn help_rows(ui: &UiState, width: usize) -> Vec<Line<'static>> {
         }
     }
     section(&mut out, "keys");
+    let keys = &ui.local.keys;
     for (k, what) in [
-        ("enter", "send the prompt (steer while a turn runs)"),
-        ("alt-enter", "urgent steer"),
-        ("/  tab  ↑↓", "open, complete and move in the command menu"),
-        ("esc", "close the menu or the panel in front"),
-        ("ctrl-c", "abort the running turn"),
-        ("ctrl-a ctrl-e ctrl-u ctrl-w", "line editing"),
-        ("alt-h", "HUD: entry ids and origins"),
-        ("ctrl-q / ctrl-d", "quit"),
-        ("//text", "send a prompt that starts with /"),
+        ("enter".to_string(), "send the prompt (steer while a turn runs)"),
+        ("alt-enter".into(), "urgent steer"),
+        ("/  tab  ↑↓".into(), "open, complete and move in the command menu"),
+        ("esc".into(), "close the menu or the panel in front"),
+        (keys.abort_turn.label(), "abort the running turn; background jobs keep running"),
+        (keys.abort_all.label(), "abort the turn and every background job"),
+        ("ctrl-a ctrl-e ctrl-u ctrl-w".into(), "line editing"),
+        ("alt-h".into(), "HUD: entry ids and origins"),
+        ("ctrl-q / ctrl-d".into(), "quit"),
+        ("//text".into(), "send a prompt that starts with /"),
     ] {
-        row(&mut out, k.to_string(), what);
+        row(&mut out, k, what);
     }
     out
 }
@@ -750,7 +772,9 @@ fn panel_rows(ui: &UiState, p: &Panel, width: usize) -> Vec<Line<'static>> {
                     Some(OpStatus::Cancelled { reason }) => (format!("⊘ {reason:?}").to_lowercase(), t.dim),
                     Some(OpStatus::Uncertain { .. }) => ("? uncertain".to_string(), t.info),
                 };
-                let head = format!("op{} {} ", j.op.0, j.tool);
+                // `turn`: cancelled with its turn; `job`: detached, outlives it.
+                let scope = if j.detached { "job " } else { "turn" };
+                let head = format!("op{} {scope} {} ", j.op.0, j.tool);
                 let rest = width.saturating_sub(UnicodeWidthStr::width(head.as_str()));
                 out.push(Line::from(vec![Span::styled(head, t.text), Span::styled(trunc(&status, rest), style)]));
             }

@@ -174,6 +174,23 @@ pub enum EntryKind {
         op: OpId,
         status: OpStatus,
     },
+    /// A running op left its turn and became a session job; the session appends the call's
+    /// `ToolResult` (a mechanical "running as job" line) right after this entry.
+    OpDetached {
+        op: OpId,
+        call: CallId,
+        cause: DetachCause,
+    },
+    /// A finished job's outcome, appended at a request boundary (never between a call and its
+    /// result) or at the next turn's start; its `OpDone` follows.
+    JobDelivered {
+        op: OpId,
+        call: CallId,
+        tool: String,
+        status: OpStatus,
+        content: Vec<ContentBlock>,
+        spill_ref: Option<Hash>,
+    },
 
     // ── compaction ──
     SurfaceReplace {
@@ -325,6 +342,8 @@ impl EntryKind {
             ToolResult,
             OpStarted,
             OpDone,
+            OpDetached,
+            JobDelivered,
             SurfaceReplace,
             CompactionStart,
             CompactionEnd,
@@ -415,6 +434,25 @@ pub enum CancelReason {
     UserInterrupted,
     Rewind,
     Reload,
+    /// A forked child closes the jobs it inherited: a fork never inherits live jobs.
+    Fork,
+    /// The operator's jobs lease (`LeaseGranted`, subject `jobs:`) expired or was revoked while
+    /// the job ran.
+    LeaseExpired,
+}
+
+/// What detached a running op (`OpDetached.cause`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "cause", content = "ms", rename_all = "snake_case")]
+pub enum DetachCause {
+    /// At start: the model passed `background: true`, or `jobs.detach.<tool> = always`.
+    Requested,
+    /// `jobs.detach.<tool> = after:<dur>` fired after this many ms.
+    After(u64),
+    /// The operator (`Session::detach`).
+    Operator,
+    /// A model action on a running op.
+    Model,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -548,6 +586,22 @@ pub enum Item {
     },
     /// A request was made here (`RequestHeader`) or a turn began; results after it are late.
     Boundary,
+    /// A finished job's outcome (`JobDelivered`), shown as a user-side notice at its own position.
+    Job {
+        op: OpId,
+        tool: String,
+        status: OpStatus,
+        content: Vec<ContentBlock>,
+    },
+}
+
+/// A detached op (`OpDetached`) that has no `OpDone` yet.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Job {
+    pub call: CallId,
+    pub cause: DetachCause,
+    /// Its `JobDelivered` status once logged; only the `OpDone` is missing then.
+    pub delivered: Option<OpStatus>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -561,6 +615,8 @@ pub struct State {
     pub calls: BTreeMap<CallId, (String, Consequence, Value)>,
     pub open_calls: Vec<CallId>,
     pub open_ops: BTreeMap<OpId, (CallId, bool, bool)>,
+    /// The subset of `open_ops` that are session jobs: the turn does not wait on them.
+    pub jobs: BTreeMap<OpId, Job>,
     pub op_status: BTreeMap<OpId, OpStatus>,
     pub turn: Option<TurnId>,
     pub turns: u64,
@@ -690,7 +746,24 @@ pub fn step(mut s: State, e: &Entry, custom: &CustomFolds) -> Result<State, LogE
             if s.open_ops.remove(op).is_none() {
                 return Err(inv("op.done_matches_started", e.id, format!("op {}", op.0)));
             }
+            s.jobs.remove(op);
             s.op_status.insert(*op, status.clone());
+        }
+        EntryKind::OpDetached { op, call, cause } => {
+            if s.open_ops.get(op).map(|o| &o.0) != Some(call) {
+                return Err(inv("op.detach_matches_started", e.id, format!("op {} call {}", op.0, call.0)));
+            }
+            if s.jobs.contains_key(op) {
+                return Err(inv("job.detach_once", e.id, format!("op {}", op.0)));
+            }
+            s.jobs.insert(*op, Job { call: call.clone(), cause: *cause, delivered: None });
+        }
+        EntryKind::JobDelivered { op, tool, status, content, .. } => {
+            match s.jobs.get_mut(op) {
+                Some(j) if j.delivered.is_none() => j.delivered = Some(status.clone()),
+                _ => return Err(inv("job.delivered_matches_detached", e.id, format!("op {}", op.0))),
+            }
+            s.items.push((e.id, Item::Job { op: *op, tool: tool.clone(), status: status.clone(), content: content.clone() }));
         }
         EntryKind::SurfaceReplace { start, end, summary, .. } => {
             let splits = s.items.iter().any(|(id, it)| {
@@ -808,6 +881,10 @@ pub fn derive_messages(state: &State) -> Vec<Message> {
                 out.push(Message { role: Role::User, content: blocks });
             }
             Item::Boundary => i += 1,
+            Item::Job { op, tool, status, content } => {
+                out.push(job_notice(*op, tool, status, content));
+                i += 1;
+            }
             Item::Result { call, tool, content, is_error } => {
                 if !answered.contains(call) {
                     // late result: a second result for a call that showed a placeholder
@@ -822,13 +899,33 @@ pub fn derive_messages(state: &State) -> Vec<Message> {
 }
 
 fn result_block(call: &CallId, tool: &str, content: &[ContentBlock], is_error: bool) -> ContentBlock {
-    // 3. empty-output marker
-    let content = if content.iter().all(|b| b.as_text().map(|t| t.trim().is_empty()).unwrap_or(false)) {
+    ContentBlock::ToolResult { id: call.clone(), content: shown(tool, content), is_error }
+}
+
+/// 3. empty-output marker
+fn shown(tool: &str, content: &[ContentBlock]) -> Vec<ContentBlock> {
+    if content.iter().all(|b| b.as_text().map(|t| t.trim().is_empty()).unwrap_or(false)) {
         vec![ContentBlock::text(format!("({tool} completed with no output)"))]
     } else {
         content.to_vec()
+    }
+}
+
+/// `prompts/job-delivered.md`: the header line of a delivered job's notice.
+const JOB_DELIVERED: &str = include_str!("../prompts/job-delivered.md");
+
+/// A delivered job as a user-side message: the header line, then the job's own content.
+fn job_notice(op: OpId, tool: &str, status: &OpStatus, content: &[ContentBlock]) -> Message {
+    let word = match status {
+        OpStatus::Completed { .. } => "completed",
+        OpStatus::Failed { .. } => "failed",
+        OpStatus::Cancelled { .. } => "cancelled",
+        OpStatus::Uncertain { .. } => "uncertain",
     };
-    ContentBlock::ToolResult { id: call.clone(), content, is_error }
+    let header = JOB_DELIVERED.trim_end().replace("{op}", &op.0.to_string()).replace("{tool}", tool).replace("{status}", word);
+    let mut blocks = vec![ContentBlock::text(header)];
+    blocks.extend(shown(tool, content));
+    Message { role: Role::User, content: blocks }
 }
 
 /// Hash of a frozen request's message list; recorded in `RequestHeader.request_hash` for replay equality.

@@ -13,7 +13,8 @@ use aho_policy::{ApprovalCard, DecisionReason};
 use aho_types::*;
 use serde_json::{Value, json};
 use surface_rpc::wire::{
-    self, AnswerParams, ClientFrame, Hello, HelloOk, PromptParams, RewindParams, ServerFrame, SteerParams, SubscribeParams,
+    self, AbortParams, AnswerParams, ClientFrame, Hello, HelloOk, JobParams, PromptParams, RewindParams, ServerFrame, SteerParams,
+    SubscribeParams,
 };
 
 fn client(id: u64, method: &str, params: Value) -> Value {
@@ -68,15 +69,26 @@ fn frames() -> Value {
         session: "18f3a".into(),
         head: Some(EntryId(42)),
     };
+    let job = aho_session::JobInfo {
+        op: OpId(7),
+        call: CallId("c4".into()),
+        tool: "bash".into(),
+        cause: aho_log::DetachCause::After(60_000),
+        status: None,
+        started: Some(Timestamp(1_700_000_000_000)),
+    };
     json!({
         "client": {
             "hello": client(1, "hello", j(&hello)),
             "session.prompt": client(2, "session.prompt", j(&PromptParams { text: "run the tests".into(), client_key: Some("k1".into()) })),
             "session.steer": client(3, "session.steer", j(&SteerParams { text: "also lint".into(), urgent: true })),
-            "session.abort": client(4, "session.abort", Value::Null),
+            "session.abort": client(4, "session.abort", j(&AbortParams { scope: Some("op".into()), op: Some(OpId(7)) })),
             "session.subscribe": client(5, "session.subscribe", j(&SubscribeParams { from: Some(EntryId(41)) })),
             "session.fold": client(6, "session.fold", Value::Null),
             "session.rewind": client(7, "session.rewind", j(&RewindParams { checkpoint: 2, mode: Some("code".into()) })),
+            "job.list": client(19, "job.list", Value::Null),
+            "job.kill": client(20, "job.kill", j(&JobParams { op: OpId(7) })),
+            "job.detach": client(21, "job.detach", j(&JobParams { op: OpId(7) })),
             "approval.answer": client(8, "approval.answer", j(&AnswerParams { id: 1, outcome: "allow".into(), scope: Some("session".into()) })),
             "caps.list": client(9, "caps.list", json!({"kind": "tool"})),
             "caps.tree": client(10, "caps.tree", json!({"id": "tool-fs"})),
@@ -102,6 +114,8 @@ fn frames() -> Value {
             "idle": server(ServerFrame::new(1, None, "idle", wire::idle_payload(TurnId(2), &Transition::Aborted("stopped by the operator".into())))),
             "approval": server(ServerFrame::new(1, None, "approval", wire::approval_payload(1, &card, Some("tool-fs"), 3))),
             "fold": server(ServerFrame::result(1, Some(6), wire::state_payload(&state))),
+            "jobs": server(ServerFrame::result(1, Some(19), json!({ "jobs": [job.to_json()] }))),
+            "job_finished": server(ServerFrame::new(1, None, "job_finished", wire::job_finished_payload(OpId(7)))),
         },
     })
 }

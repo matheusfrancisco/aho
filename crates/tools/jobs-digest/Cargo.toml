@@ -1,0 +1,26 @@
+[package]
+name = "jobs-digest"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Opt-in delivery callback: job outcomes that arrive within jobs_digest.window_ms reach the model as one digest notice"
+
+[dependencies]
+aho-types.workspace = true
+aho-cap.workspace = true
+aho-config.workspace = true
+aho-log.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+aho-session.workspace = true
+aho-llm.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+tokio.workspace = true
+tempfile.workspace = true
+llm-scripted = { path = "../../providers/llm-scripted" }
+world-host = { path = "../../providers/world-host" }
+
+[lints]
+workspace = true

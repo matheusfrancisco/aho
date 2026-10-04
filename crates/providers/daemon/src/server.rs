@@ -6,16 +6,19 @@
 //! `session.attach{session, client_instance?, has_local_history, from?, watch?}`,
 //! `session.subscribe{session, from?}`, `session.detach{session}`,
 //! `session.prompt{session, text, client_key?, wait?}`, `session.steer{session, text, urgent}`,
-//! `session.abort{session}`, `session.resume{session}`, `session.command{session, kind}`,
-//! `session.call{session, method, params}`, `session.reopen{session}`,
+//! `session.abort{session, scope?, op?}` (scope `turn` default | `all` | `op`), `job.list{session}`,
+//! `job.kill{session, op}`, `job.detach{session, op}`, `session.resume{session}`,
+//! `session.command{session, kind}`, `session.call{session, method, params}`, `session.reopen{session}`,
 //! `approval.answer{id, allow | outcome, scope?}`, `daemon.reload{binary?, session?}`, `daemon.shutdown`.
 //! Pushed events: `entry{session, entry}`, `stream{session, event}`, `idle{session, turn,
 //! transition}`, `error{session, message}`, `approval.request{id, session, tool, cap, class, args,
-//! rendered, why, reason, world, enforced_by, suggested_cut, preset_cut, epoch_next}`, `owner.lost{session, by}`.
+//! rendered, why, reason, world, enforced_by, suggested_cut, preset_cut, epoch_next}`, `owner.lost{session, by}`,
+//! `job.finished{session, op}`.
 //!
 //! Authentication: the socket is `0600`, so every connection is this user; *driving* a session
-//! (prompt, steer, abort, operator commands, host calls, reopen) needs the ownership an attach was
-//! allowed. A connection whose attach was refused is read-only: it watches.
+//! (prompt, steer, abort, job kill/detach, operator commands, host calls, reopen) needs the
+//! ownership an attach was allowed. A connection whose attach was refused is read-only: it
+//! watches, and may list jobs.
 //!
 //! Reload is exec-in-place: intents are persisted, turns wound down and closed, the host's
 //! [`SessionHost::before_exec`] runs, and the new image is exec'd with the initiator's connection
@@ -34,8 +37,10 @@ use std::time::{Duration, Instant};
 
 use aho_approval::{Approval, ApprovalRequest, ChannelApproval, Decided};
 use aho_llm::StreamEvent;
-use aho_log::{CancelReason, Entry, EntryId, EntryKind, GrantScope, LogStore, ProcessIdentity, RecoveryRole, SessionIndex, Takeover};
-use aho_session::{Session, SessionEvent};
+use aho_log::{
+    CancelReason, DetachCause, Entry, EntryId, EntryKind, GrantScope, LogStore, ProcessIdentity, RecoveryRole, SessionIndex, Takeover,
+};
+use aho_session::{AbortScope, JobInfo, Session, SessionEvent};
 use aho_types::*;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -505,7 +510,7 @@ impl Daemon {
                     turns.push(h);
                 }
             }
-            (turns, st.sessions.values().map(|l| l.session.clone()).collect::<Vec<_>>())
+            (turns, st.sessions.values().map(|l| (l.session.clone(), l.mutation.is_some())).collect::<Vec<_>>())
         };
         let deadline = tokio::time::Instant::now() + self.opts.reload_grace;
         let mut late = Vec::new();
@@ -538,8 +543,29 @@ impl Daemon {
         for s in streams {
             s.abort();
         }
+        // A turn this daemon did not start (a host driver's: schedule, jobs wake) may still run:
+        // abort it and wait for the session's admission lock, then hold it while the log's open
+        // turn is closed, so no turn writes its own end after that and no driver starts another.
+        // An operator mutation this daemon holds already excludes every turn.
+        let deadline = tokio::time::Instant::now() + self.opts.reload_grace;
         let mut problems = Vec::new();
-        for s in sessions {
+        for (s, reserved) in sessions {
+            s.abort();
+            let held = loop {
+                match s.try_mutation() {
+                    Ok(g) => break Some(g),
+                    Err(_) if reserved => break None,
+                    Err(_) if tokio::time::Instant::now() < deadline => tokio::time::sleep(Duration::from_millis(20)).await,
+                    Err(_) => break None,
+                }
+            };
+            if held.is_none() && !reserved {
+                problems.push(format!(
+                    "session {}: a turn did not stop within the grace period, so its log was left as is; it is closed when the session next opens",
+                    s.id.0
+                ));
+                continue;
+            }
             if let Err(e) = recovery::close_open_turn(&**s.log(), reason) {
                 problems.push(format!("session {}: {e}", s.id.0));
             }
@@ -661,9 +687,28 @@ impl Daemon {
                 Ok(("result", json!({ "session": p.session })))
             }
             "session.abort" => {
+                let p: AbortParams = parse(method, params)?;
+                let scope = AbortScope::from_wire(p.scope.as_deref(), p.op)?;
+                match (self.owned(conn, p.session)?.abort_scope(scope), scope) {
+                    (false, AbortScope::Op(op)) => Err(format!("there is no running operation {}; nothing was cancelled", op.0)),
+                    _ => Ok(("result", json!({ "session": p.session }))),
+                }
+            }
+            "job.list" => {
                 let sid = parse::<SessionParams>(method, params)?.session;
-                self.owned(conn, sid)?.abort();
-                Ok(("result", json!({ "session": sid })))
+                let session = self.st().sessions.get(&sid).map(|l| l.session.clone()).ok_or_else(|| not_open(sid))?;
+                let jobs = session.jobs().map_err(|e| e.to_string())?;
+                Ok(("result", json!({ "session": sid, "jobs": jobs.iter().map(JobInfo::to_json).collect::<Vec<_>>() })))
+            }
+            "job.kill" => {
+                let p: JobParams = parse(method, params)?;
+                self.owned(conn, p.session)?.kill_job(p.op).map_err(|e| e.to_string())?;
+                Ok(("result", json!({ "session": p.session, "op": p.op })))
+            }
+            "job.detach" => {
+                let p: JobParams = parse(method, params)?;
+                self.owned(conn, p.session)?.detach(p.op, DetachCause::Operator).map_err(|e| e.to_string())?;
+                Ok(("result", json!({ "session": p.session, "op": p.op })))
             }
             "session.resume" => Ok(("result", self.resume(parse::<SessionParams>(method, params)?.session).await?)),
             "approval.answer" => Ok(("result", self.answer(conn, parse(method, params)?).await?)),

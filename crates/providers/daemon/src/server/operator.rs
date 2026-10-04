@@ -7,9 +7,10 @@
 use super::*;
 
 /// Kinds an operator command may append: configuration and plan records, operator commands
-/// and notes, invariant records, and capability-owned records (`Custom`, e.g.
-/// `schedule/Cancelled`). Only the session writes the turn machinery (turns, steps, messages,
-/// calls, results, operations, approvals, attachments, recovery, compaction).
+/// and notes, operator leases (VM and jobs: `aho lease grant|revoke`), invariant records, and
+/// capability-owned records (`Custom`, e.g. `schedule/Cancelled`). Only the session writes the
+/// turn machinery (turns, steps, messages, calls, results, operations, approvals, attachments,
+/// recovery, compaction).
 fn operator_kind(k: &EntryKind) -> bool {
     matches!(
         k,
@@ -21,6 +22,8 @@ fn operator_kind(k: &EntryKind) -> bool {
             | EntryKind::CommandRun { .. }
             | EntryKind::CommandDone { .. }
             | EntryKind::Note { .. }
+            | EntryKind::LeaseGranted { .. }
+            | EntryKind::LeaseRevoked { .. }
             | EntryKind::InvariantRegistered { .. }
             | EntryKind::InvariantChecked { .. }
             | EntryKind::InvariantMutated { .. }
@@ -73,6 +76,13 @@ impl Daemon {
         let jobs = running_jobs(&live.session);
         if !jobs.is_empty() {
             return Err(format!("background work is running ({}), so the mutation did not start", jobs.join("; ")));
+        }
+        let waiting = waiting_jobs(&live.session);
+        if !waiting.is_empty() {
+            return Err(format!(
+                "finished background work is waiting to be delivered ({}), so the mutation did not start: a new boot would lose its outcome. Prompt the session to deliver it, then try again",
+                waiting.join("; ")
+            ));
         }
         live.mutation = Some(Mutation { conn, _guard: guard, head: live.session.log().head() });
         Ok(json!({ "session": sid, "head": live.session.log().head() }))
@@ -233,7 +243,7 @@ impl Daemon {
         let tag = p.kind.tag();
         if !operator_kind(&p.kind) {
             return Err(format!(
-                "`{tag}` entries are written by the session itself, never by an operator command, so nothing was appended. Operator commands append configuration, plan, command, note, invariant and capability (`custom`) records"
+                "`{tag}` entries are written by the session itself, never by an operator command, so nothing was appended. Operator commands append configuration, plan, command, note, lease, invariant and capability (`custom`) records"
             ));
         }
         let changing = plan_kind(&p.kind);
@@ -316,7 +326,8 @@ impl Daemon {
     /// `session.reopen{session}`: the host closes the session and boots it again over the same
     /// log, so it runs under what was recorded since it booted (an operator's plan change). The
     /// owner stays; every stream moves to the new session from the entry it sent last. Refused
-    /// while a turn or a background job runs. A boot that fails leaves the session closed here.
+    /// while a turn or a background job runs, or a finished job's outcome waits for delivery (only
+    /// this process holds it). A boot that fails leaves the session closed here.
     pub(super) async fn reopen(self: &Arc<Self>, conn: ConnId, sid: SessionId) -> Result<Value, String> {
         let _files = self.files.lock().await;
         self.begin_mutation(conn, sid)?;
@@ -333,6 +344,14 @@ impl Daemon {
                     "session {} has background work running ({}), so it was not reopened: a new boot would lose track of it. Reopen it once they finish",
                     sid.0,
                     jobs.join("; ")
+                ));
+            }
+            let waiting = waiting_jobs(&live.session);
+            if !waiting.is_empty() {
+                return Err(format!(
+                    "session {} has finished background work waiting to be delivered ({}), so it was not reopened: a new boot would lose its outcome. Prompt the session to deliver it, then reopen it",
+                    sid.0,
+                    waiting.join("; ")
                 ));
             }
             live.session.clone()

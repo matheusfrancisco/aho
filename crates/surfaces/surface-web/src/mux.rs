@@ -71,6 +71,9 @@ async fn run(mut socket: WebSocket, app: App, from: Option<EntryId>) {
                     Ok(SessionEvent::Stream(s)) => frame("stream", views::stream_json(&s)),
                     Ok(SessionEvent::Idle { turn, transition }) => frame("idle", json!({ "turn": turn, "transition": transition })),
                     Ok(SessionEvent::Error(message)) => frame("error", json!({ "message": message })),
+                    // The outcome reaches the log at the next turn's start; this tells the page
+                    // the jobs panel is stale now.
+                    Ok(SessionEvent::JobFinished { op }) => frame("job_finished", json!({ "op": op })),
                     Err(RecvError::Lagged(_)) => match catch_up(&mut socket, &app, last).await {
                         Some(l) => {
                             last = l;
