@@ -10,7 +10,7 @@
 //! a stutter. `Invariant/Checked` (`inv`, `verdict`, `code`) and `Workspace/Checkpoint` (`tree`)
 //! carry what a verify gate is judged against.
 
-use aho_log::{ApprovalOutcome, Entry, EntryKind, OpStatus, ToolOutcome, Verdict};
+use aho_log::{ApprovalOutcome, DetachCause, Entry, EntryKind, OpStatus, ToolOutcome, Verdict};
 use aho_tasks::{Actor, Event, Settings};
 use aho_types::{CallId, Consequence, ContentBlock, Form, Principal, Value};
 use serde_json::{Map, json};
@@ -106,6 +106,15 @@ fn op_status(s: &OpStatus) -> &'static str {
     }
 }
 
+fn detach_cause(c: DetachCause) -> &'static str {
+    match c {
+        DetachCause::Requested => "requested",
+        DetachCause::After(_) => "after",
+        DetachCause::Operator => "operator",
+        DetachCause::Model => "model",
+    }
+}
+
 /// The serde tag of a transition (`completed`, `tool_use`, `aborted`, …).
 fn transition(t: &aho_log::Transition) -> String {
     serde_json::to_value(t).ok().and_then(|v| v.get("transition").and_then(Value::as_str).map(str::to_string)).unwrap_or_default()
@@ -147,6 +156,10 @@ fn action(k: &EntryKind, e: &Entry) -> (&'static str, Value) {
         }
         EntryKind::OpStarted { op, call, .. } => ("OpStart", json!({"op": op.0, "call": call.0})),
         EntryKind::OpDone { op, status } => ("OpDone", json!({"op": op.0, "status": op_status(status)})),
+        EntryKind::OpDetached { op, call, cause } => ("Detach", json!({"op": op.0, "call": call.0, "cause": detach_cause(*cause)})),
+        EntryKind::JobDelivered { op, call, tool, status, .. } => {
+            ("Deliver", json!({"op": op.0, "call": call.0, "tool": tool, "status": op_status(status)}))
+        }
         EntryKind::ApprovalRequested { call, .. } => {
             ("ApprovalRequested", json!({"req": e.id.0, "call": call.as_ref().map(|c| c.0.as_str()).unwrap_or("")}))
         }
@@ -341,6 +354,72 @@ mod tests {
         let t = trace_of(&entries[..2]);
         assert_eq!((t[0]["at"].clone(), t[1]["at"].clone()), (json!(0), json!(250)));
         assert!(trace_of(&[]).is_empty());
+    }
+
+    /// A job's entries are steps of `Turn.tla` (`Detach`, `Deliver`), never `Other` stutters, and
+    /// carry what its `TraceStep` reads: op, call, the delivered status.
+    #[test]
+    fn a_detached_op_and_its_delivery_are_turn_actions() {
+        let log = MemoryLog::new();
+        let sys = Principal::system("loop");
+        let ap = |by: Principal, k: EntryKind| log.append(None, by, k).map(|e| e.id).unwrap();
+        let c1 = || CallId("c1".into());
+        ap(sys.clone(), EntryKind::TurnStart { turn: TurnId(1) });
+        ap(Principal::Operator, EntryKind::UserMessage { form: Form::Prompt, text: "go".into(), client_key: None });
+        ap(
+            Principal::system("model"),
+            EntryKind::AssistantMessage {
+                content: vec![ContentBlock::ToolUse { id: c1(), name: "bash".into(), args: json!({}) }],
+                usage: Usage::default(),
+                stop: StopReason::ToolUse,
+            },
+        );
+        ap(agent(), EntryKind::ToolCall { call: c1(), tool: "bash".into(), args: json!({}), class: Consequence::SpawnsProcess });
+        ap(
+            Principal::system("ops"),
+            EntryKind::OpStarted { op: OpId(3), call: c1(), kind: aho_log::OpKind::Process, rerunnable: false, external_effect: false },
+        );
+        ap(Principal::system("jobs"), EntryKind::OpDetached { op: OpId(3), call: c1(), cause: DetachCause::After(60_000) });
+        ap(
+            Principal::system("jobs"),
+            EntryKind::ToolResult {
+                call: c1(),
+                outcome: ToolOutcome::Ok,
+                value: json!(null),
+                content: vec![ContentBlock::text("running as job 3")],
+                spill_ref: None,
+                meta: None,
+                late: false,
+            },
+        );
+        ap(sys.clone(), EntryKind::TurnEnd { turn: TurnId(1) });
+        ap(sys, EntryKind::TurnStart { turn: TurnId(2) });
+        let cancelled = OpStatus::Cancelled { reason: aho_log::CancelReason::Aborted };
+        ap(
+            Principal::system("jobs"),
+            EntryKind::JobDelivered {
+                op: OpId(3),
+                call: c1(),
+                tool: "bash".into(),
+                status: cancelled.clone(),
+                content: vec![ContentBlock::text("killed")],
+                spill_ref: None,
+            },
+        );
+        ap(Principal::system("jobs"), EntryKind::OpDone { op: OpId(3), status: cancelled });
+        let entries = log.read_branch(log.head().unwrap()).unwrap();
+        aho_log::fold(&entries, &Default::default()).unwrap();
+
+        let t = trace_of(&entries);
+        let of = |a: &str| t.iter().find(|r| r["action"] == json!(a)).unwrap_or_else(|| panic!("no {a} record in {t:?}"));
+        let (detach, deliver) = (of("Detach"), of("Deliver"));
+        assert_eq!((detach["op"].clone(), detach["call"].clone(), detach["cause"].clone()), (json!(3), json!("c1"), json!("after")));
+        assert_eq!((deliver["op"].clone(), deliver["call"].clone()), (json!(3), json!("c1")));
+        assert_eq!((deliver["tool"].clone(), deliver["status"].clone()), (json!("bash"), json!("cancelled")));
+        assert!(t.iter().all(|r| r["action"] != json!("Other")), "every entry here is a loop step: {t:?}");
+        for r in &t {
+            crate::tla::to_tla(r).unwrap();
+        }
     }
 
     #[test]

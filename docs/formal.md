@@ -7,7 +7,7 @@
 |---|---|
 | `Log.tla` | the append-only log: hash chain, fork-as-head-move |
 | `Policy.tla` | the meet-only lattice: narrow always, widen only by operator approval |
-| `Turn.tla` | the loop: phases, grace, injection points, `TraceStepEnd` per transition |
+| `Turn.tla` (+ `TurnJobs.cfg`) | the loop: phases, grace, injection points, session-scoped jobs, `TraceStepEnd` per transition |
 | `Tasks.tla` (+ `TasksVerify.cfg`) | the task graph and its verify-gate rule |
 
 ## Trace validation
@@ -31,6 +31,38 @@ TraceStepEnd(t) ==
 Adding a `Transition` variant therefore touches three places or fails: the Rust enum
 (`aho-log`), this spec, and the SDK protocol table (whose exhaustive sample in
 `aho-sdk/tests/schema.rs` is a compile error until updated).
+
+## Jobs in `Turn.tla`
+
+A running op is a turn op (`ops`) or a job (`jobs`). `Detach` moves it out of the turn
+(`OpDetached`, then its call's `Result`), so `IdleIffNothingPending` counts turn work only: a
+turn completes and a turn abort stops while its jobs run. A finished or cancelled job waits
+in the delivery queue until `Deliver` (`JobDelivered`), which happens only in `prep` (the top
+of a step, or the next turn's start, never between a call and its result), then `JobDone`
+(its `OpDone`). `Cancel` (abort-all, kill, lease expiry) hits running jobs only; `Close` is
+the `OpDone` of an undelivered job whose branch ended (rewind, a fork's child); `Restart`
+re-dispatches an undelivered job under a fresh op id, which the log spells as that `OpDone`,
+an `OpStarted` on the closed call (`RespawnOp`) and its `OpDetached` (`Redetach`).
+
+| invariant | holds |
+|---|---|
+| `JobEndsOnce` | per detachment: one delivery then its `OpDone`, or an undelivered close; nothing after |
+| `NoDeliveryAfterCancel` | a job cancelled while running delivers its cancellation, never its own result; a closed job delivers nothing |
+| `NoDeliveryBetweenCallAndResult` | a delivery never follows a call without its result since the boundary, nor precedes the result that detached it |
+| `JobWithinLease` | running jobs ≤ `MaxJobs` (the jobs lease); model only |
+
+Trace records: `OpDetached` → `Detach{op, call, cause}`, `JobDelivered` →
+`Deliver{op, call, tool, status}`. A job finishing or being cancelled is not logged, so
+`TraceDeliver` folds it into the delivery (status `cancelled` ⇒ cancelled first); an `OpDone`
+closing an undelivered job must not say `completed` (a lost result). The session enforces the
+jobs lease (`LeaseGranted` subject `jobs:`) at detach only, and a grant with a lower max leaves
+running jobs alone, so a trace detaches unbounded and `TraceInv` leaves `JobWithinLease` out.
+
+`Turn.cfg` checks the loop with jobs off (`MaxJobs = 0`; trace validation reads its
+constants); `TurnJobs.cfg` checks jobs on a smaller loop (two calls, two ops, a lease of one).
+`formal-tlc/tests/turn_tla.rs` model-checks both, removes each job guard and expects the
+invariant it keeps to fail, and validates the logs of scripted sessions run by the real
+`Session` (delivery at a boundary and at the next turn's start, abort scopes, restart, rewind).
 
 ## Invariants
 

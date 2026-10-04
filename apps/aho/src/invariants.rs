@@ -654,7 +654,21 @@ const OWN_SPECS: &[(&str, &str, &str)] = &[
 fn models(module: &str, entries: &[Entry], trace: &[Value]) -> bool {
     let actions: &[&str] = match module {
         "Log" => &["TurnStart", "TurnEnd", "ApprovalRequested", "ApprovalDecided", "Call", "Response", "Result", "Replace"],
-        "Turn" => &["TurnStart", "TurnEnd", "StepStart", "StepEnd", "Input", "Request", "Response", "Call", "Result", "OpStart", "OpDone"],
+        "Turn" => &[
+            "TurnStart",
+            "TurnEnd",
+            "StepStart",
+            "StepEnd",
+            "Input",
+            "Request",
+            "Response",
+            "Call",
+            "Result",
+            "OpStart",
+            "OpDone",
+            "Detach",
+            "Deliver",
+        ],
         "Policy" => &["Epoch", "ApprovalRequested", "ApprovalDecided"],
         _ => return entries.iter().any(|e| matches!(&e.kind, EntryKind::Custom { ns, .. } if ns == aho_tasks::NS)),
     };

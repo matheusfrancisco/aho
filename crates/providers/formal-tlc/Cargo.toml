@@ -22,6 +22,12 @@ world-host = { path = "../world-host" }
 aho-tasks.workspace = true
 tokio.workspace = true
 aho-types.workspace = true
+# tests/turn_tla.rs: scripted sessions with jobs, run by the real Session, are behaviors of formal/Turn.tla
+aho-session.workspace = true
+aho-llm.workspace = true
+aho-approval.workspace = true
+aho-policy.workspace = true
+llm-scripted = { path = "../llm-scripted" }
 
 [lints]
 workspace = true
