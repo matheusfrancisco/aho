@@ -34,6 +34,19 @@ diagnostics to write results and sends later ones (on-save `cargo check`) as a l
 a built-in `coding` profile (`aho --profile coding`) trims the tool list from 53 to 33; and
 `scripts/evals/test-quality` is the operator-invoked eval for judgment prose.
 
+Session jobs (2026-10-04): any detachable call (subagent, bash, run_code) can become a
+session-scoped job — on request (`background: true`), after a duration
+(`jobs.detach.<tool> = after:60s`), or by `job.detach` — that outlives its turn and a turn
+abort; its outcome is logged as `JobDelivered` only at a request boundary or a turn start, so
+replay equality holds. `abort_scope` (turn | all | op) over rpc, the daemon and `aho jobs`;
+Esc stops the turn, Ctrl+C stops everything; an idle session is woken as `System("jobs")`
+(`jobs.wake`, bounded by `jobs.wake_budget`); `aho run -p` settles its jobs before exiting;
+`jobs.max` plus `aho lease grant --jobs` bound concurrency. Deliveries pass a chain of
+`Registrar::delivery` callbacks and `JobDone` hooks (keep, replace, suppress, defer);
+`jobs-digest` (opt-in) batches outcomes. `Interrupt::Cancel` is now enforced on input.
+Turn.tla models jobs (JobEndsOnce, NoDeliveryAfterCancel, NoDeliveryBetweenCallAndResult,
+JobWithinLease) and real job logs trace-check against it.
+
 ## Next
 
 Ordered by risk retired per unit of work; details in [TODO.md](TODO.md).

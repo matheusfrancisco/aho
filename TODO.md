@@ -26,6 +26,16 @@ Unfinished work and known gaps, with what closing each one looks like. Direction
 - **Deleted instruction files leave their last snapshot**: when every AGENTS.md/CLAUDE.md is
   removed mid-session, `context-files` sends nothing new, so the model keeps the last text it
   saw. Closed when removal is sent as an explicit empty snapshot.
+- **Jobs through the daemon don't settle `aho run -p`**: print mode waits for its jobs only when
+  it owns the session; through a running daemon it exits without them. Closed when the daemon
+  path settles too.
+- **Undelivered job outcomes are lost when an interactive surface exits**: a job that finished
+  but was not yet delivered is named on exit, not kept. Closed when recovery delivers it on
+  the next open.
+- **Jobs lease edges**: a grant and its revoke landing almost at once may never cancel running
+  jobs, and a new lease with a lower max does not cancel jobs already running above it.
+- **`HookEvent::SessionEnd` is never fired**: memory-local, tool-lsp, telemetry and foreign-cli
+  register for it, but aho-session never emits it. Closed when session teardown fires it.
 
 ## Enforcement gaps
 

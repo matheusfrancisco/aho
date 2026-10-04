@@ -55,3 +55,7 @@ auto-denying and asks a human, or aborts headless.
 VMs, sandboxes, and desktops are never bare handles. A `Lease` names its subject and expiry;
 machines are supervised by `aho-vm-supervisor`, so a lease keeps expiring while no aho process
 runs, and revocation is proven by the next use being refused.
+
+A jobs lease (subject `jobs:{"max":<n>}`, `aho lease grant --jobs <n>`) bounds how many session
+jobs run at once instead of `jobs.max`; the session watches it and cancels its running jobs when
+it expires or is revoked ([architecture](architecture.md#delivery-wake-turns-the-jobs-lease)).

@@ -76,3 +76,18 @@ Switched on: `verify-gate` and `context-files`. Opt-in capabilities (tool-termin
 hooks-claude-code, telemetry) stay opt-in.
 
 `coding` is not the default; `aho run` without `--profile` resolves as before.
+
+## Jobs
+
+Session jobs (background operations; [architecture](architecture.md#jobs)) read these core keys
+at boot; a value of the wrong shape refuses the boot and names the key.
+
+| key | default | |
+|---|---|---|
+| `jobs.detach.<tool>` | the tool's decl (aho-base: `subagent*`, `send_message`, `run_code` `on_request`; `bash` `after:60s`) | `never` \| `on_request` \| `always` \| `after:<n>ms\|s\|m\|h` |
+| `jobs.on_rewind` | `cancel` | `keep`: jobs the rewind target holds keep running |
+| `jobs.deliver` | `boundary` | `on_wait`: mid-turn, deliver only around a `job_wait` call; the rest at the next turn's start |
+| `jobs.wake` | `idle` | a job finished while idle: `idle` starts a wake turn (`System(jobs)`), `operator` only tells the operator, `never` waits for the next prompt |
+| `jobs.wake_budget` | `10` | wake turns since the operator's last prompt |
+| `jobs.max` | `8` | jobs running at once; a live `aho lease grant --jobs <n>` replaces it |
+| `jobs.settle_timeout_s` | `1800` | how long `aho run -p` waits for its jobs before cancelling them |

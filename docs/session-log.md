@@ -12,6 +12,20 @@ namespaced `Custom` kinds that capabilities register with their own fold
 (`Registrar::entry_kind`). Every entry records its principal — who spoke, including
 `System("loop")`, `System("hooks")`, `System("delegation")`.
 
+Operations: `OpStarted{op, call, kind, rerunnable, external_effect}` … `OpDone{op, status}`. A
+running op that becomes a session job (see `docs/architecture.md`, Jobs) gets
+`OpDetached{op, call, cause}` (`cause`: `requested` | `after{ms}` | `operator` | `model`),
+followed at once by its call's `ToolResult` (value `{"job": op}`). Its outcome is
+`JobDelivered{op, call, tool, status, content, spill_ref}`, appended only at a request boundary,
+then its `OpDone`. The fold keeps `State.jobs` (open jobs; a job with no `OpDone` is pending)
+and enforces `op.detach_matches_started`, `job.detach_once` and
+`job.delivered_matches_detached`. `derive_messages` shows a delivery as a user message: the
+line from `crates/aho-log/prompts/job-delivered.md` (`Background job {op} ({tool}) {status}:`)
+then the job's content. That content is what the delivery chain decided (`Registrar::delivery`
+callbacks, `HookEvent::JobDone` hooks: each run a `HookInvoked{point: "JobDone"}`/`HookResult`
+pair before it, possibly outside a turn); a suppressed delivery still has its entry, with a
+marker naming the capability as content.
+
 ## Requests are folds
 
 `build_request` derives the message list from `fold(log)`; nothing is cached between steps. The

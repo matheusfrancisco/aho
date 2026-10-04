@@ -14,13 +14,16 @@ All model-facing prose is a file under a crate's `prompts/` directory, included 
 |---|---|---|
 | `aho-session/prompts/identity.md` | 164 | who the agent is; two sentences |
 | `aho-session/prompts/contract.md` | 1889 | the delivery contract: the judgment residue that cannot be gated, test craft included |
-| `aho-session/prompts/async-preamble.md` | 801 | the async tool-call contract (turns, parallelism, late results) |
+| `aho-session/prompts/async-preamble.md` | 969 | the async tool-call contract (turns, parallelism, late results, background jobs) |
 | `aho-session/prompts/compaction.md` | 329 | the compaction summarizer's instructions |
 | `tool-subagent/prompts/scout.md` | 922 | scout role: reporting shape for recon |
 | `tool-subagent/prompts/reviewer.md` | 1106 | reviewer role: finding criteria and verdict shape |
 | `context-files/prompts/context.md` | 102 | one-line preamble over the repository instruction files |
 | `verify-gate/prompts/failed.md` | 35 | template for a failed verify run: command, outcome, output tail |
 | `tool-lsp/prompts/write-diagnostics.md` | 198 | wording around diagnostics appended to a write/edit result, and the late notice |
+| `aho-session/prompts/jobs.md` | 556 | mechanical job lines: detached result, interrupted-by-input, background flag, suppressed delivery, wake, not-detached refusal |
+| `aho-log/prompts/job-delivered.md` | 39 | header of a delivered background-job outcome |
+| `jobs-digest/prompts/digest.md` | 218 | digest header and the pointer line for batched job outcomes |
 
 Everything else the model reads is generated: the policy line (epoch, allowed classes, world,
 workspace, whether approval prompts exist) is computed from live state and re-logged only on

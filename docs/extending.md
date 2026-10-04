@@ -39,6 +39,9 @@ Via the `Registrar` (each recorded under the capability's grant):
   folded `State`;
 - `context(f)` — dynamic text logged as a `Snapshot` user message only when it changes;
 - `hook(spec)` — lifecycle hooks (pre-step, turn-stopping, …);
+- `delivery(f)` — sees each finished job before its `JobDelivered` is logged and may replace,
+  suppress or defer it (the powers of a `HookEvent::JobDone` hook, typed and synchronous).
+  `jobs-digest` is the worked example;
 - `entry_kind(ns, fold)` — namespaced custom log entries with their own fold;
 - `service(name, value)` — a shared object other capabilities may look up;
 - `panel(slot, projections)` — a surface panel over fold projections;
@@ -73,6 +76,49 @@ notice, and the model takes another step. It does that once per turn; the next s
 - **Off switch:** `verify.enabled = false`.
 - **Audit:** each run is a `HookInvoked`/`HookResult` pair under `system:verify-gate`. Its
   decision is `Allow` (passed), `Deny(…)` (failed) or `none` (not checked).
+
+### Worked example: a delivery hook (`jobs-digest`)
+
+A job's outcome reaches the model as a `JobDelivered` entry at a request boundary
+([architecture](architecture.md), Jobs). Before it is logged, the delivery chain sees it:
+
+```rust
+// typed and synchronous, like post_execute
+r.delivery(Arc::new(move |v: &JobView| digest.decide(v, Instant::now())));
+// or a hook: the same decisions from a JSON payload, async, under a timeout
+r.hook(HookSpec { on: &[HookEvent::JobDone], if_tool: Some("bash"), on_error: OnError::Deny, /* … */
+    run: Arc::new(|_, _p| Box::pin(async { HookOutput { delivery: Delivery::Suppress, ..HookOutput::default() } })) });
+```
+
+- **View:** `JobView {op, call, tool, status, cause, content, deferred, with}`. `content` is what
+  the model will see after earlier replacements (a hook gets it as text cut to 4096 chars, with
+  `content_truncated`); `deferred` counts earlier holds; `with` lists every op offered at this
+  delivery point.
+- **Decisions (`Delivery`):** `Keep`; `Replace(content)`, which later steps see; `Suppress`: the
+  entry is still logged, its content `Its output was suppressed by <cap>.`
+  (`aho-session/prompts/jobs.md`); `Defer { until }`: held, then offered to the whole chain
+  again at the first delivery point after `until` (while idle the session announces it again
+  with `JobFinished`). After 16 holds a `Defer` counts as `Keep`.
+- **Order:** every `delivery` callback, then every `JobDone` hook, each in registration order:
+  the embedder's seed first, then the order capabilities start (providers, then by dependency,
+  ties by id), call order within one. `Suppress` and `Defer` end the chain. `if_tool` limits a
+  hook to one tool; a timed-out hook suppresses (`on_error: Deny`) or keeps (`Allow`). A
+  `JobDone` hook's `context`, `stop` and `decision` are ignored.
+- **When:** at the request boundary that delivers the job, or before a turn opens when a driver
+  asks what is due; only the audit pairs are logged there.
+- **Audit and replay:** each run is a `HookInvoked{point: "JobDone"}`/`HookResult` pair under
+  `system:<cap>` (`matcher: "delivery"` for callbacks), decision `keep`, `replace`, `suppress`
+  or `defer <n>ms`. `JobDelivered` holds exactly the decided content, so `verify_replay` sees
+  what the model saw.
+- **`jobs-digest`** (in `aho-base`, opt-in: `aho enable jobs-digest`; `jobs_digest.window_ms`,
+  default 2000): the first delivery offered while no batch is open starts one and is deferred
+  until `window_ms` later; deliveries offered before then join and are deferred to the same
+  instant, so they come back together. There the first member offered (the lead) is replaced by
+  the digest (a header, then each outcome under `## Job <op> (<tool>) <status>`) and every other
+  member by `Its outcome is in the digest delivered with job <lead>.` Every op keeps its own
+  `JobDelivered` (its status, then its `OpDone`: the fold closes each job once), the model reads
+  the batch once, and the log holds exactly that. A batch of one is delivered unchanged; a
+  member another capability held back from its lead's delivery point is batched again.
 
 ## Ship it
 
