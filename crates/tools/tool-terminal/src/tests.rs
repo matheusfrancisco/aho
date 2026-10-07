@@ -76,11 +76,20 @@ async fn open_sh_send_echo_hi_and_the_screen_shows_hi() {
     assert_eq!(id, "t1");
     let sent = call(&t, "terminal_send", json!({"id": id, "text": "echo hi\n"})).await;
     assert_eq!(value(&sent)["sent_bytes"], json!(8));
-    let r = call(&t, "terminal_read", json!({"id": id, "wait_for": "hi"})).await;
+    // The bare `hi` of an unanchored regex matches the input echo row (`$ echo hi`) too; anchor
+    // the regex to hi's own row, or the prompt-merged one dash can produce (`$ hi`).
+    let r = call(&t, "terminal_read", json!({"id": id, "wait_for": r"(?m)^\$? ?hi$"})).await;
     let v = value(&r);
     assert_eq!(v["matched"], json!(true), "{}", text(&r));
-    assert!(v["screen"].as_str().unwrap().lines().any(|l| l.trim_end() == "hi"), "{}", text(&r));
-    assert!(v["output"].as_str().unwrap().lines().any(|l| l == "hi"));
+    assert!(
+        v["screen"].as_str().unwrap().lines().any(|l| {
+            let t = l.trim_end();
+            t == "hi" || t == "$ hi"
+        }),
+        "{}",
+        text(&r)
+    );
+    assert!(v["output"].as_str().unwrap().lines().any(|l| l == "hi" || l == "$ hi"));
     assert!(text(&r).contains("── screen 80x24"), "{}", text(&r));
     call(&t, "terminal_close", json!({"id": id})).await;
 }
