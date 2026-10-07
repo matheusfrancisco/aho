@@ -1,0 +1,16 @@
+# nextest profiles. The CI profile runs every test, never cancels on the first
+# failure, and retries only the tests known to flake under load (overrides
+# below). Every retry is reported, so a flake stays visible in the job log.
+# Local runs use the default profile with no retries.
+[profile.ci]
+fail-fast = false
+retries = 0
+failure-output = "immediate-final"
+slow-timeout = { period = "120s", terminate-after = 2 }
+
+# `aho run` starts `echo` as a background job; when it finishes before the next
+# model request the tool result is the real output, not the "background as job"
+# acknowledgment the script step expects (apps/aho/tests/settle.rs).
+[[profile.ci.overrides]]
+filter = "test(lease_grant_jobs_records_a_jobs_lease_beside_the_vm_form)"
+retries = { backoff = "fixed", count = 2, delay = "1s" }
