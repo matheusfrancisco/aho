@@ -109,11 +109,17 @@ async fn tty_input() -> Result<String, AuthError> {
                     KeyCode::Esc => return Err(AuthError::Cancelled),
                     KeyCode::Char('c' | 'd') if key.modifiers.contains(KeyModifiers::CONTROL) => return Err(AuthError::Cancelled),
                     KeyCode::Backspace => {
-                        value.pop();
+                        if value.pop().is_some() {
+                            print!("\u{8} \u{8}");
+                        }
                     }
-                    KeyCode::Char(c) => value.push(c),
+                    KeyCode::Char(c) => {
+                        value.push(c);
+                        print!("*");
+                    }
                     _ => {}
                 }
+                std::io::stdout().flush().ok();
             }
         } else {
             tokio::time::sleep(Duration::from_millis(20)).await;

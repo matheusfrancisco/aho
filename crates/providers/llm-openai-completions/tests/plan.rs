@@ -80,10 +80,28 @@ fn custom_row_without_base_url_breaks_with_the_missing_key() {
 
 #[test]
 fn subscription_routes_activate_without_an_openai_key() {
-    for (key, service) in [("provider.openrouter.key", "llm:openrouter"), ("provider.github-copilot.key", "llm:github-copilot")] {
+    for (key, service) in [
+        ("provider.openrouter.key", "llm:openrouter"),
+        ("provider.github-copilot.key", "llm:github-copilot"),
+        ("provider.ollama-cloud.key", "llm:ollama-cloud"),
+    ] {
         let s = start(&[(key, "account-token")], None);
         assert_eq!(s.state, CapState::Active);
         assert!(s.broken.is_empty(), "{:?}", s.broken);
         assert_eq!(routes(&s.registry), [service]);
     }
+}
+
+#[test]
+fn ollama_cloud_route_defaults_to_ollama_com_and_keeps_local_ollama_separate() {
+    let s = start(&[("provider.ollama-cloud.key", "ok-1")], None);
+    let route: LlmRoute = s.registry.service("llm:ollama-cloud").expect("route");
+    let info = route.0.info();
+    assert_eq!(info.route, "ollama-cloud");
+    let s = start(&[("provider.ollama-cloud.key", "ok-1")], Some("[provider.ollama]\nenabled = true\n"));
+    assert_eq!(routes(&s.registry), ["llm:ollama", "llm:ollama-cloud"]);
+    let route: LlmRoute = s.registry.service("llm:ollama-cloud").expect("cloud route");
+    assert_eq!(route.0.info().route, "ollama-cloud");
+    let stored = llm_openai_completions::OLLAMA_CLOUD_BASE_URL;
+    assert_eq!(stored, "https://ollama.com/v1");
 }

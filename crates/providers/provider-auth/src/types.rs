@@ -134,4 +134,13 @@ pub struct Provider {
     pub name: &'static str,
     pub protocol: Protocol,
     pub default_base_url: &'static str,
+    pub kind: LoginKind,
+}
+
+/// How a provider logs in. OAuth providers exchange account grants; api-key providers
+/// ask the operator to paste a key created on the provider's site.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LoginKind {
+    OAuth,
+    ApiKey { instructions_url: &'static str },
 }
