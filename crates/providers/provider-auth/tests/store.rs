@@ -1,11 +1,12 @@
 #![cfg(unix)]
 #![allow(clippy::disallowed_methods)] // test fixtures touch the host by design
+#![allow(clippy::unwrap_used)] // unit-test fixtures only
 
 use std::collections::BTreeMap;
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::PathBuf;
 
-use provider_auth::{AuthError, AuthSource, Credential, Engine, Store};
+use provider_auth::{AuthError, AuthSource, Credential, Engine, LoginKind, LoginOptions, LoginUi, PROVIDERS, Store, login};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -195,4 +196,43 @@ async fn long_lived_source_reads_updated_store_and_debug_redacts_all_secrets() {
     assert_eq!(resolved.token, "second-secret");
     store.remove("openrouter").await.unwrap();
     assert_eq!(source.resolve(&client).await.unwrap_err(), AuthError::MissingCredential);
+}
+
+#[test]
+fn ollama_cloud_is_an_api_key_provider_without_oauth_calls() {
+    let provider = PROVIDERS.iter().find(|p| p.id == "ollama-cloud").expect("ollama-cloud registered");
+    let LoginKind::ApiKey { instructions_url } = provider.kind else { panic!("expected api-key login") };
+    assert!(instructions_url.starts_with("https://ollama.com/"));
+    assert_eq!(provider.default_base_url, "https://ollama.com/v1");
+}
+
+struct PastesKey(String);
+
+impl LoginUi for PastesKey {
+    fn event(&self, _: provider_auth::LoginEvent) {}
+    fn input<'a>(&'a self, _: &'a str) -> provider_auth::InputFuture<'a> {
+        let answer = self.0.clone();
+        Box::pin(async move { Ok(answer) })
+    }
+}
+
+#[tokio::test]
+async fn ollama_cloud_login_pastes_key_into_credential_and_needs_no_refresh() {
+    let ui = PastesKey("  ok-pasted \n".into());
+    let engine = Engine::new().unwrap();
+    let credential = login("ollama-cloud", &LoginOptions::default(), &ui).await.unwrap();
+    assert_eq!(credential.access_token, "ok-pasted");
+    assert_eq!(credential.refresh_token, None);
+    assert!(!format!("{credential:?}").contains("ok-pasted"), "debug never prints the key");
+    let empty = login("ollama-cloud", &LoginOptions::default(), &PastesKey("  \n".into())).await.unwrap_err();
+    assert_eq!(empty, AuthError::InvalidInput);
+    // A pasted key never expires, so store resolution must not attempt a refresh call.
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::new(dir.path().join("auth.json"));
+    store.set("ollama-cloud", credential).await.unwrap();
+    let resolved = store.resolve_with_engine("ollama-cloud", &engine).await.unwrap();
+    assert_eq!(resolved.token, "ok-pasted");
+    assert!(!resolved.oauth);
+    assert_eq!(resolved.base_url, None);
+    assert_eq!(store.get("ollama-cloud").await.unwrap().unwrap().access_token, "ok-pasted");
 }

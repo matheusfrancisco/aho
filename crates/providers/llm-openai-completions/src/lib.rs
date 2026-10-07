@@ -4,6 +4,8 @@
 //! * `openai`: when `provider.openai.key` resolves; `provider.openai.base_url` defaults to
 //!   `https://api.openai.com/v1`.
 //! * `ollama`: built in, keyless, at `http://localhost:11434/v1`; on when `provider.ollama.enabled = true`.
+//! * `ollama-cloud`: when `provider.ollama-cloud.key` resolves; `provider.ollama-cloud.base_url`
+//!   defaults to `https://ollama.com/v1` (`aho login ollama-cloud` pastes a key).
 //! * any `provider.<name>` row with `protocol = "openai-completions"` and a `base_url`
 //!   (`key` optional; `cred:<n>` reads `credentials.<n>`).
 //!
@@ -33,6 +35,7 @@ pub const PROTOCOL: Protocol = Protocol::OpenAiCompletions;
 pub const LATE_RESULTS: LateResults = LateResults::ToolMessage;
 pub const OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const OLLAMA_BASE_URL: &str = "http://localhost:11434/v1";
+pub const OLLAMA_CLOUD_BASE_URL: &str = "https://ollama.com/v1";
 pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 pub const COPILOT_BASE_URL: &str = llm_anthropic_messages::COPILOT_BASE_URL;
 
@@ -137,6 +140,19 @@ impl Config for CompletionsConfig {
             ),
             ConfigKey::new("provider.ollama.base_url", Ty::String, Some(json!(OLLAMA_BASE_URL)), "Endpoint of the `ollama` route."),
             ConfigKey::new("provider.ollama.key", Ty::String, None, "Optional bearer token for an `ollama` route behind a proxy.").secret(),
+            ConfigKey::new(
+                "provider.ollama-cloud.key",
+                Ty::String,
+                None,
+                "Ollama Cloud API key; enables the `ollama-cloud` route (`aho login ollama-cloud`).",
+            )
+            .secret(),
+            ConfigKey::new(
+                "provider.ollama-cloud.base_url",
+                Ty::String,
+                Some(json!(OLLAMA_CLOUD_BASE_URL)),
+                "Endpoint of the `ollama-cloud` route (chat completions).",
+            ),
             ConfigKey::new("provider.openrouter.key", Ty::String, None, "OpenRouter API key or OAuth credential reference.").secret(),
             ConfigKey::new(
                 "provider.openrouter.base_url",
@@ -164,14 +180,16 @@ impl Config for CompletionsConfig {
             let base = url(l, "provider.ollama.base_url", Some(OLLAMA_BASE_URL))?.unwrap_or_else(|| OLLAMA_BASE_URL.to_string());
             routes.push(RouteConfig::new("ollama", &base, secret(l, "provider.ollama.key")?, Flavor::Compatible));
         }
-        for (name, default) in [("openrouter", OPENROUTER_BASE_URL), ("github-copilot", COPILOT_BASE_URL)] {
+        for (name, default) in
+            [("openrouter", OPENROUTER_BASE_URL), ("github-copilot", COPILOT_BASE_URL), ("ollama-cloud", OLLAMA_CLOUD_BASE_URL)]
+        {
             if let Some(key) = secret(l, &format!("provider.{name}.key"))? {
                 let base = url(l, &format!("provider.{name}.base_url"), Some(default))?.unwrap_or_else(|| default.to_string());
                 routes.push(RouteConfig::new(name, &base, Some(key), Flavor::Compatible));
             }
         }
         for (name, row) in l.table("provider") {
-            if matches!(name.as_str(), "openai" | "ollama" | "openrouter" | "github-copilot")
+            if matches!(name.as_str(), "openai" | "ollama" | "ollama-cloud" | "openrouter" | "github-copilot")
                 || row["protocol"].as_str() != Some(PROTOCOL.tag())
             {
                 continue;
@@ -329,7 +347,7 @@ impl Capability for OpenAiCompletions {
     fn build(_: (), cfg: CompletionsConfig) -> Result<Self, BuildError> {
         if cfg.routes.is_empty() {
             return Err(BuildError::Probe(
-                "no chat-completions route is configured; set an OpenAI key (`aho credential set openai`), enable Ollama (`aho set provider.ollama.enabled true`), or add a `provider.<name>` row with `protocol = \"openai-completions\"`".into(),
+                "no chat-completions route is configured; log in to a provider (`aho login --list`), enable Ollama (`aho set provider.ollama.enabled true`), or add a `provider.<name>` row with `protocol = \"openai-completions\"`".into(),
             ));
         }
         let client = http_client().map_err(BuildError::Probe)?;
@@ -352,8 +370,9 @@ declare_capability!(
         Requirement::Credential("openai"),
         Requirement::Credential("openrouter"),
         Requirement::Credential("github-copilot"),
+        Requirement::Credential("ollama-cloud"),
         Requirement::Setting { key: "provider.ollama.enabled", pred: Pred::True },
     ])],
     tools = &[],
-    doc = "Chat-completions routes `openai`, `ollama`, `openrouter`, custom protocol rows, and per-model native API dispatch for `github-copilot`; OAuth-aware auth."
+    doc = "Chat-completions routes `openai`, `ollama`, `ollama-cloud`, `openrouter`, custom protocol rows, and per-model native API dispatch for `github-copilot`; OAuth-aware auth."
 );

@@ -26,6 +26,14 @@ cd ~/your/project
 aho tui --profile coding                 # the terminal UI with the coding tool set
 ```
 
+Ollama Cloud works the same way; login prints a link to create a key, then you paste it:
+
+```sh
+aho login ollama-cloud                   # creates provider.ollama-cloud.key from a pasted key
+aho set model.provider ollama-cloud
+aho set model.name gemma4:31b
+```
+
 One-shot instead of interactive: `aho run --profile coding -p "fix the failing test"`.
 
 ## Tips

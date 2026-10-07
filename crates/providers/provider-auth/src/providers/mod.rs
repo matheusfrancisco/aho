@@ -1,10 +1,11 @@
 mod anthropic;
+mod api_key;
 mod codex;
 mod device;
 mod openrouter;
 mod radius;
 
-use crate::{AuthError, Credential, Engine, LoginOptions, LoginUi, Protocol, Provider, ResolvedAuth};
+use crate::{AuthError, Credential, Engine, LoginKind, LoginOptions, LoginUi, Protocol, Provider, ResolvedAuth};
 
 pub static PROVIDERS: &[Provider] = &[
     Provider {
@@ -12,34 +13,64 @@ pub static PROVIDERS: &[Provider] = &[
         name: "Anthropic (Claude Pro/Max)",
         protocol: Protocol::AnthropicMessages,
         default_base_url: "https://api.anthropic.com",
+        kind: LoginKind::OAuth,
     },
     Provider {
         id: "openai-codex",
         name: "OpenAI (ChatGPT Plus/Pro)",
         protocol: Protocol::OpenAiResponses,
         default_base_url: "https://chatgpt.com/backend-api/codex/responses",
+        kind: LoginKind::OAuth,
     },
     Provider {
         id: "github-copilot",
         name: "GitHub Copilot",
         protocol: Protocol::OpenAiCompletions,
         default_base_url: "https://api.individual.githubcopilot.com",
+        kind: LoginKind::OAuth,
     },
     Provider {
         id: "kimi-coding",
         name: "Kimi Coding",
         protocol: Protocol::AnthropicMessages,
         default_base_url: "https://api.kimi.com/coding",
+        kind: LoginKind::OAuth,
     },
-    Provider { id: "meta", name: "Meta", protocol: Protocol::OpenAiResponses, default_base_url: "https://api.meta.ai/v1/responses" },
+    Provider {
+        id: "meta",
+        name: "Meta",
+        protocol: Protocol::OpenAiResponses,
+        default_base_url: "https://api.meta.ai/v1/responses",
+        kind: LoginKind::OAuth,
+    },
     Provider {
         id: "openrouter",
         name: "OpenRouter",
         protocol: Protocol::OpenAiCompletions,
         default_base_url: "https://openrouter.ai/api/v1",
+        kind: LoginKind::OAuth,
     },
-    Provider { id: "radius", name: "Radius", protocol: Protocol::PiMessages, default_base_url: "https://radius.pi.dev" },
-    Provider { id: "xai", name: "xAI", protocol: Protocol::OpenAiResponses, default_base_url: "https://api.x.ai/v1/responses" },
+    Provider {
+        id: "radius",
+        name: "Radius",
+        protocol: Protocol::PiMessages,
+        default_base_url: "https://radius.pi.dev",
+        kind: LoginKind::OAuth,
+    },
+    Provider {
+        id: "xai",
+        name: "xAI",
+        protocol: Protocol::OpenAiResponses,
+        default_base_url: "https://api.x.ai/v1/responses",
+        kind: LoginKind::OAuth,
+    },
+    Provider {
+        id: "ollama-cloud",
+        name: "Ollama Cloud",
+        protocol: Protocol::OpenAiCompletions,
+        default_base_url: "https://ollama.com/v1",
+        kind: LoginKind::ApiKey { instructions_url: "https://ollama.com/settings/keys" },
+    },
 ];
 
 pub fn provider(id: &str) -> Option<&'static Provider> {
@@ -53,6 +84,7 @@ pub(crate) async fn login(id: &str, options: &LoginOptions, ui: &dyn LoginUi, en
         "openrouter" => openrouter::login(ui, engine).await,
         "github-copilot" | "kimi-coding" | "meta" | "xai" => device::login(id, options, ui, engine).await,
         "radius" => radius::login(options, ui, engine).await,
+        "ollama-cloud" => api_key::login(ui).await,
         _ => Err(AuthError::UnsupportedProvider),
     }
 }
@@ -64,12 +96,17 @@ pub(crate) async fn refresh(id: &str, credential: &Credential, engine: &Engine) 
         "openrouter" => Ok(credential.clone()),
         "github-copilot" | "kimi-coding" | "meta" | "xai" => device::refresh(id, credential, engine).await,
         "radius" => radius::refresh(credential, engine).await,
+        "ollama-cloud" => Ok(credential.clone()),
         _ => Err(AuthError::UnsupportedProvider),
     }
 }
 
 pub(crate) fn resolve(id: &str, credential: &Credential) -> Result<ResolvedAuth, AuthError> {
     match id {
+        // Pasted keys are not account grants, so no OAuth headers; openrouter keys are minted by OAuth and stay there.
+        "ollama-cloud" => {
+            return Ok(ResolvedAuth { token: credential.access_token.clone(), headers: Default::default(), base_url: None, oauth: false });
+        }
         "github-copilot" | "kimi-coding" | "meta" | "xai" => return device::resolve(id, credential),
         "radius" => return radius::resolve(credential),
         _ => {}
