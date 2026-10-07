@@ -96,7 +96,7 @@ fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)
-        .args(["-c", "user.name=aho", "-c", "user.email=aho@example.invalid"])
+        .args(["-c", "commit.gpgsign=false", "-c", "user.name=aho", "-c", "user.email=aho@example.invalid"])
         .args(args)
         .env_remove("GIT_DIR")
         .env_remove("GIT_WORK_TREE")

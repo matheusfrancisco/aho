@@ -76,11 +76,20 @@ async fn open_sh_send_echo_hi_and_the_screen_shows_hi() {
     assert_eq!(id, "t1");
     let sent = call(&t, "terminal_send", json!({"id": id, "text": "echo hi\n"})).await;
     assert_eq!(value(&sent)["sent_bytes"], json!(8));
-    let r = call(&t, "terminal_read", json!({"id": id, "wait_for": "^hi$"})).await;
+    // The bare `hi` of an unanchored regex matches the input echo row (`$ echo hi`) too; anchor
+    // the regex to hi's own row, or the prompt-merged one dash can produce (`$ hi`).
+    let r = call(&t, "terminal_read", json!({"id": id, "wait_for": r"(?m)^\$? ?hi$"})).await;
     let v = value(&r);
     assert_eq!(v["matched"], json!(true), "{}", text(&r));
-    assert!(v["screen"].as_str().unwrap().lines().any(|l| l.trim_end() == "hi"), "{}", text(&r));
-    assert!(v["output"].as_str().unwrap().lines().any(|l| l == "hi"));
+    assert!(
+        v["screen"].as_str().unwrap().lines().any(|l| {
+            let t = l.trim_end();
+            t == "hi" || t == "$ hi"
+        }),
+        "{}",
+        text(&r)
+    );
+    assert!(v["output"].as_str().unwrap().lines().any(|l| l == "hi" || l == "$ hi"));
     assert!(text(&r).contains("── screen 80x24"), "{}", text(&r));
     call(&t, "terminal_close", json!({"id": id})).await;
 }
@@ -91,10 +100,10 @@ async fn each_read_returns_only_the_output_since_the_previous_one() {
     let t = tool(dir.path());
     let id = open_sh(&t).await;
     call(&t, "terminal_send", json!({"id": id, "text": "echo first-$((1+1))\n"})).await;
-    let r1 = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "^first-2$"})).await);
+    let r1 = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "first-2"})).await);
     assert!(r1["output"].as_str().unwrap().contains("first-2"));
     call(&t, "terminal_send", json!({"id": id, "text": "echo second-$((2+2))\n"})).await;
-    let r2 = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "^second-4$"})).await);
+    let r2 = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "second-4"})).await);
     let out = r2["output"].as_str().unwrap();
     assert!(out.contains("second-4") && !out.contains("first-2"), "{out}");
     // nothing new: an immediate read has no output, but still shows the screen
@@ -129,7 +138,7 @@ async fn resize_changes_what_the_program_sees() {
     let r = call(&t, "terminal_resize", json!({"id": id, "cols": 100, "rows": 30})).await;
     assert_eq!(value(&r)["cols"], json!(100));
     call(&t, "terminal_send", json!({"id": id, "text": "stty size\n"})).await;
-    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "^30 100$"})).await);
+    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "30 100"})).await);
     assert_eq!((v["matched"].clone(), v["cols"].clone(), v["rows"].clone()), (json!(true), json!(100), json!(30)));
     let bad = call(&t, "terminal_resize", json!({"id": id, "cols": 5, "rows": 30})).await;
     assert!(text(&bad).starts_with("TOOL_BAD_ARGS"), "{}", text(&bad));
@@ -142,7 +151,7 @@ async fn close_kills_the_process_tree_and_forgets_the_terminal() {
     let t = tool(dir.path());
     let id = open_sh(&t).await;
     call(&t, "terminal_send", json!({"id": id, "text": "sleep 1000 & echo BG=$! \n"})).await;
-    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "^BG=[0-9]+$"})).await);
+    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "BG=[0-9]+"})).await);
     let out = v["output"].as_str().unwrap();
     let bg: u64 = out.lines().find_map(|l| l.strip_prefix("BG=")).and_then(|n| n.trim().parse().ok()).unwrap();
     let closed = call(&t, "terminal_close", json!({"id": id})).await;
@@ -163,7 +172,9 @@ async fn control_keys_interrupt_the_foreground_program() {
     tokio::time::sleep(Duration::from_millis(300)).await;
     call(&t, "terminal_send", json!({"id": id, "keys": ["C-c"]})).await;
     call(&t, "terminal_send", json!({"id": id, "text": "echo alive-$((3*3))", "keys": ["Enter"]})).await;
-    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "^alive-9$", "timeout_ms": 5000})).await);
+    // Not `^alive-9$`: dash draws its prompt before the command's output lands, so both share a
+    // screen row (`$ alive-9`) when the input was already buffered.
+    let v = value(&call(&t, "terminal_read", json!({"id": id, "wait_for": "alive-9", "timeout_ms": 5000})).await);
     assert_eq!(v["matched"], json!(true), "{}", v["screen"]);
     let bad = call(&t, "terminal_send", json!({"id": id, "keys": ["Hyper-q"]})).await;
     assert!(text(&bad).contains("`Hyper-q` is not a key name"), "{}", text(&bad));

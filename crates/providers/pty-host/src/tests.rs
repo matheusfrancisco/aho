@@ -56,13 +56,21 @@ async fn gone(pid: u32) -> bool {
     false
 }
 
+/// `42` on its own row, or merged into the shell's freshly drawn prompt row (`$ 42`): dash
+/// draws its prompt before a buffered command's output lands, so both share an emulator row
+/// (CI's /bin/sh is dash; the input is written before the first prompt is drawn).
+fn shows_the_output(l: &str) -> bool {
+    let t = l.trim();
+    t == "42" || t.strip_suffix("42").is_some_and(|r| r == "$" || r == "$ ")
+}
+
 #[tokio::test]
 async fn a_shell_runs_input_and_the_screen_and_transcript_show_its_output() {
     let dir = tempfile::tempdir().unwrap();
     let t = host(dir.path()).open(spec(&["/bin/sh"], Size::new(80, 24).unwrap())).await.unwrap();
     t.write(b"echo $((40 + 2))\n".to_vec()).await.unwrap();
-    let s = until(t.as_ref(), "42 on its own line", |s| s.screen.text.lines().any(|l| l.trim() == "42")).await;
-    assert!(s.delta.text.lines().any(|l| l == "42"), "{}", s.delta.text);
+    let s = until(t.as_ref(), "42 on its own line", |s| s.screen.text.lines().any(shows_the_output)).await;
+    assert!(s.delta.text.lines().any(shows_the_output), "{}", s.delta.text);
     assert_eq!(s.screen.size, Size { cols: 80, rows: 24 });
     assert!(s.exit.is_none());
     t.close().await.unwrap();

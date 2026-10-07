@@ -18,7 +18,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRATCH = Path('/Users/chico/m/projects/ai')
+SCRATCH = Path(os.environ.get('AHO_PROBE_SCRATCH', str(ROOT / 'target')))
 CASES = ('fs_alias', 'fs_function_pointer', 'file_open', 'path_metadata', 'process', 'network', 'environment', 'environment_iteration')
 
 

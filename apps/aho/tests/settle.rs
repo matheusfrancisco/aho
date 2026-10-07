@@ -86,7 +86,9 @@ fn print_mode_cancels_and_reports_jobs_still_running_at_the_settle_timeout() {
 
 #[test]
 fn lease_grant_jobs_records_a_jobs_lease_beside_the_vm_form() {
-    let p = project("echo built-ok", "The build printed built-ok.");
+    // The command only sleeps so the job cannot finish before its detach lands: an instant
+    // `echo` races the op table and usually returns its real output instead of the job notice.
+    let p = project("sleep 1; echo built-ok", "The build printed built-ok.");
     assert_eq!(aho(&p, &["run", "--script", "script.json", "-p", "go"]).status.code(), Some(0));
     let mixed = aho(&p, &["lease", "grant", "--jobs", "3", "--machines", "2"]);
     assert_eq!(mixed.status.code(), Some(1), "a jobs lease takes no VM terms: {}", text(&mixed.stderr));

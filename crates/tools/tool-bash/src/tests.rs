@@ -160,7 +160,9 @@ async fn bash_persistent_keeps_cwd_and_env_and_survives_errors() {
     assert_eq!(text(&run("pwd; echo $AHO_X").await), format!("{}/sub\n42\n", root.display()));
     let syntax = run("if then").await;
     assert!(text(&syntax).ends_with("[exit 2]"), "{}", text(&syntax));
-    assert!(text(&syntax).contains("syntax error"), "{}", text(&syntax));
+    // bash: "syntax error near unexpected token"; dash: `Syntax error: "then" unexpected`.
+    let lowered = text(&syntax).to_ascii_lowercase();
+    assert!(lowered.contains("syntax error"), "{}", text(&syntax));
     assert_eq!(text(&run("echo $AHO_X").await), "42\n", "a syntax error does not end the shell");
     assert_eq!(text(&run("echo 'it'\"'\"'s'").await), "it's\n");
     assert_eq!(text(&run("cat").await), "(no output)", "commands cannot read the protocol from stdin");

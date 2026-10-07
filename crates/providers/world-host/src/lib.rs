@@ -317,7 +317,10 @@ mod tests {
         let repo = tempfile::tempdir().unwrap();
         let home = tempfile::tempdir().unwrap();
         git(repo.path(), &["init", "-q"]);
-        git(repo.path(), &["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"]);
+        git(
+            repo.path(),
+            &["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "init"],
+        );
         let cfg = HostConfig { layout: Layout::Worktree, worktree: Some("s1".into()), ..HostConfig::in_place(repo.path(), home.path()) };
 
         let a = HostWorld::build((), cfg.clone()).unwrap();

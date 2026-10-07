@@ -209,15 +209,36 @@ struct Lines<'a> {
     sentinel: Option<String>,
     held_blank: bool,
     status: Option<i32>,
+    /// pwsh's stdin-script mode (`-NonInteractive -Command -`) brackets every read with the
+    /// DECCKM toggles `ESC[?1h`/`ESC[?1l`, attached to real output or standalone; through a
+    /// pipe they are console-keypad noise, so they are stripped before line processing.
+    strip_keypad_toggles: bool,
 }
 
 impl<'a> Lines<'a> {
     fn new(progress: Option<&'a Sender>, op: Option<(&'a OpTable, OpId)>, sentinel: Option<String>) -> Lines<'a> {
-        Lines { progress, op, partial: Vec::new(), out: HeadTail::new(), sentinel, held_blank: false, status: None }
+        Lines {
+            progress,
+            op,
+            partial: Vec::new(),
+            out: HeadTail::new(),
+            sentinel,
+            held_blank: false,
+            status: None,
+            strip_keypad_toggles: false,
+        }
     }
 
     fn feed(&mut self, bytes: &[u8]) {
+        let toggles = self.strip_keypad_toggles;
         for chunk in bytes.split_inclusive(|b| *b == b'\n') {
+            let cleaned;
+            let chunk: &[u8] = if toggles {
+                cleaned = Self::strip_toggle(chunk);
+                &cleaned
+            } else {
+                chunk
+            };
             if let Some(line) = chunk.strip_suffix(b"\n") {
                 self.partial.extend_from_slice(line);
                 let line = String::from_utf8_lossy(&std::mem::take(&mut self.partial)).into_owned();
@@ -230,6 +251,27 @@ impl<'a> Lines<'a> {
                 }
             }
         }
+    }
+
+    /// Drops DECCKM toggles (`ESC[?1h`/`ESC[?1l`), wherever they sit in the chunk, and returns
+    /// the chunk back when it holds none (the common case, no allocation).
+    fn strip_toggle(bytes: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+        const H: &[u8] = b"\x1b[?1h";
+        const L: &[u8] = b"\x1b[?1l";
+        let at = |i: usize| -> bool { i + 5 <= bytes.len() && (&bytes[i..i + 5] == H || &bytes[i..i + 5] == L) };
+        let Some(first) = (0..bytes.len().saturating_sub(4)).find(|&i| at(i)) else { return std::borrow::Cow::Borrowed(bytes) };
+        let mut clean = Vec::with_capacity(bytes.len());
+        clean.extend_from_slice(&bytes[..first]);
+        let mut i = first;
+        while i < bytes.len() {
+            if at(i) {
+                i += 5;
+            } else {
+                clean.push(bytes[i]);
+                i += 1;
+            }
+        }
+        std::borrow::Cow::Owned(clean)
     }
 
     fn line(&mut self, line: &str, newline: bool) {
@@ -446,6 +488,7 @@ impl ToolBash {
             t.attach_child(op, child.clone());
         }
         let mut lines = Lines::new(req.progress.as_ref(), op, None);
+        lines.strip_keypad_toggles = self.kind == ShellKind::Pwsh;
         // The world enforces the timeout; the local deadline is a backstop with a little slack.
         let deadline = tokio::time::Instant::now() + Duration::from_millis(a.timeout_ms) + Duration::from_secs(5);
         let (ended, _) = pump(child.as_ref(), 0, &mut lines, &req.cancel, deadline).await;
@@ -505,6 +548,7 @@ impl ToolBash {
             return proc_err(e);
         }
         let mut lines = Lines::new(req.progress.as_ref(), op, Some(sentinel));
+        lines.strip_keypad_toggles = self.kind == ShellKind::Pwsh;
         let deadline = tokio::time::Instant::now() + Duration::from_millis(a.timeout_ms);
         let (ended, cursor) = pump(shell.child.as_ref(), shell.cursor, &mut lines, &req.cancel, deadline).await;
         shell.cursor = cursor;
