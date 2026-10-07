@@ -137,8 +137,9 @@ impl HostSubprocess {
                 Ok(st) => Ok(exit_of(st)),
                 Err(e) => Err(ProcError::Io(format!("lost track of process {pid}: {e}"))),
             };
-            sup.exit_tx.send_replace(Some(result));
             let mut readers = readers;
+            // Drain before the exit broadcast: `wait` must imply `output` holds the whole stream,
+            // or a fast reader sees a truncated tail (an `echo` under CI load lost its line).
             let drained = tokio::time::timeout(DRAIN_GRACE, async {
                 for r in readers.iter_mut() {
                     let _ = r.await;
@@ -150,6 +151,7 @@ impl HostSubprocess {
                     r.abort();
                 }
             }
+            sup.exit_tx.send_replace(Some(result));
             *sup.stdin.lock().await = None;
             sup.done.store(true, Ordering::SeqCst);
             sup.out_tx.send_modify(|n| *n += 1);
